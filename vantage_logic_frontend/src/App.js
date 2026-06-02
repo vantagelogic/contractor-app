@@ -18,15 +18,15 @@ function App() {
 
   useEffect(() => {
     // When the page loads, fetch employees, jobs and cost codes
-    fetch("https://swiftness-barrel-chubby.ngrok-free.app/employees")
+    fetch("https://contractor-api-pi7o.onrender.com/employees")
       .then(res => res.json())
       .then(data => setEmployees(data));
 
-    fetch("https://swiftness-barrel-chubby.ngrok-free.app/jobs")
+    fetch("https://contractor-api-pi7o.onrender.com/jobs")
       .then(res => res.json())
       .then(data => setJobs(data));
 
-    fetch("https://swiftness-barrel-chubby.ngrok-free.app/cost-codes")
+    fetch("https://contractor-api-pi7o.onrender.com/cost-codes")
       .then(res => res.json())
       .then(data => setCostCodes(data));
   }, []);
@@ -39,7 +39,7 @@ function App() {
     e.preventDefault();
     const params = new URLSearchParams(formData);
     const response = await fetch(
-      `https://swiftness-barrel-chubby.ngrok-free.app/timesheets?${params}`,
+      `https://contractor-api-pi7o.onrender.com/timesheets?${params}`,
       {
         method: "POST",
       }
