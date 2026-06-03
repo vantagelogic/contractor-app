@@ -21,7 +21,7 @@ function Login({ onLogin }) {
 
     if (response.ok) {
       const data = await response.json();
-      onLogin(data.access_token);
+      onLogin(data.access_token, data.role);
     } else {
       setError("Incorrect email or password");
     }
@@ -145,17 +145,23 @@ function TimesheetForm({ token, onLogout }) {
 
 export default function App() {
   const [token, setToken] = useState(null);
+  const [role, setRole] = useState(null);
+  const [view, setView] = useState("timesheet");
 
-  function handleLogin(accessToken) {
+  function handleLogin(accessToken, userRole) {
     setToken(accessToken);
+    setRole(userRole);
   }
 
   function handleLogout() {
     setToken(null);
+    setRole(null);
+    setView("timesheet");
   }
 
   if (!token) return <Login onLogin={handleLogin} />;
-  return <TimesheetForm token={token} onLogout={handleLogout} />;
+  if (view === "admin") return <AdminScreen token={token} onLogout={handleLogout} onBack={() => setView("timesheet")} />;
+  return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} />;
 }
 
 const styles = {
