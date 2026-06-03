@@ -75,6 +75,12 @@ def require_owner(current_user: models.User = Depends(get_current_user)):
 def root():
     return {"message": "Vantage Logic API v2 is running"}
 
+@app.get("/debug/tables")
+def debug_tables(db: Session = Depends(get_db)):
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    return {"tables": inspector.get_table_names()}
+
 # =============================================
 # AUTH
 # =============================================
