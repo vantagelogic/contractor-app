@@ -8,10 +8,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import models
 
-# Create all tables
 models.Base.metadata.create_all(bind=engine)
 
-# Security config
 SECRET_KEY = "vantagelogic-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
@@ -75,12 +73,6 @@ def require_owner(current_user: models.User = Depends(get_current_user)):
 def root():
     return {"message": "Vantage Logic API v2 is running"}
 
-@app.get("/debug/tables")
-def debug_tables(db: Session = Depends(get_db)):
-    from sqlalchemy import inspect
-    inspector = inspect(engine)
-    return {"tables": inspector.get_table_names()}
-
 # =============================================
 # AUTH
 # =============================================
@@ -94,7 +86,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer", "role": user.role, "company_id": user.company_id}
 
 # =============================================
-# COMPANIES (you manage these manually)
+# COMPANIES
 # =============================================
 
 @app.post("/companies")
@@ -110,7 +102,7 @@ def get_companies(db: Session = Depends(get_db)):
     return db.query(models.Company).all()
 
 # =============================================
-# USERS (you create owner accounts manually)
+# USERS
 # =============================================
 
 @app.post("/users")
@@ -145,13 +137,23 @@ def get_me(current_user: models.User = Depends(get_current_user)):
 
 @app.get("/employees")
 def get_employees(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.Employee).filter(models.Employee.company_id == current_user.company_id).all()
+    return db.query(models.Employee).filter(
+        models.Employee.company_id == current_user.company_id,
+        models.Employee.active == True
+    ).all()
+
+@app.get("/employees/all")
+def get_all_employees(current_user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
+    return db.query(models.Employee).filter(
+        models.Employee.company_id == current_user.company_id
+    ).all()
 
 @app.post("/employees")
 def create_employee(
     first_name: str,
     last_name: str,
     role: str = None,
+    trade_level: str = None,
     hourly_rate: float = None,
     burden_rate: float = None,
     phone: str = None,
@@ -164,6 +166,7 @@ def create_employee(
         first_name=first_name,
         last_name=last_name,
         role=role,
+        trade_level=trade_level,
         hourly_rate=hourly_rate,
         burden_rate=burden_rate,
         phone=phone,
@@ -174,19 +177,58 @@ def create_employee(
     db.refresh(employee)
     return employee
 
+@app.patch("/employees/{employee_id}/deactivate")
+def deactivate_employee(
+    employee_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    employee = db.query(models.Employee).filter(
+        models.Employee.employee_id == employee_id,
+        models.Employee.company_id == current_user.company_id
+    ).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    employee.active = False
+    db.commit()
+    return {"message": f"{employee.first_name} {employee.last_name} deactivated"}
+
+@app.patch("/employees/{employee_id}/activate")
+def activate_employee(
+    employee_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    employee = db.query(models.Employee).filter(
+        models.Employee.employee_id == employee_id,
+        models.Employee.company_id == current_user.company_id
+    ).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    employee.active = True
+    db.commit()
+    return {"message": f"{employee.first_name} {employee.last_name} activated"}
+
 # =============================================
 # JOBS
 # =============================================
 
 @app.get("/jobs")
 def get_jobs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.Job).filter(models.Job.company_id == current_user.company_id).all()
+    return db.query(models.Job).filter(
+        models.Job.company_id == current_user.company_id
+    ).all()
 
 @app.post("/jobs")
 def create_job(
     job_name: str,
-    job_address: str = None,
+    street: str = None,
+    city: str = None,
+    province: str = None,
+    postal_code: str = None,
     contract_value: float = None,
+    budgeted_hours: float = None,
+    budgeted_materials_cost: float = None,
     notes: str = None,
     current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
@@ -194,8 +236,13 @@ def create_job(
     job = models.Job(
         company_id=current_user.company_id,
         job_name=job_name,
-        job_address=job_address,
+        street=street,
+        city=city,
+        province=province,
+        postal_code=postal_code,
         contract_value=contract_value,
+        budgeted_hours=budgeted_hours,
+        budgeted_materials_cost=budgeted_materials_cost,
         notes=notes
     )
     db.add(job)
@@ -203,13 +250,49 @@ def create_job(
     db.refresh(job)
     return job
 
+@app.patch("/jobs/{job_id}/status")
+def update_job_status(
+    job_id: int,
+    status: str,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    job = db.query(models.Job).filter(
+        models.Job.job_id == job_id,
+        models.Job.company_id == current_user.company_id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job.status = status
+    db.commit()
+    return {"message": f"Job status updated to {status}"}
+
+@app.patch("/jobs/{job_id}/deactivate")
+def deactivate_job(
+    job_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    job = db.query(models.Job).filter(
+        models.Job.job_id == job_id,
+        models.Job.company_id == current_user.company_id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job.status = "inactive"
+    db.commit()
+    return {"message": f"{job.job_name} deactivated"}
+
 # =============================================
 # COST CODES
 # =============================================
 
 @app.get("/cost-codes")
 def get_cost_codes(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.CostCode).filter(models.CostCode.company_id == current_user.company_id).all()
+    return db.query(models.CostCode).filter(
+        models.CostCode.company_id == current_user.company_id,
+        models.CostCode.active == True
+    ).all()
 
 @app.post("/cost-codes")
 def create_cost_code(
@@ -230,13 +313,31 @@ def create_cost_code(
     db.refresh(cost_code)
     return cost_code
 
+@app.patch("/cost-codes/{cost_code_id}/deactivate")
+def deactivate_cost_code(
+    cost_code_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    cc = db.query(models.CostCode).filter(
+        models.CostCode.cost_code_id == cost_code_id,
+        models.CostCode.company_id == current_user.company_id
+    ).first()
+    if not cc:
+        raise HTTPException(status_code=404, detail="Cost code not found")
+    cc.active = False
+    db.commit()
+    return {"message": f"{cc.code} deactivated"}
+
 # =============================================
 # TIMESHEETS
 # =============================================
 
 @app.get("/timesheets")
 def get_timesheets(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.Timesheet).filter(models.Timesheet.company_id == current_user.company_id).all()
+    return db.query(models.Timesheet).filter(
+        models.Timesheet.company_id == current_user.company_id
+    ).all()
 
 @app.post("/timesheets")
 def create_timesheet(
@@ -245,8 +346,8 @@ def create_timesheet(
     cost_code_id: int,
     shift_date: str,
     hours_worked: float,
+    overtime_hours: float = 0,
     field_notes: str = None,
-    material_needs: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -257,8 +358,8 @@ def create_timesheet(
         cost_code_id=cost_code_id,
         shift_date=shift_date,
         hours_worked=hours_worked,
-        field_notes=field_notes,
-        material_needs=material_needs
+        overtime_hours=overtime_hours,
+        field_notes=field_notes
     )
     db.add(timesheet)
     db.commit()
@@ -271,6 +372,93 @@ def create_timesheet(
 
 @app.get("/materials")
 def get_materials(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.Material).filter(models.Material.job_id.in_(
-        [j.job_id for j in db.query(models.Job).filter(models.Job.company_id == current_user.company_id).all()]
-    )).all()
+    return db.query(models.Material).filter(
+        models.Material.company_id == current_user.company_id
+    ).all()
+
+@app.post("/materials")
+def create_material(
+    job_id: int,
+    description: str,
+    cost_code_id: int = None,
+    purchased_by: int = None,
+    supplier: str = None,
+    quantity: float = None,
+    unit_cost: float = None,
+    total_cost: float = None,
+    purchase_date: str = None,
+    notes: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    material = models.Material(
+        company_id=current_user.company_id,
+        job_id=job_id,
+        cost_code_id=cost_code_id,
+        purchased_by=purchased_by,
+        description=description,
+        supplier=supplier,
+        quantity=quantity,
+        unit_cost=unit_cost,
+        total_cost=total_cost,
+        notes=notes
+    )
+    db.add(material)
+    db.commit()
+    db.refresh(material)
+    return material
+
+# =============================================
+# DASHBOARD
+# =============================================
+
+@app.get("/dashboard")
+def get_dashboard(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    jobs = db.query(models.Job).filter(
+        models.Job.company_id == current_user.company_id
+    ).all()
+
+    result = []
+    for job in jobs:
+        timesheets = db.query(models.Timesheet).filter(
+            models.Timesheet.job_id == job.job_id
+        ).all()
+        materials = db.query(models.Material).filter(
+            models.Material.job_id == job.job_id
+        ).all()
+
+        total_hours = sum(float(t.hours_worked or 0) for t in timesheets)
+        total_overtime = sum(float(t.overtime_hours or 0) for t in timesheets)
+        total_materials_cost = sum(float(m.total_cost or 0) for m in materials)
+
+        labour_cost = 0
+        for t in timesheets:
+            emp = db.query(models.Employee).filter(
+                models.Employee.employee_id == t.employee_id
+            ).first()
+            if emp and emp.burden_rate:
+                labour_cost += float(t.hours_worked or 0) * float(emp.burden_rate)
+            elif emp and emp.hourly_rate:
+                labour_cost += float(t.hours_worked or 0) * float(emp.hourly_rate)
+
+        total_cost = labour_cost + total_materials_cost
+        contract_value = float(job.contract_value or 0)
+        margin = contract_value - total_cost if contract_value else None
+
+        result.append({
+            "job_id": job.job_id,
+            "job_name": job.job_name,
+            "city": job.city,
+            "status": job.status,
+            "contract_value": contract_value,
+            "budgeted_hours": float(job.budgeted_hours or 0),
+            "total_hours": total_hours,
+            "total_overtime": total_overtime,
+            "labour_cost": round(labour_cost, 2),
+            "materials_cost": round(total_materials_cost, 2),
+            "total_cost": round(total_cost, 2),
+            "margin": round(margin, 2) if margin is not None else None,
+            "margin_percent": round((margin / contract_value) * 100, 1) if contract_value and margin is not None else None
+        })
+
+    return result
