@@ -241,6 +241,6 @@ const styles = {
   input: { padding: "12px", fontSize: "16px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
   textarea: { padding: "12px", fontSize: "16px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box", minHeight: "80px" },
   button: { marginTop: "16px", padding: "14px", fontSize: "16px", backgroundColor: "#1B3A5C", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
-  success: { color: "#2E6DA4", textAlign: "center", marginTop: "40px" }
+  success: { color: "#2E6DA4", textAlign: "center", marginTop: "40px" },
   sectionTitle: { fontSize: "18px", fontWeight: "bold", color: "#1B3A5C", marginTop: "24px", marginBottom: "8px" },
 };
