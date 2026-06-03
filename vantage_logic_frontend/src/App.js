@@ -21,7 +21,7 @@ function Login({ onLogin }) {
 
     if (response.ok) {
       const data = await response.json();
-      onLogin(data.access_token, data.role, data.company_id);
+      onLogin(data.access_token);
     } else {
       setError("Incorrect email or password");
     }
@@ -144,11 +144,9 @@ function TimesheetForm({ token }) {
 
 export default function App() {
   const [token, setToken] = useState(null);
-  const [role, setRole] = useState(null);
 
-  function handleLogin(accessToken, userRole) {
+  function handleLogin(accessToken) {
     setToken(accessToken);
-    setRole(userRole);
   }
 
   if (!token) return <Login onLogin={handleLogin} />;
