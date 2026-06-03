@@ -1,15 +1,25 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import get_db, engine
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 import models
 
-from fastapi.middleware.cors import CORSMiddleware
-
-# Create all tables if they don't exist
+# Create all tables
 models.Base.metadata.create_all(bind=engine)
 
-# Create the FastAPI app
-app = FastAPI(title="Vantage Logic API", version="1.0")
+# Security config
+SECRET_KEY = "vantagelogic-secret-key-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 480
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+app = FastAPI(title="Vantage Logic API", version="2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,51 +29,117 @@ app.add_middleware(
 )
 
 # =============================================
+# AUTH HELPERS
+# =============================================
+
+def verify_password(plain, hashed):
+    return pwd_context.verify(plain, hashed)
+
+def hash_password(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("user_id")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = db.query(models.User).filter(models.User.user_id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+def require_owner(current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner or admin access required")
+    return current_user
+
+# =============================================
 # HEALTH CHECK
 # =============================================
 
 @app.get("/")
 def root():
-    return {"message": "Vantage Logic API is running"}
+    return {"message": "Vantage Logic API v2 is running"}
 
 # =============================================
-# CLIENTS
+# AUTH
 # =============================================
 
-@app.get("/clients")
-def get_clients(db: Session = Depends(get_db)):
-    clients = db.query(models.Client).all()
-    return clients
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    token = create_access_token({"user_id": user.user_id, "company_id": user.company_id, "role": user.role})
+    return {"access_token": token, "token_type": "bearer", "role": user.role, "company_id": user.company_id}
 
-@app.post("/clients")
-def create_client(
-    company_name: str,
-    contact_name: str = None,
-    phone: str = None,
-    email: str = None,
-    address: str = None,
+# =============================================
+# COMPANIES (you manage these manually)
+# =============================================
+
+@app.post("/companies")
+def create_company(company_name: str, db: Session = Depends(get_db)):
+    company = models.Company(company_name=company_name)
+    db.add(company)
+    db.commit()
+    db.refresh(company)
+    return company
+
+@app.get("/companies")
+def get_companies(db: Session = Depends(get_db)):
+    return db.query(models.Company).all()
+
+# =============================================
+# USERS (you create owner accounts manually)
+# =============================================
+
+@app.post("/users")
+def create_user(
+    company_id: int,
+    email: str,
+    password: str,
+    role: str = "crew",
     db: Session = Depends(get_db)
 ):
-    client = models.Client(
-        company_name=company_name,
-        contact_name=contact_name,
-        phone=phone,
+    existing = db.query(models.User).filter(models.User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user = models.User(
+        company_id=company_id,
         email=email,
-        address=address
+        hashed_password=hash_password(password),
+        role=role
     )
-    db.add(client)
+    db.add(user)
     db.commit()
-    db.refresh(client)
-    return client
+    db.refresh(user)
+    return {"user_id": user.user_id, "email": user.email, "role": user.role}
+
+@app.get("/me")
+def get_me(current_user: models.User = Depends(get_current_user)):
+    return {"user_id": current_user.user_id, "email": current_user.email, "role": current_user.role, "company_id": current_user.company_id}
 
 # =============================================
 # EMPLOYEES
 # =============================================
 
 @app.get("/employees")
-def get_employees(db: Session = Depends(get_db)):
-    employees = db.query(models.Employee).all()
-    return employees
+def get_employees(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Employee).filter(models.Employee.company_id == current_user.company_id).all()
 
 @app.post("/employees")
 def create_employee(
@@ -74,9 +150,11 @@ def create_employee(
     burden_rate: float = None,
     phone: str = None,
     email: str = None,
+    current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
 ):
     employee = models.Employee(
+        company_id=current_user.company_id,
         first_name=first_name,
         last_name=last_name,
         role=role,
@@ -95,32 +173,21 @@ def create_employee(
 # =============================================
 
 @app.get("/jobs")
-def get_jobs(db: Session = Depends(get_db)):
-    jobs = db.query(models.Job).all()
-    return jobs
-
-@app.get("/jobs/{job_id}")
-def get_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.query(models.Job).filter(
-        models.Job.job_id == job_id
-    ).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job
+def get_jobs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Job).filter(models.Job.company_id == current_user.company_id).all()
 
 @app.post("/jobs")
 def create_job(
     job_name: str,
-    client_id: int = None,
     job_address: str = None,
     contract_value: float = None,
-    start_date: str = None,
     notes: str = None,
+    current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
 ):
     job = models.Job(
+        company_id=current_user.company_id,
         job_name=job_name,
-        client_id=client_id,
         job_address=job_address,
         contract_value=contract_value,
         notes=notes
@@ -131,13 +198,39 @@ def create_job(
     return job
 
 # =============================================
+# COST CODES
+# =============================================
+
+@app.get("/cost-codes")
+def get_cost_codes(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.CostCode).filter(models.CostCode.company_id == current_user.company_id).all()
+
+@app.post("/cost-codes")
+def create_cost_code(
+    code: str,
+    description: str,
+    category: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    cost_code = models.CostCode(
+        company_id=current_user.company_id,
+        code=code,
+        description=description,
+        category=category
+    )
+    db.add(cost_code)
+    db.commit()
+    db.refresh(cost_code)
+    return cost_code
+
+# =============================================
 # TIMESHEETS
 # =============================================
 
 @app.get("/timesheets")
-def get_timesheets(db: Session = Depends(get_db)):
-    timesheets = db.query(models.Timesheet).all()
-    return timesheets
+def get_timesheets(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Timesheet).filter(models.Timesheet.company_id == current_user.company_id).all()
 
 @app.post("/timesheets")
 def create_timesheet(
@@ -148,9 +241,11 @@ def create_timesheet(
     hours_worked: float,
     field_notes: str = None,
     material_needs: str = None,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     timesheet = models.Timesheet(
+        company_id=current_user.company_id,
         job_id=job_id,
         employee_id=employee_id,
         cost_code_id=cost_code_id,
@@ -165,63 +260,11 @@ def create_timesheet(
     return timesheet
 
 # =============================================
-# COST CODES
-# =============================================
-
-@app.get("/cost-codes")
-def get_cost_codes(db: Session = Depends(get_db)):
-    cost_codes = db.query(models.CostCode).all()
-    return cost_codes
-
-@app.post("/cost-codes")
-def create_cost_code(
-    code: str,
-    description: str,
-    category: str = None,
-    db: Session = Depends(get_db)
-):
-    cost_code = models.CostCode(
-        code=code,
-        description=description,
-        category=category
-    )
-    db.add(cost_code)
-    db.commit()
-    db.refresh(cost_code)
-    return cost_code
-
-# =============================================
 # MATERIALS
 # =============================================
 
 @app.get("/materials")
-def get_materials(db: Session = Depends(get_db)):
-    materials = db.query(models.Material).all()
-    return materials
-
-@app.post("/materials")
-def create_material(
-    job_id: int,
-    cost_code_id: int,
-    description: str,
-    quantity: float = None,
-    unit_cost: float = None,
-    total_cost: float = None,
-    logged_by: int = None,
-    notes: str = None,
-    db: Session = Depends(get_db)
-):
-    material = models.Material(
-        job_id=job_id,
-        cost_code_id=cost_code_id,
-        description=description,
-        quantity=quantity,
-        unit_cost=unit_cost,
-        total_cost=total_cost,
-        logged_by=logged_by,
-        notes=notes
-    )
-    db.add(material)
-    db.commit()
-    db.refresh(material)
-    return material
+def get_materials(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.Material).filter(models.Material.job_id.in_(
+        [j.job_id for j in db.query(models.Job).filter(models.Job.company_id == current_user.company_id).all()]
+    )).all()

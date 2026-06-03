@@ -3,21 +3,30 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from database import Base
 
-class Client(Base):
-    __tablename__ = "clients"
+class Company(Base):
+    __tablename__ = "companies"
 
-    client_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, primary_key=True, index=True)
     company_name = Column(String(255), nullable=False)
-    contact_name = Column(String(255))
-    phone = Column(String(50))
-    email = Column(String(255))
-    address = Column(Text)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+class User(Base):
+    __tablename__ = "users"
+
+    user_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    email = Column(String(255), nullable=False, unique=True)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default="crew")
+    active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Employee(Base):
     __tablename__ = "employees"
 
     employee_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     phone = Column(String(50))
@@ -32,6 +41,7 @@ class CostCode(Base):
     __tablename__ = "cost_codes"
 
     cost_code_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
     code = Column(String(50), nullable=False)
     description = Column(String(255), nullable=False)
     category = Column(String(100))
@@ -40,7 +50,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     job_id = Column(Integer, primary_key=True, index=True)
-    client_id = Column(Integer, ForeignKey("clients.client_id"))
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
     job_name = Column(String(255), nullable=False)
     job_address = Column(Text)
     status = Column(String(50), default="active")
@@ -63,6 +73,7 @@ class Timesheet(Base):
     __tablename__ = "timesheets"
 
     timesheet_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
     job_id = Column(Integer, ForeignKey("jobs.job_id"))
     employee_id = Column(Integer, ForeignKey("employees.employee_id"))
     cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"))
