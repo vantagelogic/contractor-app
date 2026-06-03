@@ -55,7 +55,7 @@ function Login({ onLogin }) {
   );
 }
 
-function TimesheetForm({ token }) {
+function TimesheetForm({ token, onLogout }) {
   const [formData, setFormData] = useState({
     employee_id: "", job_id: "", cost_code_id: "",
     shift_date: "", hours_worked: "", field_notes: "", material_needs: ""
@@ -137,6 +137,7 @@ function TimesheetForm({ token }) {
         <textarea style={styles.textarea} name="material_needs" placeholder="Any materials needed for tomorrow?" value={formData.material_needs} onChange={handleChange} />
 
         <button style={styles.button} type="submit">Submit Timesheet</button>
+        <button style={{...styles.button, backgroundColor: "#999", marginTop: "8px"}} type="button" onClick={onLogout}>Log Out</button>
       </form>
     </div>
   );
@@ -149,8 +150,12 @@ export default function App() {
     setToken(accessToken);
   }
 
+  function handleLogout() {
+    setToken(null);
+  }
+
   if (!token) return <Login onLogin={handleLogin} />;
-  return <TimesheetForm token={token} />;
+  return <TimesheetForm token={token} onLogout={handleLogout} />;
 }
 
 const styles = {
