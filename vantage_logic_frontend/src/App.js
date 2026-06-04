@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API = "https://contractor-api-pi7o.onrender.com";
+const API = "https://contractor-api-pi7o.onrender.com"; 
 
 const styles = {
   container: { maxWidth: "480px", margin: "0 auto", padding: "24px", fontFamily: "Arial, sans-serif", backgroundColor: "#f5f5f5", minHeight: "100vh" },
