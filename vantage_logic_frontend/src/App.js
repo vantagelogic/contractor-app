@@ -470,4 +470,3 @@ export default function App() {
   if (view === "materials") return <MaterialsForm token={token} onBack={() => setView("timesheet")} />;
   return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} onDashboard={() => setView("dashboard")} onMaterials={() => setView("materials")} />;
 }
-}
