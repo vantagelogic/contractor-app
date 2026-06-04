@@ -254,7 +254,63 @@ function Dashboard({ token, onLogout, onBack }) {
       {loading ? (
         <p style={{ color: "#666" }}>Loading...</p>
       ) : jobs.length === 0 ? (
-        <p style={{ color: "#666" }}>No job
+<p style={{ color: "#666" }}>No jobs yet.</p>
+      ) : (
+        jobs.map(job => {
+          const hasBudget = job.contract_value > 0;
+          const hoursPercent = job.budgeted_hours > 0 ? Math.min((job.total_hours / job.budgeted_hours) * 100, 100) : 0;
+          const isOverBudget = job.margin !== null && job.margin < 0;
+          return (
+            <div key={job.job_id} style={{...jobCard, borderLeft: `4px solid ${isOverBudget ? "#e53e3e" : "#2E6DA4"}`}}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontWeight: "bold", fontSize: "16px", color: "#1B3A5C" }}>{job.job_name}</div>
+                  <div style={{ fontSize: "13px", color: "#666", marginTop: "2px" }}>{job.city} · {job.status}</div>
+                </div>
+                {hasBudget && job.margin !== null && (
+                  <div style={{ backgroundColor: isOverBudget ? "#fff5f5" : "#f0fff4", color: isOverBudget ? "#e53e3e" : "#276749", padding: "4px 10px", borderRadius: "12px", fontSize: "13px", fontWeight: "bold" }}>
+                    {isOverBudget ? "Over Budget" : `${job.margin_percent}% margin`}
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: "12px", display: "flex", gap: "16px", fontSize: "13px", color: "#444" }}>
+                <span>⏱ {job.total_hours}h logged</span>
+                {job.budgeted_hours > 0 && <span>/ {job.budgeted_hours}h budgeted</span>}
+                <span>💰 ${job.labour_cost.toLocaleString()} labour</span>
+                {job.materials_cost > 0 && <span>🔧 ${job.materials_cost.toLocaleString()} materials</span>}
+              </div>
+              {job.budgeted_hours > 0 && (
+                <div style={{ marginTop: "10px" }}>
+                  <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Hours used: {hoursPercent.toFixed(0)}%</div>
+                  <div style={{ backgroundColor: "#e2e8f0", borderRadius: "4px", height: "8px" }}>
+                    <div style={{ width: `${hoursPercent}%`, height: "8px", borderRadius: "4px", backgroundColor: hoursPercent > 90 ? "#e53e3e" : hoursPercent > 70 ? "#dd6b20" : "#2E6DA4" }} />
+                  </div>
+                </div>
+              )}
+              {hasBudget && (
+                <div style={{ marginTop: "10px", fontSize: "13px", color: "#444" }}>
+                  <span>Contract: ${job.contract_value.toLocaleString()}</span>
+                  <span style={{ marginLeft: "16px" }}>Total cost: ${job.total_cost.toLocaleString()}</span>
+                  {job.margin !== null && (
+                    <span style={{ marginLeft: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>Margin: ${job.margin.toLocaleString()}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+      <div style={{ marginTop: "24px", display: "flex", gap: "8px" }}>
+        <button style={{...styles.button, backgroundColor: "#555", flex: 1}} onClick={onBack}>Back</button>
+        <button style={{...styles.button, backgroundColor: "#999", flex: 1}} onClick={onLogout}>Log Out</button>
+      </div>
+    </div>
+  );
+}
+const summaryCard = { flex: 1, backgroundColor: "#1B3A5C", color: "white", borderRadius: "8px", padding: "12px", textAlign: "center" };
+const summaryNumber = { fontSize: "20px", fontWeight: "bold" };
+const summaryLabel = { fontSize: "11px", opacity: 0.8, marginTop: "2px" };
+const jobCard = { backgroundColor: "white", borderRadius: "8px", padding: "16px", marginBottom: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" };
 
 export default function App() {
   const [token, setToken] = useState(null);
