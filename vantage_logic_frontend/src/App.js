@@ -15,11 +15,6 @@ const styles = {
   sectionTitle: { fontSize: "18px", fontWeight: "bold", color: "#1B3A5C", marginTop: "24px", marginBottom: "8px" },
 };
 
-const summaryCard = { flex: 1, backgroundColor: "#1B3A5C", color: "white", borderRadius: "8px", padding: "12px", textAlign: "center" };
-const summaryNumber = { fontSize: "20px", fontWeight: "bold" };
-const summaryLabel = { fontSize: "11px", opacity: 0.8, marginTop: "2px" };
-const jobCard = { backgroundColor: "white", borderRadius: "8px", padding: "16px", marginBottom: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" };
-
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -131,8 +126,6 @@ function TimesheetForm({ token, onLogout, role, onAdmin, onDashboard }) {
         <input style={styles.input} name="hours_worked" type="number" step="0.5" placeholder="e.g. 8.5" value={formData.hours_worked} onChange={handleChange} required />
         <label style={styles.label}>Field Notes</label>
         <textarea style={styles.textarea} name="field_notes" placeholder="What did you work on today?" value={formData.field_notes} onChange={handleChange} />
-        <label style={styles.label}>Material Needs</label>
-        <textarea style={styles.textarea} name="material_needs" placeholder="Any materials needed for tomorrow?" value={formData.material_needs} onChange={handleChange} />
         {(role === "owner" || role === "admin") && (
           <button style={{...styles.button, backgroundColor: "#2E6DA4", marginTop: "8px"}} type="button" onClick={onAdmin}>Admin Panel</button>
         )}
@@ -217,78 +210,113 @@ function Dashboard({ token, onLogout, onBack }) {
 
   const totalHours = jobs.reduce((sum, j) => sum + j.total_hours, 0);
   const totalLabour = jobs.reduce((sum, j) => sum + j.labour_cost, 0);
+  const totalMaterials = jobs.reduce((sum, j) => sum + j.materials_cost, 0);
   const totalRevenue = jobs.reduce((sum, j) => sum + j.contract_value, 0);
+  const totalCost = jobs.reduce((sum, j) => sum + j.total_cost, 0);
+  const totalMargin = totalRevenue - totalCost;
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Burn Rate Scoreboard</h1>
-      <p style={styles.subtitle}>Live job profitability</p>
-      <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
-        <div style={summaryCard}>
-          <div style={summaryNumber}>{totalHours.toFixed(1)}</div>
-          <div style={summaryLabel}>Total Hours</div>
-        </div>
-        <div style={summaryCard}>
-          <div style={summaryNumber}>${totalLabour.toLocaleString()}</div>
-          <div style={summaryLabel}>Labour Cost</div>
-        </div>
-        <div style={summaryCard}>
-          <div style={summaryNumber}>${totalRevenue.toLocaleString()}</div>
-          <div style={summaryLabel}>Contract Value</div>
+    <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f0f4f8", minHeight: "100vh", padding: "0" }}>
+      <div style={{ backgroundColor: "#1B3A5C", padding: "20px 24px 24px", color: "white" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 4px" }}>Burn Rate Scoreboard</h1>
+        <p style={{ fontSize: "13px", opacity: 0.7, margin: "0" }}>Live job profitability</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "20px" }}>
+          {[
+            { label: "Total Hours", value: totalHours.toFixed(1) },
+            { label: "Labour Cost", value: `$${totalLabour.toLocaleString()}` },
+            { label: "Materials", value: `$${totalMaterials.toLocaleString()}` },
+            { label: "Contract Value", value: `$${totalRevenue.toLocaleString()}` },
+            { label: "Total Cost", value: `$${totalCost.toLocaleString()}` },
+            { label: "Total Margin", value: `$${totalMargin.toLocaleString()}`, highlight: true, positive: totalMargin >= 0 },
+          ].map((item, i) => (
+            <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "#276749" : "#c53030") : "rgba(255,255,255,0.1)", borderRadius: "8px", padding: "10px", textAlign: "center" }}>
+              <div style={{ fontSize: item.highlight ? "16px" : "15px", fontWeight: "bold" }}>{item.value}</div>
+              <div style={{ fontSize: "10px", opacity: 0.8, marginTop: "2px" }}>{item.label}</div>
+            </div>
+          ))}
         </div>
       </div>
-      {loading ? (
-        <p style={{ color: "#666" }}>Loading...</p>
-      ) : jobs.length === 0 ? (
-        <p style={{ color: "#666" }}>No jobs yet.</p>
-      ) : (
-        jobs.map(job => {
-          const hasBudget = job.contract_value > 0;
-          const hoursPercent = job.budgeted_hours > 0 ? Math.min((job.total_hours / job.budgeted_hours) * 100, 100) : 0;
-          const isOverBudget = job.margin !== null && job.margin < 0;
-          return (
-            <div key={job.job_id} style={{...jobCard, borderLeft: `4px solid ${isOverBudget ? "#e53e3e" : "#2E6DA4"}`}}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <div style={{ fontWeight: "bold", fontSize: "16px", color: "#1B3A5C" }}>{job.job_name}</div>
-                  <div style={{ fontSize: "13px", color: "#666", marginTop: "2px" }}>{job.city} · {job.status}</div>
-                </div>
-                {hasBudget && job.margin !== null && (
-                  <div style={{ backgroundColor: isOverBudget ? "#fff5f5" : "#f0fff4", color: isOverBudget ? "#e53e3e" : "#276749", padding: "4px 10px", borderRadius: "12px", fontSize: "13px", fontWeight: "bold" }}>
-                    {isOverBudget ? "Over Budget" : `${job.margin_percent}% margin`}
+
+      <div style={{ padding: "16px" }}>
+        {loading ? (
+          <p style={{ color: "#666", textAlign: "center", marginTop: "40px" }}>Loading...</p>
+        ) : jobs.length === 0 ? (
+          <p style={{ color: "#666", textAlign: "center", marginTop: "40px" }}>No jobs yet.</p>
+        ) : (
+          jobs.map(job => {
+            const hasBudget = job.contract_value > 0;
+            const hoursPercent = job.budgeted_hours > 0 ? Math.min((job.total_hours / job.budgeted_hours) * 100, 100) : 0;
+            const isOverBudget = job.margin !== null && job.margin < 0;
+            const isTight = hoursPercent > 70 && hoursPercent <= 90;
+            const isOver = hoursPercent > 90;
+            const borderColor = isOverBudget || isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169";
+
+            return (
+              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "12px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `5px solid ${borderColor}` }}>
+                <div style={{ padding: "14px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                    <div>
+                      <div style={{ fontWeight: "bold", fontSize: "15px", color: "#1B3A5C" }}>{job.job_name}</div>
+                      <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
+                        {job.city && `${job.city} · `}
+                        <span style={{ backgroundColor: job.status === "active" ? "#ebf8f0" : "#f7f7f7", color: job.status === "active" ? "#276749" : "#666", padding: "1px 6px", borderRadius: "4px", fontSize: "11px" }}>
+                          {job.status}
+                        </span>
+                      </div>
+                    </div>
+                    {hasBudget && job.margin !== null && (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>
+                          {isOverBudget ? "-" : ""}${Math.abs(job.margin).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#888" }}>
+                          {isOverBudget ? "over budget" : `${job.margin_percent}% margin`}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div style={{ marginTop: "12px", display: "flex", gap: "16px", fontSize: "13px", color: "#444" }}>
-                <span>⏱ {job.total_hours}h logged</span>
-                {job.budgeted_hours > 0 && <span>/ {job.budgeted_hours}h budgeted</span>}
-                <span>💰 ${job.labour_cost.toLocaleString()} labour</span>
-                {job.materials_cost > 0 && <span>🔧 ${job.materials_cost.toLocaleString()} materials</span>}
-              </div>
-              {job.budgeted_hours > 0 && (
-                <div style={{ marginTop: "10px" }}>
-                  <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Hours used: {hoursPercent.toFixed(0)}%</div>
-                  <div style={{ backgroundColor: "#e2e8f0", borderRadius: "4px", height: "8px" }}>
-                    <div style={{ width: `${hoursPercent}%`, height: "8px", borderRadius: "4px", backgroundColor: hoursPercent > 90 ? "#e53e3e" : hoursPercent > 70 ? "#dd6b20" : "#2E6DA4" }} />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+                    {[
+                      { label: "Labour", value: `$${job.labour_cost.toLocaleString()}` },
+                      { label: "Materials", value: `$${job.materials_cost.toLocaleString()}` },
+                      { label: "Total Cost", value: `$${job.total_cost.toLocaleString()}` },
+                    ].map((item, i) => (
+                      <div key={i} style={{ backgroundColor: "#f7f9fc", borderRadius: "6px", padding: "8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "bold", color: "#1B3A5C" }}>{item.value}</div>
+                        <div style={{ fontSize: "10px", color: "#888", marginTop: "2px" }}>{item.label}</div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              )}
-              {hasBudget && (
-                <div style={{ marginTop: "10px", fontSize: "13px", color: "#444" }}>
-                  <span>Contract: ${job.contract_value.toLocaleString()}</span>
-                  <span style={{ marginLeft: "16px" }}>Total cost: ${job.total_cost.toLocaleString()}</span>
-                  {job.margin !== null && (
-                    <span style={{ marginLeft: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>Margin: ${job.margin.toLocaleString()}</span>
+
+                  {job.budgeted_hours > 0 && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#888", marginBottom: "4px" }}>
+                        <span>Hours: {job.total_hours}h of {job.budgeted_hours}h budgeted</span>
+                        <span style={{ color: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#666" }}>{hoursPercent.toFixed(0)}%</span>
+                      </div>
+                      <div style={{ backgroundColor: "#e2e8f0", borderRadius: "4px", height: "6px" }}>
+                        <div style={{ width: `${hoursPercent}%`, height: "6px", borderRadius: "4px", backgroundColor: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169", transition: "width 0.3s" }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {hasBudget && (
+                    <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666" }}>
+                      <span>Contract: ${job.contract_value.toLocaleString()}</span>
+                      {job.overtime_hours > 0 && <span style={{ color: "#dd6b20" }}>OT: {job.overtime_hours}h</span>}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })
-      )}
-      <div style={{ marginTop: "24px", display: "flex", gap: "8px" }}>
-        <button style={{...styles.button, backgroundColor: "#555", flex: 1}} onClick={onBack}>Back</button>
-        <button style={{...styles.button, backgroundColor: "#999", flex: 1}} onClick={onLogout}>Log Out</button>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div style={{ padding: "0 16px 24px", display: "flex", gap: "8px" }}>
+        <button style={{...styles.button, backgroundColor: "#555", flex: 1, marginTop: 0}} onClick={onBack}>Back</button>
+        <button style={{...styles.button, backgroundColor: "#999", flex: 1, marginTop: 0}} onClick={onLogout}>Log Out</button>
       </div>
     </div>
   );
