@@ -334,11 +334,11 @@ function Dashboard({ token, onLogout, onBack }) {
                       details[job.job_id].length === 0 ? (
                         <p style={{ fontSize: "12px", color: "#888" }}>No entries yet.</p>
                       ) : (
-                        details[job.job_id].map((t, i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9" }}>
+details[job.job_id].map((t, i) => (
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
                             <span style={{ fontWeight: "500" }}>{t.employee_name}</span>
-                            <span style={{ color: "#888" }}>{t.shift_date}</span>
-                            <span style={{ fontWeight: "bold", color: "#1B3A5C" }}>{t.hours_worked}h</span>
+                            <span style={{ color: "#888", textAlign: "center" }}>{t.shift_date}</span>
+                            <span style={{ fontWeight: "bold", color: "#1B3A5C", textAlign: "right" }}>{t.hours_worked}h</span>
                           </div>
                         ))
                       )
