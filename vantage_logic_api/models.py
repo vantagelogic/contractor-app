@@ -46,7 +46,6 @@ class CostCode(Base):
     code = Column(String(50), nullable=False)
     description = Column(String(255), nullable=False)
     category = Column(String(100))
-    active = Column(Boolean, default=True)
 
 class Job(Base):
     __tablename__ = "jobs"
