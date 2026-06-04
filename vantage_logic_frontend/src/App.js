@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API = "https://contractor-api-pi7o.onrender.com"; 
+const API = "https://contractor-api-pi7o.onrender.com";
 
 const styles = {
   container: { maxWidth: "480px", margin: "0 auto", padding: "24px", fontFamily: "Arial, sans-serif", backgroundColor: "#f5f5f5", minHeight: "100vh" },
@@ -54,7 +54,78 @@ function Login({ onLogin }) {
   );
 }
 
-function TimesheetForm({ token, onLogout, role, onAdmin, onDashboard }) {
+function MaterialsForm({ token, onBack }) {
+  const [formData, setFormData] = useState({
+    job_id: "", employee_id: "", supplier: "", description: "",
+    total_cost: "", purchase_date: "", notes: ""
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [employees, setEmployees] = useState([]);
+
+  useEffect(() => {
+    const headers = { Authorization: `Bearer ${token}` };
+    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(setJobs);
+    fetch(`${API}/employees`, { headers }).then(r => r.json()).then(setEmployees);
+  }, [token]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const params = new URLSearchParams(formData);
+    const response = await fetch(`${API}/materials?${params}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.ok) setSubmitted(true);
+  }
+
+  if (submitted) {
+    return (
+      <div style={styles.container}>
+        <h2 style={styles.success}>Materials Logged!</h2>
+        <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
+        <button style={{...styles.button, backgroundColor: "#555", marginTop: "8px"}} onClick={onBack}>Back</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Log Materials</h1>
+      <p style={styles.subtitle}>Record a material purchase</p>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <label style={styles.label}>Job</label>
+        <select style={styles.input} value={formData.job_id} onChange={e => setFormData({...formData, job_id: e.target.value})} required>
+          <option value="">Select Job</option>
+          {jobs.map(job => (
+            <option key={job.job_id} value={job.job_id}>{job.job_name}</option>
+          ))}
+        </select>
+        <label style={styles.label}>Purchased By</label>
+        <select style={styles.input} value={formData.employee_id} onChange={e => setFormData({...formData, employee_id: e.target.value})}>
+          <option value="">Select Employee</option>
+          {employees.map(emp => (
+            <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>
+          ))}
+        </select>
+        <label style={styles.label}>Supplier</label>
+        <input style={styles.input} placeholder="e.g. Home Depot" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} />
+        <label style={styles.label}>Description</label>
+        <input style={styles.input} placeholder="e.g. Copper fittings" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
+        <label style={styles.label}>Total Amount ($)</label>
+        <input style={styles.input} type="number" step="0.01" placeholder="e.g. 245.50" value={formData.total_cost} onChange={e => setFormData({...formData, total_cost: e.target.value})} required />
+        <label style={styles.label}>Purchase Date</label>
+        <input style={styles.input} type="date" value={formData.purchase_date} onChange={e => setFormData({...formData, purchase_date: e.target.value})} required />
+        <label style={styles.label}>Notes (optional)</label>
+        <textarea style={styles.textarea} placeholder="Any additional notes" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+        <button style={styles.button} type="submit">Log Materials</button>
+        <button style={{...styles.button, backgroundColor: "#555", marginTop: "8px"}} type="button" onClick={onBack}>Cancel</button>
+      </form>
+    </div>
+  );
+}
+
+function TimesheetForm({ token, onLogout, role, onAdmin, onDashboard, onMaterials }) {
   const [formData, setFormData] = useState({
     employee_id: "", job_id: "", cost_code_id: "",
     shift_date: "", hours_worked: "", field_notes: "", material_needs: ""
@@ -126,6 +197,7 @@ function TimesheetForm({ token, onLogout, role, onAdmin, onDashboard }) {
         <input style={styles.input} name="hours_worked" type="number" step="0.5" placeholder="e.g. 8.5" value={formData.hours_worked} onChange={handleChange} required />
         <label style={styles.label}>Field Notes</label>
         <textarea style={styles.textarea} name="field_notes" placeholder="What did you work on today?" value={formData.field_notes} onChange={handleChange} />
+        <button style={{...styles.button, backgroundColor: "#b7791f", marginTop: "16px"}} type="button" onClick={onMaterials}>Log Materials</button>
         {(role === "owner" || role === "admin") && (
           <button style={{...styles.button, backgroundColor: "#2E6DA4", marginTop: "8px"}} type="button" onClick={onAdmin}>Admin Panel</button>
         )}
@@ -334,7 +406,7 @@ function Dashboard({ token, onLogout, onBack }) {
                       details[job.job_id].length === 0 ? (
                         <p style={{ fontSize: "12px", color: "#888" }}>No entries yet.</p>
                       ) : (
-details[job.job_id].map((t, i) => (
+                        details[job.job_id].map((t, i) => (
                           <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
                             <span style={{ fontWeight: "500" }}>{t.employee_name}</span>
                             <span style={{ color: "#888", textAlign: "center" }}>{t.shift_date}</span>
@@ -380,5 +452,6 @@ export default function App() {
   if (!token) return <Login onLogin={handleLogin} />;
   if (view === "admin") return <AdminScreen token={token} onLogout={handleLogout} onBack={() => setView("timesheet")} />;
   if (view === "dashboard") return <Dashboard token={token} onLogout={handleLogout} onBack={() => setView("timesheet")} />;
-  return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} onDashboard={() => setView("dashboard")} />;
+  if (view === "materials") return <MaterialsForm token={token} onBack={() => setView("timesheet")} />;
+  return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} onDashboard={() => setView("dashboard")} onMaterials={() => setView("materials")} />;
 }
