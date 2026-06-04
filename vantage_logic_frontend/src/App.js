@@ -201,6 +201,8 @@ function AdminScreen({ token, onLogout, onBack }) {
 function Dashboard({ token, onLogout, onBack }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState({});
+  const [details, setDetails] = useState({});
 
   useEffect(() => {
     fetch(`${API}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
@@ -214,6 +216,18 @@ function Dashboard({ token, onLogout, onBack }) {
   const totalRevenue = jobs.reduce((sum, j) => sum + j.contract_value, 0);
   const totalCost = jobs.reduce((sum, j) => sum + j.total_cost, 0);
   const totalMargin = totalRevenue - totalCost;
+
+  async function toggleJob(job_id) {
+    const isOpen = expanded[job_id];
+    setExpanded({...expanded, [job_id]: !isOpen});
+    if (!isOpen && !details[job_id]) {
+      const res = await fetch(`${API}/jobs/${job_id}/timesheets`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setDetails({...details, [job_id]: data});
+    }
+  }
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f0f4f8", minHeight: "100vh", padding: "0" }}>
@@ -250,9 +264,10 @@ function Dashboard({ token, onLogout, onBack }) {
             const isTight = hoursPercent > 70 && hoursPercent <= 90;
             const isOver = hoursPercent > 90;
             const borderColor = isOverBudget || isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169";
+            const isExpanded = expanded[job.job_id];
 
             return (
-              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "12px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `5px solid ${borderColor}` }}>
+              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "12px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `5px solid ${borderColor}`, cursor: "pointer" }} onClick={() => toggleJob(job.job_id)}>
                 <div style={{ padding: "14px 16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
                     <div>
@@ -264,16 +279,19 @@ function Dashboard({ token, onLogout, onBack }) {
                         </span>
                       </div>
                     </div>
-                    {hasBudget && job.margin !== null && (
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>
-                          {isOverBudget ? "-" : ""}${Math.abs(job.margin).toLocaleString()}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {hasBudget && job.margin !== null && (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>
+                            {isOverBudget ? "-" : ""}${Math.abs(job.margin).toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#888" }}>
+                            {isOverBudget ? "over budget" : `${job.margin_percent}% margin`}
+                          </div>
                         </div>
-                        <div style={{ fontSize: "11px", color: "#888" }}>
-                          {isOverBudget ? "over budget" : `${job.margin_percent}% margin`}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                      <div style={{ fontSize: "16px", color: "#888" }}>{isExpanded ? "▲" : "▼"}</div>
+                    </div>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
@@ -308,6 +326,27 @@ function Dashboard({ token, onLogout, onBack }) {
                     </div>
                   )}
                 </div>
+
+                {isExpanded && (
+                  <div style={{ padding: "0 16px 14px", borderTop: "1px solid #f0f0f0" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "8px", paddingTop: "10px" }}>Timesheet Entries</div>
+                    {details[job.job_id] ? (
+                      details[job.job_id].length === 0 ? (
+                        <p style={{ fontSize: "12px", color: "#888" }}>No entries yet.</p>
+                      ) : (
+                        details[job.job_id].map((t, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9" }}>
+                            <span style={{ fontWeight: "500" }}>{t.employee_name}</span>
+                            <span style={{ color: "#888" }}>{t.shift_date}</span>
+                            <span style={{ fontWeight: "bold", color: "#1B3A5C" }}>{t.hours_worked}h</span>
+                          </div>
+                        ))
+                      )
+                    ) : (
+                      <p style={{ fontSize: "12px", color: "#888" }}>Loading...</p>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
