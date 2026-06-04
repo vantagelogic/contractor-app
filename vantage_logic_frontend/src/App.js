@@ -345,3 +345,7 @@ const styles = {
   success: { color: "#2E6DA4", textAlign: "center", marginTop: "40px" },
   sectionTitle: { fontSize: "18px", fontWeight: "bold", color: "#1B3A5C", marginTop: "24px", marginBottom: "8px" },
 };
+const summaryCard = { flex: 1, backgroundColor: "#1B3A5C", color: "white", borderRadius: "8px", padding: "12px", textAlign: "center" };
+const summaryNumber = { fontSize: "20px", fontWeight: "bold" };
+const summaryLabel = { fontSize: "11px", opacity: 0.8, marginTop: "2px" };
+const jobCard = { backgroundColor: "white", borderRadius: "8px", padding: "16px", marginBottom: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" };
