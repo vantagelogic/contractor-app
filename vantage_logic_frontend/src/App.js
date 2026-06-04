@@ -293,11 +293,14 @@ function Dashboard({ token, onLogout, onBack }) {
     const isOpen = expanded[job_id];
     setExpanded({...expanded, [job_id]: !isOpen});
     if (!isOpen && !details[job_id]) {
-      const res = await fetch(`${API}/jobs/${job_id}/timesheets`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setDetails({...details, [job_id]: data});
+      const headers = { Authorization: `Bearer ${token}` };
+      const [tsRes, matRes] = await Promise.all([
+        fetch(`${API}/jobs/${job_id}/timesheets`, { headers }),
+        fetch(`${API}/jobs/${job_id}/materials`, { headers })
+      ]);
+      const timesheets = await tsRes.json();
+      const materials = await matRes.json();
+      setDetails({...details, [job_id]: { timesheets, materials }});
     }
   }
 
@@ -403,10 +406,10 @@ function Dashboard({ token, onLogout, onBack }) {
                   <div style={{ padding: "0 16px 14px", borderTop: "1px solid #f0f0f0" }}>
                     <div style={{ fontSize: "12px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "8px", paddingTop: "10px" }}>Timesheet Entries</div>
                     {details[job.job_id] ? (
-                      details[job.job_id].length === 0 ? (
+                      details[job.job_id].timesheets.length === 0 ? (
                         <p style={{ fontSize: "12px", color: "#888" }}>No entries yet.</p>
                       ) : (
-                        details[job.job_id].map((t, i) => (
+                        details[job.job_id].timesheets.map((t, i) => (
                           <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
                             <span style={{ fontWeight: "500" }}>{t.employee_name}</span>
                             <span style={{ color: "#888", textAlign: "center" }}>{t.shift_date}</span>
@@ -416,6 +419,18 @@ function Dashboard({ token, onLogout, onBack }) {
                       )
                     ) : (
                       <p style={{ fontSize: "12px", color: "#888" }}>Loading...</p>
+                    )}
+                    {details[job.job_id] && details[job.job_id].materials.length > 0 && (
+                      <div style={{ marginTop: "12px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: "bold", color: "#b7791f", marginBottom: "8px" }}>Materials Purchased</div>
+                        {details[job.job_id].materials.map((m, i) => (
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
+                            <span style={{ fontWeight: "500" }}>{m.supplier || "Unknown"}</span>
+                            <span style={{ color: "#888", textAlign: "center" }}>{m.description}</span>
+                            <span style={{ fontWeight: "bold", color: "#b7791f", textAlign: "right" }}>${m.total_cost.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -454,4 +469,5 @@ export default function App() {
   if (view === "dashboard") return <Dashboard token={token} onLogout={handleLogout} onBack={() => setView("timesheet")} />;
   if (view === "materials") return <MaterialsForm token={token} onBack={() => setView("timesheet")} />;
   return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} onDashboard={() => setView("dashboard")} onMaterials={() => setView("materials")} />;
+}
 }
