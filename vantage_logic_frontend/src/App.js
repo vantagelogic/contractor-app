@@ -55,7 +55,7 @@ function Login({ onLogin }) {
   );
 }
 
-function TimesheetForm({ token, onLogout, role, onAdmin }) {
+function TimesheetForm({ token, onLogout, role, onAdmin, onDashboard }) {
   const [formData, setFormData] = useState({
     employee_id: "", job_id: "", cost_code_id: "",
     shift_date: "", hours_worked: "", field_notes: "", material_needs: ""
@@ -140,6 +140,10 @@ function TimesheetForm({ token, onLogout, role, onAdmin }) {
           <button style={{...styles.button, backgroundColor: "#2E6DA4", marginTop: "8px"}} type="button" onClick={onAdmin}>Admin Panel</button>
         )}
 
+        {(role === "owner" || role === "admin") && (
+          <button style={{...styles.button, backgroundColor: "#1a5c3a", marginTop: "8px"}} type="button" onClick={onDashboard}>Dashboard</button>
+        )}
+
         <button style={styles.button} type="submit">Submit Timesheet</button>
         <button style={{...styles.button, backgroundColor: "#999", marginTop: "8px"}} type="button" onClick={onLogout}>Log Out</button>
       </form>
@@ -211,6 +215,47 @@ function AdminScreen({ token, onLogout, onBack }) {
   );
 }
 
+function Dashboard({ token, onLogout, onBack }) {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API}/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => { setJobs(data); setLoading(false); });
+  }, [token]);
+
+  const totalHours = jobs.reduce((sum, j) => sum + j.total_hours, 0);
+  const totalLabour = jobs.reduce((sum, j) => sum + j.labour_cost, 0);
+  const totalRevenue = jobs.reduce((sum, j) => sum + j.contract_value, 0);
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Burn Rate Scoreboard</h1>
+      <p style={styles.subtitle}>Live job profitability</p>
+
+      <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+        <div style={summaryCard}>
+          <div style={summaryNumber}>{totalHours.toFixed(1)}</div>
+          <div style={summaryLabel}>Total Hours</div>
+        </div>
+        <div style={summaryCard}>
+          <div style={summaryNumber}>${totalLabour.toLocaleString()}</div>
+          <div style={summaryLabel}>Labour Cost</div>
+        </div>
+        <div style={summaryCard}>
+          <div style={summaryNumber}>${totalRevenue.toLocaleString()}</div>
+          <div style={summaryLabel}>Contract Value</div>
+        </div>
+      </div>
+
+      {loading ? (
+        <p style={{ color: "#666" }}>Loading...</p>
+      ) : jobs.length === 0 ? (
+        <p style={{ color: "#666" }}>No job
+
 export default function App() {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
@@ -227,10 +272,10 @@ export default function App() {
     setView("timesheet");
   }
 
-  if (!token) return <Login onLogin={handleLogin} />;
+if (!token) return <Login onLogin={handleLogin} />;
   if (view === "admin") return <AdminScreen token={token} onLogout={handleLogout} onBack={() => setView("timesheet")} />;
-  return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} />;
-}
+  if (view === "dashboard") return <Dashboard token={token} onLogout={handleLogout} onBack={() => setView("timesheet")} />;
+  return <TimesheetForm token={token} onLogout={handleLogout} role={role} onAdmin={() => setView("admin")} onDashboard={() => setView("dashboard")} />;
 
 const styles = {
   container: { maxWidth: "480px", margin: "0 auto", padding: "24px", fontFamily: "Arial, sans-serif", backgroundColor: "#f5f5f5", minHeight: "100vh" },
