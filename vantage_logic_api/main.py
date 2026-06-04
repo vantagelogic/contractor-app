@@ -290,8 +290,7 @@ def deactivate_job(
 @app.get("/cost-codes")
 def get_cost_codes(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(models.CostCode).filter(
-        models.CostCode.company_id == current_user.company_id,
-        models.CostCode.active == True
+        models.CostCode.company_id == current_user.company_id
     ).all()
 
 @app.post("/cost-codes")
