@@ -338,6 +338,32 @@ def get_timesheets(current_user: models.User = Depends(get_current_user), db: Se
         models.Timesheet.company_id == current_user.company_id
     ).all()
 
+@app.get("/jobs/{job_id}/timesheets")
+def get_job_timesheets(
+    job_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    timesheets = db.query(models.Timesheet).filter(
+        models.Timesheet.job_id == job_id,
+        models.Timesheet.company_id == current_user.company_id
+    ).all()
+    
+    result = []
+    for t in timesheets:
+        emp = db.query(models.Employee).filter(
+            models.Employee.employee_id == t.employee_id
+        ).first()
+        result.append({
+            "timesheet_id": t.timesheet_id,
+            "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "shift_date": str(t.shift_date),
+            "hours_worked": float(t.hours_worked),
+            "overtime_hours": float(t.overtime_hours or 0),
+            "field_notes": t.field_notes,
+        })
+    return result
+
 @app.post("/timesheets")
 def create_timesheet(
     job_id: int,
