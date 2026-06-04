@@ -364,6 +364,33 @@ def get_job_timesheets(
         })
     return result
 
+@app.get("/jobs/{job_id}/materials")
+def get_job_materials(
+    job_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    materials = db.query(models.Material).filter(
+        models.Material.job_id == job_id,
+        models.Material.company_id == current_user.company_id
+    ).all()
+    
+    result = []
+    for m in materials:
+        emp = db.query(models.Employee).filter(
+            models.Employee.employee_id == m.purchased_by
+        ).first()
+        result.append({
+            "material_id": m.material_id,
+            "supplier": m.supplier,
+            "description": m.description,
+            "total_cost": float(m.total_cost or 0),
+            "purchase_date": str(m.purchase_date),
+            "purchased_by": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "notes": m.notes,
+        })
+    return result
+
 @app.post("/timesheets")
 def create_timesheet(
     job_id: int,
