@@ -3,20 +3,35 @@ import { useState, useEffect } from "react";
 const API = "https://contractor-api-pi7o.onrender.com";
 
 const styles = {
-  container: { maxWidth: "480px", margin: "0 auto", padding: "24px", paddingTop: "80px", fontFamily: "Arial, sans-serif", backgroundColor: "#f5f5f5", minHeight: "100vh" },
-  title: { fontSize: "24px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "4px" },
-  subtitle: { fontSize: "14px", color: "#666", marginBottom: "24px" },
-  form: { display: "flex", flexDirection: "column", gap: "8px" },
-  label: { fontSize: "14px", fontWeight: "bold", color: "#333", marginTop: "8px" },
-  input: { padding: "12px", fontSize: "16px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
-  textarea: { padding: "12px", fontSize: "16px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box", minHeight: "80px" },
-  button: { marginTop: "16px", padding: "14px", fontSize: "16px", backgroundColor: "#1B3A5C", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
+  container: { maxWidth: "480px", margin: "0 auto", padding: "16px", paddingTop: "72px", fontFamily: "Arial, sans-serif", backgroundColor: "#f5f5f5", minHeight: "100vh" },
+  title: { fontSize: "22px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "4px" },
+  subtitle: { fontSize: "13px", color: "#666", marginBottom: "20px" },
+  form: { display: "flex", flexDirection: "column", gap: "6px" },
+  label: { fontSize: "13px", fontWeight: "bold", color: "#333", marginTop: "6px" },
+  input: { padding: "11px", fontSize: "15px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
+  textarea: { padding: "11px", fontSize: "15px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box", minHeight: "72px" },
+  button: { marginTop: "12px", padding: "13px", fontSize: "15px", backgroundColor: "#1B3A5C", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
   success: { color: "#2E6DA4", textAlign: "center", marginTop: "40px" },
-  sectionTitle: { fontSize: "18px", fontWeight: "bold", color: "#1B3A5C", marginTop: "24px", marginBottom: "8px" },
+  sectionTitle: { fontSize: "17px", fontWeight: "bold", color: "#1B3A5C", marginTop: "20px", marginBottom: "8px" },
 };
 
 function fmt(n) {
   return Number(n || 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getStoredAuth() {
+  try {
+    const token = localStorage.getItem("vl_token");
+    const role = localStorage.getItem("vl_role");
+    return { token, role };
+  } catch { return { token: null, role: null }; }
+}
+
+function setStoredAuth(token, role) {
+  try {
+    if (token) { localStorage.setItem("vl_token", token); localStorage.setItem("vl_role", role); }
+    else { localStorage.removeItem("vl_token"); localStorage.removeItem("vl_role"); }
+  } catch {}
 }
 
 function PasswordInput({ placeholder, value, onChange, required }) {
@@ -24,7 +39,7 @@ function PasswordInput({ placeholder, value, onChange, required }) {
   return (
     <div style={{ position: "relative" }}>
       <input
-        style={{...styles.input, paddingRight: "48px"}}
+        style={{...styles.input, paddingRight: "60px"}}
         type={show ? "text" : "password"}
         placeholder={placeholder || "Password"}
         value={value}
@@ -34,9 +49,9 @@ function PasswordInput({ placeholder, value, onChange, required }) {
       <button
         type="button"
         onClick={() => setShow(!show)}
-        style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "#888", padding: 0 }}
+        style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: "#2E6DA4", fontWeight: "bold", padding: 0 }}
       >
-        {show ? "🙈" : "👁"}
+        {show ? "Hide" : "Show"}
       </button>
     </div>
   );
@@ -53,11 +68,11 @@ function NavBar({ view, setView, role }) {
   ];
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, backgroundColor: "#1B3A5C", zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "10px 0 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, backgroundColor: "#1B3A5C", zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "8px 0 6px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
       {tabs.map(tab => (
         <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "4px 12px", borderRadius: "8px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent" }}>
-          <span style={{ fontSize: "20px" }}>{tab.icon}</span>
-          <span style={{ fontSize: "11px", color: view === tab.id ? "white" : "rgba(255,255,255,0.6)", fontWeight: view === tab.id ? "bold" : "normal" }}>{tab.label}</span>
+          <span style={{ fontSize: "18px" }}>{tab.icon}</span>
+          <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.6)", fontWeight: view === tab.id ? "bold" : "normal" }}>{tab.label}</span>
         </button>
       ))}
     </div>
@@ -68,11 +83,11 @@ function CollapsibleSection({ title, color, children }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ marginBottom: "10px", borderRadius: "10px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-      <div onClick={() => setOpen(!open)} style={{ backgroundColor: color || "#1B3A5C", color: "white", padding: "14px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: "bold", fontSize: "15px" }}>
+      <div onClick={() => setOpen(!open)} style={{ backgroundColor: color || "#1B3A5C", color: "white", padding: "13px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: "bold", fontSize: "14px" }}>
         <span>{title}</span>
         <span>{open ? "▲" : "▼"}</span>
       </div>
-      {open && <div style={{ backgroundColor: "white", padding: "16px" }}>{children}</div>}
+      {open && <div style={{ backgroundColor: "white", padding: "14px" }}>{children}</div>}
     </div>
   );
 }
@@ -102,21 +117,21 @@ function Login({ onLogin }) {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f0f4f8", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Arial, sans-serif" }}>
-      <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "40px", width: "100%", maxWidth: "420px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", margin: "24px" }}>
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ fontSize: "32px", marginBottom: "8px" }}>📊</div>
-          <h1 style={{ fontSize: "24px", fontWeight: "bold", color: "#1B3A5C", margin: "0 0 4px" }}>Vantage Logic</h1>
-          <p style={{ fontSize: "14px", color: "#888", margin: 0 }}>Field Management System</p>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "36px 32px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", margin: "24px" }}>
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
+          <div style={{ width: "56px", height: "56px", backgroundColor: "#1B3A5C", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: "24px" }}>📊</div>
+          <h1 style={{ fontSize: "22px", fontWeight: "bold", color: "#1B3A5C", margin: "0 0 4px" }}>Vantage Logic</h1>
+          <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>Field Management System</p>
         </div>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Email</label>
           <input style={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="your@email.com" />
           <label style={styles.label}>Password</label>
           <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {error && <p style={{ color: "red", fontSize: "14px", margin: "4px 0" }}>{error}</p>}
-          <button style={{...styles.button, marginTop: "24px"}} type="submit">Sign In</button>
+          {error && <p style={{ color: "red", fontSize: "13px", margin: "4px 0" }}>{error}</p>}
+          <button style={{...styles.button, marginTop: "20px"}} type="submit">Sign In</button>
         </form>
-        <p style={{ textAlign: "center", fontSize: "12px", color: "#aaa", marginTop: "24px" }}>Forgot your password? Contact your administrator.</p>
+        <p style={{ textAlign: "center", fontSize: "12px", color: "#aaa", marginTop: "20px" }}>Forgot your password? Contact your administrator.</p>
       </div>
     </div>
   );
@@ -354,7 +369,7 @@ function AdminScreen({ token }) {
   async function toggleEmployee(emp) {
     const endpoint = emp.active ? "deactivate" : "activate";
     const res = await fetch(`${API}/employees/${emp.employee_id}/${endpoint}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage(`${emp.first_name} ${emp.active ? "deactivated" : "activated"}`); refresh(); }
+    if (res.ok) { showMessage(`${emp.first_name} ${emp.active ? "archived" : "restored"}`); refresh(); }
   }
 
   async function setJobStatus(job, status) {
@@ -387,7 +402,7 @@ function AdminScreen({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Admin Panel</h1>
       <p style={styles.subtitle}>Manage your team and jobs</p>
-      {message && <p style={{ color: "#276749", fontWeight: "bold", marginBottom: "12px", backgroundColor: "#f0fff4", padding: "10px", borderRadius: "8px" }}>{message}</p>}
+      {message && <p style={{ color: "#276749", fontWeight: "bold", marginBottom: "12px", backgroundColor: "#f0fff4", padding: "10px", borderRadius: "8px", fontSize: "13px" }}>{message}</p>}
 
       <CollapsibleSection title="Employees" color="#1B3A5C">
         <p style={{ fontSize: "13px", fontWeight: "bold", color: "#333", marginBottom: "8px", marginTop: 0 }}>
@@ -406,9 +421,8 @@ function AdminScreen({ token }) {
         ) : (
           <button style={styles.button} onClick={addEmployee}>Add Employee</button>
         )}
-
         {activeEmps.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
+          <div style={{ marginTop: "14px" }}>
             <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Active Employees</p>
             {activeEmps.map(emp => (
               <div key={emp.employee_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
@@ -427,7 +441,6 @@ function AdminScreen({ token }) {
             ))}
           </div>
         )}
-
         {inactiveEmps.length > 0 && (
           <div style={{ marginTop: "8px" }}>
             <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: "#888", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
@@ -461,9 +474,8 @@ function AdminScreen({ token }) {
         ) : (
           <button style={styles.button} onClick={addJob}>Add Job</button>
         )}
-
         {activeJobs.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
+          <div style={{ marginTop: "14px" }}>
             <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Active Jobs</p>
             {activeJobs.map(job => (
               <div key={job.job_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
@@ -483,7 +495,6 @@ function AdminScreen({ token }) {
             ))}
           </div>
         )}
-
         {completedJobs.length > 0 && (
           <div style={{ marginTop: "8px" }}>
             <p style={{ fontSize: "12px", color: "#276749", marginBottom: "6px", fontWeight: "bold" }}>Completed ({completedJobs.length})</p>
@@ -497,7 +508,6 @@ function AdminScreen({ token }) {
             ))}
           </div>
         )}
-
         {inactiveJobs.length > 0 && (
           <div style={{ marginTop: "8px" }}>
             <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: "#888", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
@@ -531,7 +541,7 @@ function AdminScreen({ token }) {
           <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>
         )}
         {costCodes.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
+          <div style={{ marginTop: "14px" }}>
             <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Current Cost Codes</p>
             {costCodes.map(cc => (
               <div key={cc.cost_code_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
@@ -604,34 +614,34 @@ function Dashboard({ token }) {
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f0f4f8", minHeight: "100vh", paddingTop: "60px" }}>
-      <div style={{ backgroundColor: "#1B3A5C", padding: "24px", color: "white" }}>
-        <h1 style={{ fontSize: "22px", fontWeight: "bold", margin: "0 0 4px" }}>Burn Rate Scoreboard</h1>
-        <p style={{ fontSize: "14px", opacity: 0.7, margin: "0 0 16px" }}>Live job profitability</p>
-        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+      <div style={{ backgroundColor: "#1B3A5C", padding: "20px 16px", color: "white" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 2px" }}>Burn Rate Scoreboard</h1>
+        <p style={{ fontSize: "13px", opacity: 0.7, margin: "0 0 14px" }}>Live job profitability</p>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
           {["active", "completed", "all"].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{ padding: "6px 14px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "bold", backgroundColor: filter === f ? "white" : "rgba(255,255,255,0.15)", color: filter === f ? "#1B3A5C" : "white" }}>
+            <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 12px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "bold", backgroundColor: filter === f ? "white" : "rgba(255,255,255,0.15)", color: filter === f ? "#1B3A5C" : "white" }}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
           {[
             { label: "Total Hours", value: totalHours.toFixed(1) },
-            { label: "Labour Cost", value: `$${fmt(totalLabour)}` },
+            { label: "Labour", value: `$${fmt(totalLabour)}` },
             { label: "Materials", value: `$${fmt(totalMaterials)}` },
-            { label: "Contract Value", value: `$${fmt(totalRevenue)}` },
+            { label: "Contract", value: `$${fmt(totalRevenue)}` },
             { label: "Total Cost", value: `$${fmt(totalCost)}` },
-            { label: "Total Margin", value: `$${fmt(totalMargin)}`, highlight: true, positive: totalMargin >= 0 },
+            { label: "Margin", value: `$${fmt(totalMargin)}`, highlight: true, positive: totalMargin >= 0 },
           ].map((item, i) => (
-            <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "#276749" : "#c53030") : "rgba(255,255,255,0.12)", borderRadius: "10px", padding: "14px 10px", textAlign: "center" }}>
-              <div style={{ fontSize: "18px", fontWeight: "bold" }}>{item.value}</div>
-              <div style={{ fontSize: "12px", opacity: 0.8, marginTop: "4px" }}>{item.label}</div>
+            <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "#276749" : "#c53030") : "rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px 8px", textAlign: "center" }}>
+              <div style={{ fontSize: "15px", fontWeight: "bold" }}>{item.value}</div>
+              <div style={{ fontSize: "10px", opacity: 0.8, marginTop: "3px" }}>{item.label}</div>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: "16px", maxWidth: "900px", margin: "0 auto" }}>
+      <div style={{ padding: "12px", maxWidth: "900px", margin: "0 auto" }}>
         {loading ? (
           <p style={{ color: "#666", textAlign: "center", marginTop: "40px" }}>Loading...</p>
         ) : filteredJobs.length === 0 ? (
@@ -647,60 +657,60 @@ function Dashboard({ token }) {
             const isExpanded = expanded[job.job_id];
 
             return (
-              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "12px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `5px solid ${borderColor}`, cursor: "pointer" }} onClick={() => toggleJob(job.job_id)}>
-                <div style={{ padding: "16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "10px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `5px solid ${borderColor}`, cursor: "pointer" }} onClick={() => toggleJob(job.job_id)}>
+                <div style={{ padding: "14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
                     <div>
-                      <div style={{ fontWeight: "bold", fontSize: "16px", color: "#1B3A5C" }}>{job.job_name}</div>
-                      <div style={{ fontSize: "13px", color: "#888", marginTop: "3px" }}>
+                      <div style={{ fontWeight: "bold", fontSize: "15px", color: "#1B3A5C" }}>{job.job_name}</div>
+                      <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
                         {job.city && `${job.city} · `}
-                        <span style={{ backgroundColor: job.status === "completed" ? "#ebf8f0" : job.status === "active" ? "#ebf8f0" : "#f7f7f7", color: job.status === "completed" ? "#276749" : job.status === "active" ? "#276749" : "#666", padding: "2px 8px", borderRadius: "4px", fontSize: "12px" }}>
+                        <span style={{ backgroundColor: job.status === "completed" ? "#ebf8f0" : job.status === "active" ? "#ebf8f0" : "#f7f7f7", color: job.status === "completed" || job.status === "active" ? "#276749" : "#666", padding: "1px 6px", borderRadius: "4px", fontSize: "11px" }}>
                           {job.status}
                         </span>
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       {hasBudget && job.margin !== null && (
                         <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "18px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>
+                          <div style={{ fontSize: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>
                             {isOverBudget ? "-" : ""}${fmt(Math.abs(job.margin))}
                           </div>
-                          <div style={{ fontSize: "12px", color: "#888" }}>
+                          <div style={{ fontSize: "11px", color: "#888" }}>
                             {isOverBudget ? "over budget" : `${job.margin_percent}% margin`}
                           </div>
                         </div>
                       )}
-                      <div style={{ fontSize: "18px", color: "#888" }}>{isExpanded ? "▲" : "▼"}</div>
+                      <div style={{ fontSize: "16px", color: "#888" }}>{isExpanded ? "▲" : "▼"}</div>
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
                     {[
                       { label: "Labour", value: `$${fmt(job.labour_cost)}` },
                       { label: "Materials", value: `$${fmt(job.materials_cost)}` },
                       { label: "Total Cost", value: `$${fmt(job.total_cost)}` },
                     ].map((item, i) => (
-                      <div key={i} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px", textAlign: "center" }}>
-                        <div style={{ fontSize: "15px", fontWeight: "bold", color: "#1B3A5C" }}>{item.value}</div>
-                        <div style={{ fontSize: "11px", color: "#888", marginTop: "3px" }}>{item.label}</div>
+                      <div key={i} style={{ backgroundColor: "#f7f9fc", borderRadius: "6px", padding: "8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "bold", color: "#1B3A5C" }}>{item.value}</div>
+                        <div style={{ fontSize: "10px", color: "#888", marginTop: "2px" }}>{item.label}</div>
                       </div>
                     ))}
                   </div>
 
                   {job.budgeted_hours > 0 && (
                     <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#888", marginBottom: "5px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#888", marginBottom: "4px" }}>
                         <span>Hours: {job.total_hours}h of {job.budgeted_hours}h budgeted</span>
                         <span style={{ color: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#666", fontWeight: "bold" }}>{hoursPercent.toFixed(0)}%</span>
                       </div>
-                      <div style={{ backgroundColor: "#e2e8f0", borderRadius: "4px", height: "8px" }}>
-                        <div style={{ width: `${hoursPercent}%`, height: "8px", borderRadius: "4px", backgroundColor: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169" }} />
+                      <div style={{ backgroundColor: "#e2e8f0", borderRadius: "4px", height: "6px" }}>
+                        <div style={{ width: `${hoursPercent}%`, height: "6px", borderRadius: "4px", backgroundColor: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169" }} />
                       </div>
                     </div>
                   )}
 
                   {hasBudget && (
-                    <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#666" }}>
+                    <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666" }}>
                       <span>Contract: ${fmt(job.contract_value)}</span>
                       {job.overtime_hours > 0 && <span style={{ color: "#dd6b20" }}>OT: {job.overtime_hours}h</span>}
                     </div>
@@ -708,31 +718,31 @@ function Dashboard({ token }) {
                 </div>
 
                 {isExpanded && (
-                  <div style={{ padding: "0 16px 16px", borderTop: "1px solid #f0f0f0" }}>
-                    <div style={{ fontSize: "13px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "10px", paddingTop: "12px" }}>Timesheet Entries</div>
+                  <div style={{ padding: "0 14px 14px", borderTop: "1px solid #f0f0f0" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "8px", paddingTop: "10px" }}>Timesheet Entries</div>
                     {details[job.job_id] ? (
                       details[job.job_id].timesheets.length === 0 ? (
-                        <p style={{ fontSize: "13px", color: "#888" }}>No entries yet.</p>
+                        <p style={{ fontSize: "12px", color: "#888" }}>No entries yet.</p>
                       ) : (
                         details[job.job_id].timesheets.map((t, i) => (
-                          <div key={i} style={{ marginBottom: "8px", padding: "8px 10px", backgroundColor: "#f7f9fc", borderRadius: "8px" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "13px", color: "#444", alignItems: "center" }}>
+                          <div key={i} style={{ marginBottom: "6px", padding: "7px 10px", backgroundColor: "#f7f9fc", borderRadius: "6px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", alignItems: "center" }}>
                               <span style={{ fontWeight: "500" }}>{t.employee_name}</span>
                               <span style={{ color: "#888", textAlign: "center" }}>{t.shift_date}</span>
                               <span style={{ fontWeight: "bold", color: "#1B3A5C", textAlign: "right" }}>{t.hours_worked}h</span>
                             </div>
-                            {t.field_notes && <div style={{ fontSize: "12px", color: "#666", marginTop: "5px", fontStyle: "italic" }}>{t.field_notes}</div>}
+                            {t.field_notes && <div style={{ fontSize: "11px", color: "#666", marginTop: "4px", fontStyle: "italic" }}>{t.field_notes}</div>}
                           </div>
                         ))
                       )
                     ) : (
-                      <p style={{ fontSize: "13px", color: "#888" }}>Loading...</p>
+                      <p style={{ fontSize: "12px", color: "#888" }}>Loading...</p>
                     )}
                     {details[job.job_id] && details[job.job_id].materials.length > 0 && (
-                      <div style={{ marginTop: "14px" }}>
-                        <div style={{ fontSize: "13px", fontWeight: "bold", color: "#b7791f", marginBottom: "10px" }}>Materials Purchased</div>
+                      <div style={{ marginTop: "12px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: "bold", color: "#b7791f", marginBottom: "8px" }}>Materials Purchased</div>
                         {details[job.job_id].materials.map((m, i) => (
-                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "13px", color: "#444", padding: "6px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
                             <span style={{ fontWeight: "500" }}>{m.supplier || "Unknown"}</span>
                             <span style={{ color: "#888", textAlign: "center" }}>{m.description}</span>
                             <span style={{ fontWeight: "bold", color: "#b7791f", textAlign: "right" }}>${fmt(m.total_cost)}</span>
@@ -752,17 +762,20 @@ function Dashboard({ token }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState(null);
-  const [role, setRole] = useState(null);
+  const stored = getStoredAuth();
+  const [token, setToken] = useState(stored.token);
+  const [role, setRole] = useState(stored.role);
   const [view, setView] = useState("timesheet");
 
   function handleLogin(accessToken, userRole) {
+    setStoredAuth(accessToken, userRole);
     setToken(accessToken);
     setRole(userRole);
     setView("timesheet");
   }
 
   function handleLogout() {
+    setStoredAuth(null, null);
     setToken(null);
     setRole(null);
     setView("timesheet");
