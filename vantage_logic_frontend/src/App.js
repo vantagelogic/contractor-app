@@ -232,11 +232,12 @@ function AdminScreen({ token, onLogout, onBack }) {
   const [message, setMessage] = useState("");
   const [companyId, setCompanyId] = useState(null);
 
-  useEffect(() => {
-    fetch(`${API}/me`, { headers }).then(r => r.json()).then(data => setCompanyId(data.company_id));
-    fetch(`${API}/employees/all`, { headers }).then(r => r.json()).then(setEmployees);
-    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(setJobs);
-  }, []);
+useEffect(() => {
+    const h = { Authorization: `Bearer ${token}` };
+    fetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => setCompanyId(data.company_id));
+    fetch(`${API}/employees/all`, { headers: h }).then(r => r.json()).then(setEmployees);
+    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(setJobs);
+  }, [token]);
 
   async function addEmployee() {
     const params = new URLSearchParams(empForm);
