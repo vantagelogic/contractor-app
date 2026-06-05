@@ -308,10 +308,10 @@ function refresh() {
     else showMessage("Error adding cost code.");
   }
 
-  async function updateCostCode() {
+async function updateCostCode() {
     const params = new URLSearchParams(ccForm);
     const res = await fetch(`${API}/cost-codes/${editingCc.cost_code_id}?${params}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage("Cost code updated!"); setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }
+    if (res.ok) { showMessage("Cost code updated!"); setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); refresh(); }
     else showMessage("Error updating cost code.");
   }
 
