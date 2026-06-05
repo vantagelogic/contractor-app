@@ -209,6 +209,38 @@ def activate_employee(
     db.commit()
     return {"message": f"{employee.first_name} {employee.last_name} activated"}
 
+@app.patch("/employees/{employee_id}")
+def update_employee(
+    employee_id: int,
+    first_name: str = None,
+    last_name: str = None,
+    role: str = None,
+    trade_level: str = None,
+    hourly_rate: float = None,
+    burden_rate: float = None,
+    phone: str = None,
+    email: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    emp = db.query(models.Employee).filter(
+        models.Employee.employee_id == employee_id,
+        models.Employee.company_id == current_user.company_id
+    ).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    if first_name is not None: emp.first_name = first_name
+    if last_name is not None: emp.last_name = last_name
+    if role is not None: emp.role = role
+    if trade_level is not None: emp.trade_level = trade_level
+    if hourly_rate is not None: emp.hourly_rate = hourly_rate
+    if burden_rate is not None: emp.burden_rate = burden_rate
+    if phone is not None: emp.phone = phone
+    if email is not None: emp.email = email
+    db.commit()
+    db.refresh(emp)
+    return emp
+
 # =============================================
 # JOBS
 # =============================================
@@ -282,6 +314,40 @@ def deactivate_job(
     job.status = "inactive"
     db.commit()
     return {"message": f"{job.job_name} deactivated"}
+@app.patch("/jobs/{job_id}")
+def update_job(
+    job_id: int,
+    job_name: str = None,
+    city: str = None,
+    province: str = None,
+    street: str = None,
+    postal_code: str = None,
+    contract_value: float = None,
+    budgeted_hours: float = None,
+    budgeted_materials_cost: float = None,
+    notes: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    job = db.query(models.Job).filter(
+        models.Job.job_id == job_id,
+        models.Job.company_id == current_user.company_id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job_name is not None: job.job_name = job_name
+    if city is not None: job.city = city
+    if province is not None: job.province = province
+    if street is not None: job.street = street
+    if postal_code is not None: job.postal_code = postal_code
+    if contract_value is not None: job.contract_value = contract_value
+    if budgeted_hours is not None: job.budgeted_hours = budgeted_hours
+    if budgeted_materials_cost is not None: job.budgeted_materials_cost = budgeted_materials_cost
+    if notes is not None: job.notes = notes
+    db.commit()
+    db.refresh(job)
+    return job
+
 
 # =============================================
 # COST CODES
@@ -327,6 +393,28 @@ def deactivate_cost_code(
     cc.active = False
     db.commit()
     return {"message": f"{cc.code} deactivated"}
+
+@app.patch("/cost-codes/{cost_code_id}")
+def update_cost_code(
+    cost_code_id: int,
+    code: str = None,
+    description: str = None,
+    category: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    cc = db.query(models.CostCode).filter(
+        models.CostCode.cost_code_id == cost_code_id,
+        models.CostCode.company_id == current_user.company_id
+    ).first()
+    if not cc:
+        raise HTTPException(status_code=404, detail="Cost code not found")
+    if code is not None: cc.code = code
+    if description is not None: cc.description = description
+    if category is not None: cc.category = category
+    db.commit()
+    db.refresh(cc)
+    return cc
 
 # =============================================
 # TIMESHEETS
