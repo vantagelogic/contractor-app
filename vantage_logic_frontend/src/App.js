@@ -238,8 +238,9 @@ function TimesheetForm({ token, onLogout, role, onAdmin, onDashboard, onMaterial
 
 function AdminScreen({ token, onLogout, onBack }) {
   const headers = { Authorization: `Bearer ${token}` };
-  const [employees, setEmployees] = useState([]);
+const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [costCodes, setCostCodes] = useState([]);
   const [companyId, setCompanyId] = useState(null);
   const [message, setMessage] = useState("");
   const [editingEmp, setEditingEmp] = useState(null);
@@ -253,16 +254,18 @@ function AdminScreen({ token, onLogout, onBack }) {
   const [ccForm, setCcForm] = useState({ code: "", description: "", category: "" });
   const [loginForm, setLoginForm] = useState({ email: "", password: "", employee_role: "crew" });
 
-  useEffect(() => {
+useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
     fetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => setCompanyId(data.company_id));
     fetch(`${API}/employees/all`, { headers: h }).then(r => r.json()).then(setEmployees);
     fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(setJobs);
+    fetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
   }, [token]);
 
-  function refresh() {
+function refresh() {
     fetch(`${API}/employees/all`, { headers }).then(r => r.json()).then(setEmployees);
     fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(setJobs);
+    fetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
   }
 
   function showMessage(msg) {
@@ -340,6 +343,11 @@ function AdminScreen({ token, onLogout, onBack }) {
   function startEditJob(job) {
     setEditingJob(job);
     setJobForm({ job_name: job.job_name, city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" });
+  }
+
+function startEditCc(cc) {
+    setEditingCc(cc);
+    setCcForm({ code: cc.code, description: cc.description, category: cc.category || "" });
   }
 
   const activeEmps = employees.filter(e => e.active);
@@ -480,6 +488,23 @@ function AdminScreen({ token, onLogout, onBack }) {
           </div>
         ) : (
           <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>
+        )}
+{costCodes.length > 0 && (
+          <div style={{ marginTop: "16px" }}>
+            <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Current Cost Codes</p>
+            {costCodes.map(cc => (
+              <div key={cc.cost_code_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <span style={{ fontWeight: "500", fontSize: "13px" }}>{cc.code}</span>
+                    <span style={{ color: "#888", fontSize: "12px", marginLeft: "8px" }}>{cc.description}</span>
+                  </div>
+                  <button onClick={() => startEditCc(cc)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#e8f0fe", color: "#2E6DA4", fontWeight: "bold" }}>Edit</button>
+                </div>
+                {cc.category && <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>{cc.category}</div>}
+              </div>
+            ))}
+          </div>
         )}
       </CollapsibleSection>
 
