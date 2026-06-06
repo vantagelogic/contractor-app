@@ -2,17 +2,35 @@ import { useState, useEffect } from "react";
 
 const API = "https://contractor-api-pi7o.onrender.com";
 
+const theme = {
+  primary: "#1B3A5C",
+  primaryLight: "#2E6DA4",
+  accent: "#E8A020",
+  success: "#276749",
+  successLight: "#f0fff4",
+  danger: "#e53e3e",
+  dangerLight: "#fff5f5",
+  warning: "#dd6b20",
+  bg: "#F4F6F9",
+  card: "white",
+  border: "#E2E8F0",
+  textPrimary: "#1a202c",
+  textSecondary: "#718096",
+  textLight: "#A0AEC0",
+};
+
 const styles = {
-  container: { maxWidth: "480px", margin: "0 auto", padding: "16px", paddingTop: "72px", fontFamily: "Arial, sans-serif", backgroundColor: "#f5f5f5", minHeight: "100vh" },
-  title: { fontSize: "22px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "4px" },
-  subtitle: { fontSize: "13px", color: "#666", marginBottom: "20px" },
+  container: { maxWidth: "480px", margin: "0 auto", padding: "16px", paddingBottom: "80px", fontFamily: "'Segoe UI', Arial, sans-serif", backgroundColor: theme.bg, minHeight: "100vh" },
+  title: { fontSize: "22px", fontWeight: "700", color: theme.primary, marginBottom: "4px" },
+  subtitle: { fontSize: "13px", color: theme.textSecondary, marginBottom: "20px" },
   form: { display: "flex", flexDirection: "column", gap: "6px" },
-  label: { fontSize: "13px", fontWeight: "bold", color: "#333", marginTop: "6px" },
-  input: { padding: "11px", fontSize: "15px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
-  textarea: { padding: "11px", fontSize: "15px", borderRadius: "8px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box", minHeight: "72px" },
-  button: { marginTop: "12px", padding: "13px", fontSize: "15px", backgroundColor: "#1B3A5C", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
-  success: { color: "#2E6DA4", textAlign: "center", marginTop: "40px" },
-  sectionTitle: { fontSize: "17px", fontWeight: "bold", color: "#1B3A5C", marginTop: "20px", marginBottom: "8px" },
+  label: { fontSize: "13px", fontWeight: "600", color: theme.textPrimary, marginTop: "8px" },
+  input: { padding: "11px 14px", fontSize: "15px", borderRadius: "8px", border: `1px solid ${theme.border}`, width: "100%", boxSizing: "border-box", backgroundColor: "white", outline: "none" },
+  textarea: { padding: "11px 14px", fontSize: "15px", borderRadius: "8px", border: `1px solid ${theme.border}`, width: "100%", boxSizing: "border-box", minHeight: "72px", backgroundColor: "white" },
+  button: { marginTop: "12px", padding: "13px", fontSize: "15px", backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "700", letterSpacing: "0.3px" },
+  card: { backgroundColor: "white", borderRadius: "12px", padding: "16px", marginBottom: "12px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
+  success: { color: theme.primaryLight, textAlign: "center", marginTop: "40px", fontSize: "20px", fontWeight: "700" },
+  sectionTitle: { fontSize: "16px", fontWeight: "700", color: theme.primary, marginTop: "20px", marginBottom: "8px" },
 };
 
 function fmt(n) {
@@ -38,19 +56,8 @@ function PasswordInput({ placeholder, value, onChange, required }) {
   const [show, setShow] = useState(false);
   return (
     <div style={{ position: "relative" }}>
-      <input
-        style={{...styles.input, paddingRight: "60px"}}
-        type={show ? "text" : "password"}
-        placeholder={placeholder || "Password"}
-        value={value}
-        onChange={onChange}
-        required={required}
-      />
-      <button
-        type="button"
-        onClick={() => setShow(!show)}
-        style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: "#2E6DA4", fontWeight: "bold", padding: 0 }}
-      >
+      <input style={{...styles.input, paddingRight: "60px"}} type={show ? "text" : "password"} placeholder={placeholder || "Password"} value={value} onChange={onChange} required={required} />
+      <button type="button" onClick={() => setShow(!show)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: theme.primaryLight, fontWeight: "700", padding: 0 }}>
         {show ? "Hide" : "Show"}
       </button>
     </div>
@@ -68,11 +75,11 @@ function NavBar({ view, setView, role }) {
   ];
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, backgroundColor: "#1B3A5C", zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "8px 0 6px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+    <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primary, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "8px 0 10px", boxShadow: "0 -2px 10px rgba(0,0,0,0.15)" }}>
       {tabs.map(tab => (
-        <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "4px 12px", borderRadius: "8px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent" }}>
-          <span style={{ fontSize: "18px" }}>{tab.icon}</span>
-          <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.6)", fontWeight: view === tab.id ? "bold" : "normal" }}>{tab.label}</span>
+        <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "4px 16px", borderRadius: "8px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent" }}>
+          <span style={{ fontSize: "20px" }}>{tab.icon}</span>
+          <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.55)", fontWeight: view === tab.id ? "700" : "400" }}>{tab.label}</span>
         </button>
       ))}
     </div>
@@ -83,22 +90,66 @@ function CollapsibleSection({ title, color, children }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ marginBottom: "10px", borderRadius: "10px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-      <div onClick={() => setOpen(!open)} style={{ backgroundColor: color || "#1B3A5C", color: "white", padding: "13px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: "bold", fontSize: "14px" }}>
+      <div onClick={() => setOpen(!open)} style={{ backgroundColor: color || theme.primary, color: "white", padding: "13px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: "700", fontSize: "14px" }}>
         <span>{title}</span>
-        <span>{open ? "▲" : "▼"}</span>
+        <span style={{ fontSize: "12px" }}>{open ? "▲" : "▼"}</span>
       </div>
       {open && <div style={{ backgroundColor: "white", padding: "14px" }}>{children}</div>}
     </div>
   );
 }
 
-function Login({ onLogin }) {
+function OnboardingChecklist({ token, onDismiss }) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const [hasJob, setHasJob] = useState(false);
+  const [hasEmployee, setHasEmployee] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(data => setHasJob(data.length > 0));
+    fetch(`${API}/employees`, { headers }).then(r => r.json()).then(data => setHasEmployee(data.length > 0));
+  }, [token]);
+
+  const steps = [
+    { label: "Add your first job", done: hasJob, hint: "Go to Admin → Jobs" },
+    { label: "Add your first employee", done: hasEmployee, hint: "Go to Admin → Employees" },
+    { label: "Share the app link with your crew", done: false, hint: window.location.origin },
+  ];
+
+  const allDone = steps.every(s => s.done);
+
+  return (
+    <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "16px", marginBottom: "16px", border: `2px solid ${theme.accent}`, boxShadow: "0 2px 8px rgba(232,160,32,0.15)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <div>
+          <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary }}>Welcome to Vantage Logic</div>
+          <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>Complete these steps to get started</div>
+        </div>
+        {allDone && <button onClick={onDismiss} style={{ fontSize: "11px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer" }}>Dismiss</button>}
+      </div>
+      {steps.map((step, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "8px 0", borderBottom: i < steps.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+          <div style={{ width: "22px", height: "22px", borderRadius: "50%", backgroundColor: step.done ? theme.success : theme.border, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>
+            <span style={{ fontSize: "12px", color: "white", fontWeight: "700" }}>{step.done ? "✓" : i + 1}</span>
+          </div>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "600", color: step.done ? theme.textSecondary : theme.textPrimary, textDecoration: step.done ? "line-through" : "none" }}>{step.label}</div>
+            <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px" }}>{step.hint}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Login({ onLogin, onSignUp }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setLoading(true);
     const formData = new URLSearchParams();
     formData.append("username", email);
     formData.append("password", password);
@@ -107,6 +158,7 @@ function Login({ onLogin }) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formData,
     });
+    setLoading(false);
     if (response.ok) {
       const data = await response.json();
       onLogin(data.access_token, data.role);
@@ -116,32 +168,105 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f0f4f8", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Arial, sans-serif" }}>
-      <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "36px 32px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", margin: "24px" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "36px 32px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", margin: "24px" }}>
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div style={{ width: "56px", height: "56px", backgroundColor: "#1B3A5C", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: "24px" }}>📊</div>
-          <h1 style={{ fontSize: "22px", fontWeight: "bold", color: "#1B3A5C", margin: "0 0 4px" }}>Vantage Logic</h1>
-          <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>Field Management System</p>
+          <div style={{ width: "56px", height: "56px", backgroundColor: theme.primary, borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+            <span style={{ fontSize: "26px" }}>📊</span>
+          </div>
+          <h1 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, margin: "0 0 4px" }}>Vantage Logic</h1>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>Field Management for Trades</p>
         </div>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Email</label>
           <input style={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="your@email.com" />
           <label style={styles.label}>Password</label>
           <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {error && <p style={{ color: "red", fontSize: "13px", margin: "4px 0" }}>{error}</p>}
-          <button style={{...styles.button, marginTop: "20px"}} type="submit">Sign In</button>
+          {error && <p style={{ color: theme.danger, fontSize: "13px", margin: "4px 0" }}>{error}</p>}
+          <button style={{...styles.button, marginTop: "20px", opacity: loading ? 0.7 : 1}} type="submit" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
         </form>
-        <p style={{ textAlign: "center", fontSize: "12px", color: "#aaa", marginTop: "20px" }}>Forgot your password? Contact your administrator.</p>
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 8px" }}>Don't have an account?</p>
+          <button onClick={onSignUp} style={{ fontSize: "14px", color: theme.primaryLight, background: "none", border: `1px solid ${theme.primaryLight}`, borderRadius: "8px", padding: "8px 20px", cursor: "pointer", fontWeight: "600" }}>
+            Start Free Trial
+          </button>
+        </div>
+        <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "16px" }}>Forgot your password? Contact your administrator.</p>
+      </div>
+    </div>
+  );
+}
+
+function SignUp({ onLogin, onBack }) {
+  const [form, setForm] = useState({ company_name: "", email: "", password: "", confirm_password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (form.password !== form.confirm_password) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const params = new URLSearchParams({ company_name: form.company_name, email: form.email, password: form.password });
+    const response = await fetch(`${API}/signup?${params}`, { method: "POST" });
+    setLoading(false);
+    if (response.ok) {
+      const data = await response.json();
+      onLogin(data.access_token, data.role, true);
+    } else {
+      const data = await response.json();
+      setError(data.detail || "Sign up failed. Please try again.");
+    }
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "36px 32px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", margin: "24px" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <div style={{ width: "56px", height: "56px", backgroundColor: theme.primary, borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+            <span style={{ fontSize: "26px" }}>📊</span>
+          </div>
+          <h1 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, margin: "0 0 4px" }}>Start Your Free Trial</h1>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>30 days free — no credit card required</p>
+        </div>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <label style={styles.label}>Company Name</label>
+          <input style={styles.input} placeholder="e.g. Johnson Electrical" value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} required />
+          <label style={styles.label}>Your Email</label>
+          <input style={styles.input} type="email" placeholder="you@yourcompany.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required />
+          <label style={styles.label}>Password</label>
+          <PasswordInput placeholder="At least 8 characters" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required />
+          <label style={styles.label}>Confirm Password</label>
+          <PasswordInput placeholder="Confirm your password" value={form.confirm_password} onChange={e => setForm({...form, confirm_password: e.target.value})} required />
+          {error && <p style={{ color: theme.danger, fontSize: "13px", margin: "4px 0" }}>{error}</p>}
+          <button style={{...styles.button, marginTop: "20px", backgroundColor: theme.accent, opacity: loading ? 0.7 : 1}} type="submit" disabled={loading}>
+            {loading ? "Creating account..." : "Create Free Account"}
+          </button>
+        </form>
+        <div style={{ textAlign: "center", marginTop: "16px" }}>
+          <button onClick={onBack} style={{ fontSize: "13px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer" }}>
+            Already have an account? Sign in
+          </button>
+        </div>
+        <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "12px" }}>
+          By signing up you agree to our terms of service.
+        </p>
       </div>
     </div>
   );
 }
 
 function MaterialsForm({ token }) {
-  const [formData, setFormData] = useState({
-    job_id: "", employee_id: "", supplier: "", description: "",
-    total_cost: "", purchase_date: "", notes: ""
-  });
+  const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -155,18 +280,18 @@ function MaterialsForm({ token }) {
   async function handleSubmit(e) {
     e.preventDefault();
     const params = new URLSearchParams(formData);
-    const response = await fetch(`${API}/materials?${params}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await fetch(`${API}/materials?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
   if (submitted) {
     return (
       <div style={styles.container}>
-        <h2 style={styles.success}>Materials Logged!</h2>
-        <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
+        <div style={{ textAlign: "center", marginTop: "60px" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
+          <h2 style={{ fontSize: "20px", fontWeight: "700", color: theme.success }}>Materials Logged!</h2>
+          <button style={{...styles.button, marginTop: "24px"}} onClick={() => setSubmitted(false)}>Log Another</button>
+        </div>
       </div>
     );
   }
@@ -203,10 +328,7 @@ function MaterialsForm({ token }) {
 }
 
 function TimesheetForm({ token }) {
-  const [formData, setFormData] = useState({
-    employee_id: "", job_id: "", cost_code_id: "",
-    shift_date: "", hours_worked: "", field_notes: ""
-  });
+  const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: "", hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -219,25 +341,23 @@ function TimesheetForm({ token }) {
     fetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
   }, [token]);
 
-  function handleChange(e) {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  }
+  function handleChange(e) { setFormData({ ...formData, [e.target.name]: e.target.value }); }
 
   async function handleSubmit(e) {
     e.preventDefault();
     const params = new URLSearchParams(formData);
-    const response = await fetch(`${API}/timesheets?${params}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await fetch(`${API}/timesheets?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
   if (submitted) {
     return (
       <div style={styles.container}>
-        <h2 style={styles.success}>Timesheet Submitted!</h2>
-        <button style={styles.button} onClick={() => setSubmitted(false)}>Submit Another</button>
+        <div style={{ textAlign: "center", marginTop: "60px" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
+          <h2 style={{ fontSize: "20px", fontWeight: "700", color: theme.success }}>Timesheet Submitted!</h2>
+          <button style={{...styles.button, marginTop: "24px"}} onClick={() => setSubmitted(false)}>Submit Another</button>
+        </div>
       </div>
     );
   }
@@ -306,10 +426,7 @@ function AdminScreen({ token }) {
     fetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
   }
 
-  function showMessage(msg) {
-    setMessage(msg);
-    setTimeout(() => setMessage(""), 3000);
-  }
+  function showMessage(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
   async function addEmployee() {
     const params = new URLSearchParams(empForm);
@@ -355,10 +472,7 @@ function AdminScreen({ token }) {
 
   async function createLogin() {
     if (!companyId) return;
-    if (loginForm.password !== loginForm.confirm_password) {
-      setLoginError("Passwords do not match");
-      return;
-    }
+    if (loginForm.password !== loginForm.confirm_password) { setLoginError("Passwords do not match"); return; }
     setLoginError("");
     const params = new URLSearchParams({ company_id: companyId, email: loginForm.email, password: loginForm.password, role: loginForm.employee_role });
     const res = await fetch(`${API}/users?${params}`, { method: "POST" });
@@ -377,20 +491,9 @@ function AdminScreen({ token }) {
     if (res.ok) { showMessage(`${job.job_name} marked as ${status}`); refresh(); }
   }
 
-  function startEditEmp(emp) {
-    setEditingEmp(emp);
-    setEmpForm({ first_name: emp.first_name, last_name: emp.last_name, role: emp.role || "", hourly_rate: emp.hourly_rate || "", burden_rate: emp.burden_rate || "" });
-  }
-
-  function startEditJob(job) {
-    setEditingJob(job);
-    setJobForm({ job_name: job.job_name, city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" });
-  }
-
-  function startEditCc(cc) {
-    setEditingCc(cc);
-    setCcForm({ code: cc.code, description: cc.description, category: cc.category || "" });
-  }
+  function startEditEmp(emp) { setEditingEmp(emp); setEmpForm({ first_name: emp.first_name, last_name: emp.last_name, role: emp.role || "", hourly_rate: emp.hourly_rate || "", burden_rate: emp.burden_rate || "" }); }
+  function startEditJob(job) { setEditingJob(job); setJobForm({ job_name: job.job_name, city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" }); }
+  function startEditCc(cc) { setEditingCc(cc); setCcForm({ code: cc.code, description: cc.description, category: cc.category || "" }); }
 
   const activeEmps = employees.filter(e => e.active);
   const inactiveEmps = employees.filter(e => !e.active);
@@ -398,14 +501,16 @@ function AdminScreen({ token }) {
   const completedJobs = jobs.filter(j => j.status === "completed");
   const inactiveJobs = jobs.filter(j => j.status === "inactive");
 
+  const btnStyle = (color, text) => ({ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: color, color: text, fontWeight: "700" });
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Admin Panel</h1>
       <p style={styles.subtitle}>Manage your team and jobs</p>
-      {message && <p style={{ color: "#276749", fontWeight: "bold", marginBottom: "12px", backgroundColor: "#f0fff4", padding: "10px", borderRadius: "8px", fontSize: "13px" }}>{message}</p>}
+      {message && <div style={{ color: theme.success, fontWeight: "700", marginBottom: "12px", backgroundColor: theme.successLight, padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>{message}</div>}
 
-      <CollapsibleSection title="Employees" color="#1B3A5C">
-        <p style={{ fontSize: "13px", fontWeight: "bold", color: "#333", marginBottom: "8px", marginTop: 0 }}>
+      <CollapsibleSection title="👷 Employees" color={theme.primary}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: theme.textPrimary, marginBottom: "8px", marginTop: 0 }}>
           {editingEmp ? `Editing: ${editingEmp.first_name} ${editingEmp.last_name}` : "Add New Employee"}
         </p>
         <input style={styles.input} placeholder="First Name" value={empForm.first_name} onChange={e => setEmpForm({...empForm, first_name: e.target.value})} />
@@ -418,39 +523,38 @@ function AdminScreen({ token }) {
             <button style={{...styles.button, flex: 1}} onClick={updateEmployee}>Save Changes</button>
             <button style={{...styles.button, backgroundColor: "#999", flex: 1}} onClick={() => { setEditingEmp(null); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); }}>Cancel</button>
           </div>
-        ) : (
-          <button style={styles.button} onClick={addEmployee}>Add Employee</button>
-        )}
+        ) : <button style={styles.button} onClick={addEmployee}>Add Employee</button>}
+
         {activeEmps.length > 0 && (
           <div style={{ marginTop: "14px" }}>
-            <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Active Employees</p>
+            <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "6px" }}>Active Employees</p>
             {activeEmps.map(emp => (
-              <div key={emp.employee_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
+              <div key={emp.employee_id} style={{ backgroundColor: theme.bg, borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <span style={{ fontWeight: "500", fontSize: "13px" }}>{emp.first_name} {emp.last_name}</span>
-                    <span style={{ color: "#888", fontSize: "12px", marginLeft: "8px" }}>{emp.role}</span>
+                    <span style={{ fontWeight: "600", fontSize: "13px" }}>{emp.first_name} {emp.last_name}</span>
+                    <span style={{ color: theme.textSecondary, fontSize: "12px", marginLeft: "8px" }}>{emp.role}</span>
                   </div>
                   <div style={{ display: "flex", gap: "6px" }}>
-                    <button onClick={() => startEditEmp(emp)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#e8f0fe", color: "#2E6DA4", fontWeight: "bold" }}>Edit</button>
-                    <button onClick={() => toggleEmployee(emp)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#fff5f5", color: "#e53e3e", fontWeight: "bold" }}>Archive</button>
+                    <button onClick={() => startEditEmp(emp)} style={btnStyle("#e8f0fe", theme.primaryLight)}>Edit</button>
+                    <button onClick={() => toggleEmployee(emp)} style={btnStyle(theme.dangerLight, theme.danger)}>Archive</button>
                   </div>
                 </div>
-                <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>${emp.hourly_rate}/hr · Burden: ${emp.burden_rate}/hr</div>
+                <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px" }}>${emp.hourly_rate}/hr · Burden: ${emp.burden_rate}/hr</div>
               </div>
             ))}
           </div>
         )}
         {inactiveEmps.length > 0 && (
           <div style={{ marginTop: "8px" }}>
-            <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: "#888", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
               {showInactiveEmp ? "Hide" : "Show"} archived ({inactiveEmps.length})
             </button>
             {showInactiveEmp && inactiveEmps.map(emp => (
               <div key={emp.employee_id} style={{ backgroundColor: "#f7f7f7", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px", marginTop: "6px", opacity: 0.7 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: "500", fontSize: "13px", color: "#888" }}>{emp.first_name} {emp.last_name}</span>
-                  <button onClick={() => toggleEmployee(emp)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#f0fff4", color: "#276749", fontWeight: "bold" }}>Restore</button>
+                  <span style={{ fontWeight: "600", fontSize: "13px", color: theme.textSecondary }}>{emp.first_name} {emp.last_name}</span>
+                  <button onClick={() => toggleEmployee(emp)} style={btnStyle(theme.successLight, theme.success)}>Restore</button>
                 </div>
               </div>
             ))}
@@ -458,8 +562,8 @@ function AdminScreen({ token }) {
         )}
       </CollapsibleSection>
 
-      <CollapsibleSection title="Jobs" color="#2E6DA4">
-        <p style={{ fontSize: "13px", fontWeight: "bold", color: "#333", marginBottom: "8px", marginTop: 0 }}>
+      <CollapsibleSection title="🏗️ Jobs" color={theme.primaryLight}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: theme.textPrimary, marginBottom: "8px", marginTop: 0 }}>
           {editingJob ? `Editing: ${editingJob.job_name}` : "Add New Job"}
         </p>
         <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
@@ -471,38 +575,37 @@ function AdminScreen({ token }) {
             <button style={{...styles.button, flex: 1}} onClick={updateJob}>Save Changes</button>
             <button style={{...styles.button, backgroundColor: "#999", flex: 1}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
           </div>
-        ) : (
-          <button style={styles.button} onClick={addJob}>Add Job</button>
-        )}
+        ) : <button style={styles.button} onClick={addJob}>Add Job</button>}
+
         {activeJobs.length > 0 && (
           <div style={{ marginTop: "14px" }}>
-            <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Active Jobs</p>
+            <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "6px" }}>Active Jobs</p>
             {activeJobs.map(job => (
-              <div key={job.job_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
+              <div key={job.job_id} style={{ backgroundColor: theme.bg, borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
                   <div>
-                    <span style={{ fontWeight: "500", fontSize: "13px" }}>{job.job_name}</span>
-                    <span style={{ color: "#888", fontSize: "12px", marginLeft: "8px" }}>{job.city}</span>
+                    <span style={{ fontWeight: "600", fontSize: "13px" }}>{job.job_name}</span>
+                    <span style={{ color: theme.textSecondary, fontSize: "12px", marginLeft: "8px" }}>{job.city}</span>
                   </div>
                   <div style={{ display: "flex", gap: "6px" }}>
-                    <button onClick={() => startEditJob(job)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#e8f0fe", color: "#2E6DA4", fontWeight: "bold" }}>Edit</button>
-                    <button onClick={() => setJobStatus(job, "completed")} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#ebf8f0", color: "#276749", fontWeight: "bold" }}>Complete</button>
-                    <button onClick={() => setJobStatus(job, "inactive")} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#fff5f5", color: "#e53e3e", fontWeight: "bold" }}>Archive</button>
+                    <button onClick={() => startEditJob(job)} style={btnStyle("#e8f0fe", theme.primaryLight)}>Edit</button>
+                    <button onClick={() => setJobStatus(job, "completed")} style={btnStyle(theme.successLight, theme.success)}>Complete</button>
+                    <button onClick={() => setJobStatus(job, "inactive")} style={btnStyle(theme.dangerLight, theme.danger)}>Archive</button>
                   </div>
                 </div>
-                {job.contract_value && <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>${fmt(job.contract_value)} contract · {job.budgeted_hours}h budgeted</div>}
+                {job.contract_value && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px" }}>${fmt(job.contract_value)} contract · {job.budgeted_hours}h budgeted</div>}
               </div>
             ))}
           </div>
         )}
         {completedJobs.length > 0 && (
           <div style={{ marginTop: "8px" }}>
-            <p style={{ fontSize: "12px", color: "#276749", marginBottom: "6px", fontWeight: "bold" }}>Completed ({completedJobs.length})</p>
+            <p style={{ fontSize: "12px", color: theme.success, marginBottom: "6px", fontWeight: "700" }}>Completed ({completedJobs.length})</p>
             {completedJobs.map(job => (
-              <div key={job.job_id} style={{ backgroundColor: "#f0fff4", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
+              <div key={job.job_id} style={{ backgroundColor: theme.successLight, borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: "500", fontSize: "13px", color: "#276749" }}>{job.job_name}</span>
-                  <button onClick={() => setJobStatus(job, "active")} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#e8f0fe", color: "#2E6DA4", fontWeight: "bold" }}>Reactivate</button>
+                  <span style={{ fontWeight: "600", fontSize: "13px", color: theme.success }}>{job.job_name}</span>
+                  <button onClick={() => setJobStatus(job, "active")} style={btnStyle("#e8f0fe", theme.primaryLight)}>Reactivate</button>
                 </div>
               </div>
             ))}
@@ -510,14 +613,14 @@ function AdminScreen({ token }) {
         )}
         {inactiveJobs.length > 0 && (
           <div style={{ marginTop: "8px" }}>
-            <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: "#888", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
               {showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})
             </button>
             {showInactiveJob && inactiveJobs.map(job => (
               <div key={job.job_id} style={{ backgroundColor: "#f7f7f7", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px", marginTop: "6px", opacity: 0.7 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: "500", fontSize: "13px", color: "#888" }}>{job.job_name}</span>
-                  <button onClick={() => setJobStatus(job, "active")} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#f0fff4", color: "#276749", fontWeight: "bold" }}>Restore</button>
+                  <span style={{ fontWeight: "600", fontSize: "13px", color: theme.textSecondary }}>{job.job_name}</span>
+                  <button onClick={() => setJobStatus(job, "active")} style={btnStyle(theme.successLight, theme.success)}>Restore</button>
                 </div>
               </div>
             ))}
@@ -525,8 +628,8 @@ function AdminScreen({ token }) {
         )}
       </CollapsibleSection>
 
-      <CollapsibleSection title="Cost Codes" color="#744210">
-        <p style={{ fontSize: "13px", fontWeight: "bold", color: "#333", marginBottom: "8px", marginTop: 0 }}>
+      <CollapsibleSection title="🏷️ Cost Codes" color="#744210">
+        <p style={{ fontSize: "13px", fontWeight: "700", color: theme.textPrimary, marginBottom: "8px", marginTop: 0 }}>
           {editingCc ? `Editing: ${editingCc.code}` : "Add New Cost Code"}
         </p>
         <input style={styles.input} placeholder="Code (e.g. 001)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
@@ -537,40 +640,38 @@ function AdminScreen({ token }) {
             <button style={{...styles.button, flex: 1}} onClick={updateCostCode}>Save Changes</button>
             <button style={{...styles.button, backgroundColor: "#999", flex: 1}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
           </div>
-        ) : (
-          <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>
-        )}
+        ) : <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>}
         {costCodes.length > 0 && (
           <div style={{ marginTop: "14px" }}>
-            <p style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>Current Cost Codes</p>
+            <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "6px" }}>Current Cost Codes</p>
             {costCodes.map(cc => (
-              <div key={cc.cost_code_id} style={{ backgroundColor: "#f7f9fc", borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
+              <div key={cc.cost_code_id} style={{ backgroundColor: theme.bg, borderRadius: "8px", padding: "10px 12px", marginBottom: "6px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <span style={{ fontWeight: "500", fontSize: "13px" }}>{cc.code}</span>
-                    <span style={{ color: "#888", fontSize: "12px", marginLeft: "8px" }}>{cc.description}</span>
+                    <span style={{ fontWeight: "600", fontSize: "13px" }}>{cc.code}</span>
+                    <span style={{ color: theme.textSecondary, fontSize: "12px", marginLeft: "8px" }}>{cc.description}</span>
                   </div>
-                  <button onClick={() => startEditCc(cc)} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: "#e8f0fe", color: "#2E6DA4", fontWeight: "bold" }}>Edit</button>
+                  <button onClick={() => startEditCc(cc)} style={btnStyle("#e8f0fe", theme.primaryLight)}>Edit</button>
                 </div>
-                {cc.category && <div style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}>{cc.category}</div>}
+                {cc.category && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px" }}>{cc.category}</div>}
               </div>
             ))}
           </div>
         )}
       </CollapsibleSection>
 
-      <CollapsibleSection title="Create Crew Login" color="#276749">
-        <p style={{ fontSize: "13px", color: "#666", marginTop: 0, marginBottom: "8px" }}>Give a crew member access to the app</p>
+      <CollapsibleSection title="🔑 Create Crew Login" color={theme.success}>
+        <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "8px" }}>Give a crew member access to the app</p>
         <input style={styles.input} placeholder="Email" type="email" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
         <PasswordInput placeholder="Password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
         <PasswordInput placeholder="Confirm Password" value={loginForm.confirm_password} onChange={e => setLoginForm({...loginForm, confirm_password: e.target.value})} />
-        {loginError && <p style={{ color: "red", fontSize: "13px", margin: "4px 0" }}>{loginError}</p>}
+        {loginError && <p style={{ color: theme.danger, fontSize: "13px", margin: "4px 0" }}>{loginError}</p>}
         <select style={styles.input} value={loginForm.employee_role} onChange={e => setLoginForm({...loginForm, employee_role: e.target.value})}>
           <option value="crew">Crew</option>
           <option value="admin">Admin</option>
           <option value="owner">Owner</option>
         </select>
-        <button style={{...styles.button, backgroundColor: "#276749"}} onClick={createLogin}>Create Login</button>
+        <button style={{...styles.button, backgroundColor: theme.success}} onClick={createLogin}>Create Login</button>
       </CollapsibleSection>
     </div>
   );
@@ -613,13 +714,16 @@ function Dashboard({ token }) {
   }
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", backgroundColor: "#f0f4f8", minHeight: "100vh", paddingTop: "60px" }}>
-      <div style={{ backgroundColor: "#1B3A5C", padding: "20px 16px", color: "white" }}>
-        <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 2px" }}>Burn Rate Scoreboard</h1>
-        <p style={{ fontSize: "13px", opacity: 0.7, margin: "0 0 14px" }}>Live job profitability</p>
+    <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif", backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "80px" }}>
+      <div style={{ backgroundColor: theme.primary, padding: "20px 16px 24px", color: "white" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+          <span style={{ fontSize: "20px" }}>📊</span>
+          <h1 style={{ fontSize: "20px", fontWeight: "700", margin: 0 }}>Burn Rate Scoreboard</h1>
+        </div>
+        <p style={{ fontSize: "13px", opacity: 0.65, margin: "0 0 14px" }}>Vantage Logic · Live job profitability</p>
         <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
           {["active", "completed", "all"].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 12px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "bold", backgroundColor: filter === f ? "white" : "rgba(255,255,255,0.15)", color: filter === f ? "#1B3A5C" : "white" }}>
+            <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 14px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700", backgroundColor: filter === f ? "white" : "rgba(255,255,255,0.15)", color: filter === f ? theme.primary : "white" }}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
@@ -633,8 +737,8 @@ function Dashboard({ token }) {
             { label: "Total Cost", value: `$${fmt(totalCost)}` },
             { label: "Margin", value: `$${fmt(totalMargin)}`, highlight: true, positive: totalMargin >= 0 },
           ].map((item, i) => (
-            <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "#276749" : "#c53030") : "rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px 8px", textAlign: "center" }}>
-              <div style={{ fontSize: "15px", fontWeight: "bold" }}>{item.value}</div>
+            <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? theme.success : theme.danger) : "rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px 8px", textAlign: "center" }}>
+              <div style={{ fontSize: "14px", fontWeight: "700" }}>{item.value}</div>
               <div style={{ fontSize: "10px", opacity: 0.8, marginTop: "3px" }}>{item.label}</div>
             </div>
           ))}
@@ -643,9 +747,9 @@ function Dashboard({ token }) {
 
       <div style={{ padding: "12px", maxWidth: "900px", margin: "0 auto" }}>
         {loading ? (
-          <p style={{ color: "#666", textAlign: "center", marginTop: "40px" }}>Loading...</p>
+          <p style={{ color: theme.textSecondary, textAlign: "center", marginTop: "40px" }}>Loading...</p>
         ) : filteredJobs.length === 0 ? (
-          <p style={{ color: "#666", textAlign: "center", marginTop: "40px" }}>No {filter} jobs.</p>
+          <p style={{ color: theme.textSecondary, textAlign: "center", marginTop: "40px" }}>No {filter} jobs.</p>
         ) : (
           filteredJobs.map(job => {
             const hasBudget = job.contract_value > 0;
@@ -653,18 +757,18 @@ function Dashboard({ token }) {
             const isOverBudget = job.margin !== null && job.margin < 0;
             const isTight = hoursPercent > 70 && hoursPercent <= 90;
             const isOver = hoursPercent > 90;
-            const borderColor = job.status === "completed" ? "#276749" : isOverBudget || isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169";
+            const borderColor = job.status === "completed" ? theme.success : isOverBudget || isOver ? theme.danger : isTight ? theme.warning : theme.success;
             const isExpanded = expanded[job.job_id];
 
             return (
-              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "10px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderLeft: `5px solid ${borderColor}`, cursor: "pointer" }} onClick={() => toggleJob(job.job_id)}>
+              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "10px", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", borderLeft: `5px solid ${borderColor}`, cursor: "pointer" }} onClick={() => toggleJob(job.job_id)}>
                 <div style={{ padding: "14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
                     <div>
-                      <div style={{ fontWeight: "bold", fontSize: "15px", color: "#1B3A5C" }}>{job.job_name}</div>
-                      <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
+                      <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary }}>{job.job_name}</div>
+                      <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>
                         {job.city && `${job.city} · `}
-                        <span style={{ backgroundColor: job.status === "completed" ? "#ebf8f0" : job.status === "active" ? "#ebf8f0" : "#f7f7f7", color: job.status === "completed" || job.status === "active" ? "#276749" : "#666", padding: "1px 6px", borderRadius: "4px", fontSize: "11px" }}>
+                        <span style={{ backgroundColor: job.status === "active" || job.status === "completed" ? theme.successLight : "#f7f7f7", color: job.status === "active" || job.status === "completed" ? theme.success : "#666", padding: "1px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: "600" }}>
                           {job.status}
                         </span>
                       </div>
@@ -672,15 +776,15 @@ function Dashboard({ token }) {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       {hasBudget && job.margin !== null && (
                         <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "16px", fontWeight: "bold", color: isOverBudget ? "#e53e3e" : "#276749" }}>
+                          <div style={{ fontSize: "16px", fontWeight: "700", color: isOverBudget ? theme.danger : theme.success }}>
                             {isOverBudget ? "-" : ""}${fmt(Math.abs(job.margin))}
                           </div>
-                          <div style={{ fontSize: "11px", color: "#888" }}>
+                          <div style={{ fontSize: "11px", color: theme.textSecondary }}>
                             {isOverBudget ? "over budget" : `${job.margin_percent}% margin`}
                           </div>
                         </div>
                       )}
-                      <div style={{ fontSize: "16px", color: "#888" }}>{isExpanded ? "▲" : "▼"}</div>
+                      <div style={{ fontSize: "14px", color: theme.textLight }}>{isExpanded ? "▲" : "▼"}</div>
                     </div>
                   </div>
 
@@ -690,62 +794,60 @@ function Dashboard({ token }) {
                       { label: "Materials", value: `$${fmt(job.materials_cost)}` },
                       { label: "Total Cost", value: `$${fmt(job.total_cost)}` },
                     ].map((item, i) => (
-                      <div key={i} style={{ backgroundColor: "#f7f9fc", borderRadius: "6px", padding: "8px", textAlign: "center" }}>
-                        <div style={{ fontSize: "13px", fontWeight: "bold", color: "#1B3A5C" }}>{item.value}</div>
-                        <div style={{ fontSize: "10px", color: "#888", marginTop: "2px" }}>{item.label}</div>
+                      <div key={i} style={{ backgroundColor: theme.bg, borderRadius: "6px", padding: "8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{item.value}</div>
+                        <div style={{ fontSize: "10px", color: theme.textSecondary, marginTop: "2px" }}>{item.label}</div>
                       </div>
                     ))}
                   </div>
 
                   {job.budgeted_hours > 0 && (
                     <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#888", marginBottom: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textSecondary, marginBottom: "4px" }}>
                         <span>Hours: {job.total_hours}h of {job.budgeted_hours}h budgeted</span>
-                        <span style={{ color: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#666", fontWeight: "bold" }}>{hoursPercent.toFixed(0)}%</span>
+                        <span style={{ color: isOver ? theme.danger : isTight ? theme.warning : theme.textSecondary, fontWeight: "700" }}>{hoursPercent.toFixed(0)}%</span>
                       </div>
-                      <div style={{ backgroundColor: "#e2e8f0", borderRadius: "4px", height: "6px" }}>
-                        <div style={{ width: `${hoursPercent}%`, height: "6px", borderRadius: "4px", backgroundColor: isOver ? "#e53e3e" : isTight ? "#dd6b20" : "#38a169" }} />
+                      <div style={{ backgroundColor: theme.border, borderRadius: "4px", height: "6px" }}>
+                        <div style={{ width: `${hoursPercent}%`, height: "6px", borderRadius: "4px", backgroundColor: isOver ? theme.danger : isTight ? theme.warning : theme.success }} />
                       </div>
                     </div>
                   )}
 
                   {hasBudget && (
-                    <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#666" }}>
+                    <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", fontSize: "12px", color: theme.textSecondary }}>
                       <span>Contract: ${fmt(job.contract_value)}</span>
-                      {job.overtime_hours > 0 && <span style={{ color: "#dd6b20" }}>OT: {job.overtime_hours}h</span>}
+                      {job.overtime_hours > 0 && <span style={{ color: theme.warning }}>OT: {job.overtime_hours}h</span>}
                     </div>
                   )}
                 </div>
 
                 {isExpanded && (
-                  <div style={{ padding: "0 14px 14px", borderTop: "1px solid #f0f0f0" }}>
-                    <div style={{ fontSize: "12px", fontWeight: "bold", color: "#1B3A5C", marginBottom: "8px", paddingTop: "10px" }}>Timesheet Entries</div>
+                  <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${theme.border}` }}>
+                    <div style={{ fontSize: "12px", fontWeight: "700", color: theme.primary, marginBottom: "8px", paddingTop: "10px" }}>Timesheet Entries</div>
                     {details[job.job_id] ? (
                       details[job.job_id].timesheets.length === 0 ? (
-                        <p style={{ fontSize: "12px", color: "#888" }}>No entries yet.</p>
+                        <p style={{ fontSize: "12px", color: theme.textSecondary }}>No entries yet.</p>
                       ) : (
                         details[job.job_id].timesheets.map((t, i) => (
-                          <div key={i} style={{ marginBottom: "6px", padding: "7px 10px", backgroundColor: "#f7f9fc", borderRadius: "6px" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", alignItems: "center" }}>
-                              <span style={{ fontWeight: "500" }}>{t.employee_name}</span>
-                              <span style={{ color: "#888", textAlign: "center" }}>{t.shift_date}</span>
-                              <span style={{ fontWeight: "bold", color: "#1B3A5C", textAlign: "right" }}>{t.hours_worked}h</span>
+                          <div key={i} style={{ marginBottom: "6px", padding: "7px 10px", backgroundColor: theme.bg, borderRadius: "6px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: theme.textPrimary, alignItems: "center" }}>
+                              <span style={{ fontWeight: "600" }}>{t.employee_name}</span>
+                              <span style={{ color: theme.textSecondary, textAlign: "center" }}>{t.shift_date}</span>
+                              <span style={{ fontWeight: "700", color: theme.primary, textAlign: "right" }}>{t.hours_worked}h</span>
                             </div>
-                            {t.field_notes && <div style={{ fontSize: "11px", color: "#666", marginTop: "4px", fontStyle: "italic" }}>{t.field_notes}</div>}
+                            {t.field_notes && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px", fontStyle: "italic" }}>{t.field_notes}</div>}
                           </div>
                         ))
                       )
-                    ) : (
-                      <p style={{ fontSize: "12px", color: "#888" }}>Loading...</p>
-                    )}
+                    ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
                     {details[job.job_id] && details[job.job_id].materials.length > 0 && (
                       <div style={{ marginTop: "12px" }}>
-                        <div style={{ fontSize: "12px", fontWeight: "bold", color: "#b7791f", marginBottom: "8px" }}>Materials Purchased</div>
+                        <div style={{ fontSize: "12px", fontWeight: "700", color: theme.warning, marginBottom: "8px" }}>Materials Purchased</div>
                         {details[job.job_id].materials.map((m, i) => (
-                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: "#444", padding: "5px 0", borderBottom: "1px solid #f9f9f9", alignItems: "center" }}>
-                            <span style={{ fontWeight: "500" }}>{m.supplier || "Unknown"}</span>
-                            <span style={{ color: "#888", textAlign: "center" }}>{m.description}</span>
-                            <span style={{ fontWeight: "bold", color: "#b7791f", textAlign: "right" }}>${fmt(m.total_cost)}</span>
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: theme.textPrimary, padding: "5px 0", borderBottom: `1px solid ${theme.border}`, alignItems: "center" }}>
+                            <span style={{ fontWeight: "600" }}>{m.supplier || "Unknown"}</span>
+                            <span style={{ color: theme.textSecondary, textAlign: "center" }}>{m.description}</span>
+                            <span style={{ fontWeight: "700", color: theme.warning, textAlign: "right" }}>${fmt(m.total_cost)}</span>
                           </div>
                         ))}
                       </div>
@@ -766,12 +868,16 @@ export default function App() {
   const [token, setToken] = useState(stored.token);
   const [role, setRole] = useState(stored.role);
   const [view, setView] = useState("timesheet");
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
-  function handleLogin(accessToken, userRole) {
+  function handleLogin(accessToken, userRole, newUser = false) {
     setStoredAuth(accessToken, userRole);
     setToken(accessToken);
     setRole(userRole);
     setView("timesheet");
+    if (newUser) { setIsNewUser(true); setShowOnboarding(true); }
   }
 
   function handleLogout() {
@@ -779,19 +885,32 @@ export default function App() {
     setToken(null);
     setRole(null);
     setView("timesheet");
+    setShowSignUp(false);
+    setIsNewUser(false);
+    setShowOnboarding(false);
   }
 
-  if (!token) return <Login onLogin={handleLogin} />;
+  if (!token) {
+    if (showSignUp) return <SignUp onLogin={handleLogin} onBack={() => setShowSignUp(false)} />;
+    return <Login onLogin={handleLogin} onSignUp={() => setShowSignUp(true)} />;
+  }
 
   return (
-    <div style={{ backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
+    <div style={{ backgroundColor: theme.bg, minHeight: "100vh" }}>
       <NavBar view={view} setView={setView} role={role} />
-      {view === "timesheet" && <TimesheetForm token={token} />}
-      {view === "materials" && <MaterialsForm token={token} />}
-      {view === "dashboard" && <Dashboard token={token} />}
-      {view === "admin" && <AdminScreen token={token} />}
-      <div style={{ padding: "16px", textAlign: "center" }}>
-        <button onClick={handleLogout} style={{ fontSize: "13px", color: "#999", background: "none", border: "none", cursor: "pointer" }}>Log Out</button>
+      <div>
+        {showOnboarding && (role === "owner" || role === "admin") && view === "timesheet" && (
+          <div style={{ maxWidth: "480px", margin: "0 auto", padding: "16px 16px 0" }}>
+            <OnboardingChecklist token={token} onDismiss={() => setShowOnboarding(false)} />
+          </div>
+        )}
+        {view === "timesheet" && <TimesheetForm token={token} />}
+        {view === "materials" && <MaterialsForm token={token} />}
+        {view === "dashboard" && <Dashboard token={token} />}
+        {view === "admin" && <AdminScreen token={token} />}
+      </div>
+      <div style={{ padding: "8px 16px 90px", textAlign: "center" }}>
+        <button onClick={handleLogout} style={{ fontSize: "12px", color: theme.textLight, background: "none", border: "none", cursor: "pointer" }}>Log Out</button>
       </div>
     </div>
   );
