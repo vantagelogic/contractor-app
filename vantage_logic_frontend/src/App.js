@@ -872,12 +872,12 @@ export default function App() {
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  function handleLogin(accessToken, userRole, newUser = false) {
+function handleLogin(accessToken, userRole, newUser = false) {
     setStoredAuth(accessToken, userRole);
     setToken(accessToken);
     setRole(userRole);
     setView("timesheet");
-    if (newUser) { setIsNewUser(true); setShowOnboarding(true); }
+    if (newUser) { setShowOnboarding(true); }
   }
 
   function handleLogout() {
@@ -886,7 +886,6 @@ export default function App() {
     setRole(null);
     setView("timesheet");
     setShowSignUp(false);
-    setIsNewUser(false);
     setShowOnboarding(false);
   }
 
