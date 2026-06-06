@@ -21,6 +21,7 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True)
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="crew")
+    employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=True)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
