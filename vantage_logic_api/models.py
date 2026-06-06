@@ -107,3 +107,16 @@ class Material(Base):
     receipt_image_url = Column(String(500))
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+class Mileage(Base):
+    __tablename__ = "mileage"
+
+    mileage_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
+    trip_date = Column(Date, nullable=False)
+    km_driven = Column(Numeric(8, 2), nullable=False)
+    purpose = Column(String(255))
+    notes = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
