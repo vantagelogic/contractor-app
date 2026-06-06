@@ -104,9 +104,10 @@ function OnboardingChecklist({ token, onDismiss }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
 
-  useEffect(() => {
-    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(data => setHasJob(data.length > 0));
-    fetch(`${API}/employees`, { headers }).then(r => r.json()).then(data => setHasEmployee(data.length > 0));
+useEffect(() => {
+    const h = { Authorization: `Bearer ${token}` };
+    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(data.length > 0));
+    fetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(data => setHasEmployee(data.length > 0));
   }, [token]);
 
   const steps = [
@@ -869,7 +870,6 @@ export default function App() {
   const [role, setRole] = useState(stored.role);
   const [view, setView] = useState("timesheet");
   const [showSignUp, setShowSignUp] = useState(false);
-  const [isNewUser, setIsNewUser] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   function handleLogin(accessToken, userRole, newUser = false) {
