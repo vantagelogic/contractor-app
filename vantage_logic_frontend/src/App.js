@@ -687,7 +687,7 @@ function Dashboard({ token }) {
 
 const now = new Date();
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
 
   const filtered = jobs.filter(j => {
     const statusMatch = filter === "all" || j.status === filter;
