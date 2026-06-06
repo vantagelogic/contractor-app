@@ -110,6 +110,7 @@ function NavBar({ view, setView, role, onLogout }) {
   const tabs = [
     { id: "timesheet", label: "Hours", icon: "⏱" },
     { id: "materials", label: "Materials", icon: "🔧" },
+    { id: "mileage", label: "Mileage", icon: "🚗" },
     ...(role === "owner" || role === "admin" ? [
       { id: "dashboard", label: "Dashboard", icon: "📊" },
       { id: "admin", label: "Admin", icon: "⚙️" },
@@ -474,6 +475,95 @@ function MaterialsForm({ token }) {
           <label style={styles.label}>Notes (optional)</label>
           <textarea style={styles.textarea} placeholder="Any additional notes" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
           <button style={styles.button} type="submit">Log Materials</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MileageForm({ token }) {
+  const [formData, setFormData] = useState({ job_id: "", employee_id: "", trip_date: "", km_driven: "", purpose: "", notes: "" });
+  const [submitted, setSubmitted] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [linkedEmployeeId, setLinkedEmployeeId] = useState(null);
+  const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
+  const [employees, setEmployees] = useState([]);
+
+  useEffect(() => {
+    const h = { Authorization: `Bearer ${token}` };
+    apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => {
+      if (data.employee_id) {
+        setLinkedEmployeeId(data.employee_id);
+        setFormData(prev => ({ ...prev, employee_id: data.employee_id }));
+      }
+    });
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
+    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(emps => {
+      setEmployees(emps);
+    });
+  }, [token]);
+
+  useEffect(() => {
+    if (linkedEmployeeId && employees.length > 0) {
+      const emp = employees.find(e => e.employee_id === linkedEmployeeId);
+      if (emp) setLinkedEmployeeName(`${emp.first_name} ${emp.last_name}`);
+    }
+  }, [linkedEmployeeId, employees]);
+
+  function handleChange(e) { setFormData({ ...formData, [e.target.name]: e.target.value }); }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const response = await apiFetch(`${API}/mileage?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    if (response.ok) setSubmitted(true);
+  }
+
+  if (submitted) {
+    return (
+      <div style={styles.container}>
+        <div style={{ textAlign: "center", marginTop: "80px" }}>
+          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "28px" }}>✓</div>
+          <h2 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, margin: "0 0 8px" }}>Mileage logged.</h2>
+          <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Trip recorded successfully.</p>
+          <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Log Mileage</h1>
+      <p style={styles.subtitle}>Record a trip for a job</p>
+      <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          {linkedEmployeeId ? (
+            <div style={{ padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "6px", border: `1px solid ${theme.accent}`, fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "4px" }}>
+              Logging as {linkedEmployeeName || "your account"}
+            </div>
+          ) : (
+            <>
+              <label style={styles.label}>Employee</label>
+              <select style={styles.input} name="employee_id" value={formData.employee_id} onChange={handleChange} required>
+                <option value="">Select employee</option>
+                {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+              </select>
+            </>
+          )}
+          <label style={styles.label}>Job</label>
+          <select style={styles.input} name="job_id" value={formData.job_id} onChange={handleChange} required>
+            <option value="">Select job</option>
+            {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
+          </select>
+          <label style={styles.label}>Date</label>
+          <input style={styles.input} name="trip_date" type="date" value={formData.trip_date} onChange={handleChange} required />
+          <label style={styles.label}>KM Driven</label>
+          <input style={styles.input} name="km_driven" type="number" step="0.1" placeholder="e.g. 45.5" value={formData.km_driven} onChange={handleChange} required />
+          <label style={styles.label}>Purpose (optional)</label>
+          <input style={styles.input} name="purpose" placeholder="e.g. Site visit, Supply run" value={formData.purpose} onChange={handleChange} />
+          <label style={styles.label}>Notes (optional)</label>
+          <textarea style={styles.textarea} name="notes" placeholder="Any additional notes" value={formData.notes} onChange={handleChange} />
+          <button style={styles.button} type="submit">Log Mileage</button>
         </form>
       </div>
     </div>
@@ -954,6 +1044,7 @@ export default function App() {
         )}
         {view === "timesheet" && <TimesheetForm token={token} />}
         {view === "materials" && <MaterialsForm token={token} />}
+        {view === "mileage" && <MileageForm token={token} />}
         {view === "dashboard" && <Dashboard token={token} />}
         {view === "admin" && <AdminScreen token={token} />}
         {mobile && (
