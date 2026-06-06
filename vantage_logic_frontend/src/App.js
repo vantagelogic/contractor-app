@@ -112,7 +112,7 @@ useEffect(() => {
   const steps = [
     { label: "Add your first job", done: hasJob, hint: "Go to Admin → Jobs" },
     { label: "Add your first employee", done: hasEmployee, hint: "Go to Admin → Employees" },
-    { label: "Share the app link with your crew", done: false, hint: window.location.origin },
+    { label: "Share the app link with your crew", done: false, hint: window.location.origin, copyable: true },
   ];
 
   const allDone = steps.every(s => s.done);
@@ -133,7 +133,12 @@ useEffect(() => {
           </div>
           <div>
             <div style={{ fontSize: "13px", fontWeight: "600", color: step.done ? theme.textSecondary : theme.textPrimary, textDecoration: step.done ? "line-through" : "none" }}>{step.label}</div>
-            <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px" }}>{step.hint}</div>
+<div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>{step.hint}</span>
+              {step.copyable && (
+                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(step.hint); }} style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", border: "none", cursor: "pointer", backgroundColor: theme.primaryLight, color: "white", fontWeight: "700" }}>Copy</button>
+              )}
+            </div>
           </div>
         </div>
       ))}
