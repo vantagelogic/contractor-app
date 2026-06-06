@@ -678,13 +678,21 @@ function Dashboard({ token }) {
   const [expanded, setExpanded] = useState({});
   const [details, setDetails] = useState({});
   const [filter, setFilter] = useState("active");
+  const [timeFilter, setTimeFilter] = useState("all");
 
   useEffect(() => {
     fetch(`${API}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(data => { setJobs(data); setLoading(false); });
   }, [token]);
 
-  const filtered = filter === "all" ? jobs : jobs.filter(j => j.status === filter);
+const now = new Date();
+  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const filtered = jobs.filter(j => {
+    const statusMatch = filter === "all" || j.status === filter;
+    return statusMatch;
+  });
   const totals = {
     hours: filtered.reduce((s, j) => s + j.total_hours, 0),
     labour: filtered.reduce((s, j) => s + j.labour_cost, 0),
@@ -724,14 +732,21 @@ function Dashboard({ token }) {
           <div style={{ marginBottom: "20px" }}>
             <VantageLogo size={32} dark={true} />
           </div>
-          <h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.heading }}>Burn Rate Scoreboard</h1>
+<h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.heading }}>Project Overview</h1>
           <p style={{ fontSize: "13px", opacity: 0.6, margin: "0 0 20px" }}>Live job profitability</p>
 
           {/* Filter pills */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+<div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
             {["active", "completed", "all"].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 16px", borderRadius: "20px", border: filter === f ? "none" : "1px solid rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "12px", fontWeight: "700", backgroundColor: filter === f ? "white" : "transparent", color: filter === f ? theme.primary : "white", fontFamily: font.body }}>
+              <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 14px", borderRadius: "20px", border: filter === f ? "none" : "1px solid rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "12px", fontWeight: "700", backgroundColor: filter === f ? "white" : "transparent", color: filter === f ? theme.primary : "white", fontFamily: font.body }}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "18px", flexWrap: "wrap" }}>
+            {[["all", "All Time"], ["week", "This Week"], ["month", "This Month"]].map(([val, label]) => (
+              <button key={val} onClick={() => setTimeFilter(val)} style={{ padding: "4px 12px", borderRadius: "20px", border: timeFilter === val ? "none" : "1px solid rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "11px", fontWeight: "600", backgroundColor: timeFilter === val ? theme.gold : "transparent", color: "white", fontFamily: font.body }}>
+                {label}
               </button>
             ))}
           </div>
@@ -814,6 +829,14 @@ function Dashboard({ token }) {
                   </div>
                 )}
 
+{(over || overHours) && (
+                  <div style={{ marginTop: "10px", padding: "8px 12px", backgroundColor: "#fdf0ee", borderRadius: "6px", border: `1px solid ${theme.danger}`, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "14px" }}>⚠️</span>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: theme.danger }}>
+                      {over && overHours ? "Hours and budget exceeded" : over ? "Cost exceeds contract value" : "Hours exceeded budget"}
+                    </span>
+                  </div>
+                )}
                 {hasBudget && (
                   <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, fontSize: "12px", color: theme.textSecondary }}>
                     Contract: ${fmt(job.contract_value)}
