@@ -330,13 +330,28 @@ function TimesheetForm({ token }) {
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [costCodes, setCostCodes] = useState([]);
+  const [linkedEmployeeId, setLinkedEmployeeId] = useState(null);
+  const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
+    apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => {
+      if (data.employee_id) {
+        setLinkedEmployeeId(data.employee_id);
+        setFormData(prev => ({ ...prev, employee_id: data.employee_id }));
+      }
+    });
     apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
     apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
     apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
   }, [token]);
+
+  useEffect(() => {
+    if (linkedEmployeeId && employees.length > 0) {
+      const emp = employees.find(e => e.employee_id === linkedEmployeeId);
+      if (emp) setLinkedEmployeeName(`${emp.first_name} ${emp.last_name}`);
+    }
+  }, [linkedEmployeeId, employees]);
 
   function handleChange(e) { setFormData({ ...formData, [e.target.name]: e.target.value }); }
 
@@ -365,11 +380,19 @@ function TimesheetForm({ token }) {
       <p style={styles.subtitle}>Field entry — Vantage Logic</p>
       <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Employee</label>
-          <select style={styles.input} name="employee_id" value={formData.employee_id} onChange={handleChange} required>
-            <option value="">Select employee</option>
-            {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
-          </select>
+          {linkedEmployeeId ? (
+            <div style={{ padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "6px", border: `1px solid ${theme.accent}`, fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "4px" }}>
+              Logging as {linkedEmployeeName || "your account"}
+            </div>
+          ) : (
+            <>
+              <label style={styles.label}>Employee</label>
+              <select style={styles.input} name="employee_id" value={formData.employee_id} onChange={handleChange} required>
+                <option value="">Select employee</option>
+                {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+              </select>
+            </>
+          )}
           <label style={styles.label}>Job</label>
           <select style={styles.input} name="job_id" value={formData.job_id} onChange={handleChange} required>
             <option value="">Select job</option>
