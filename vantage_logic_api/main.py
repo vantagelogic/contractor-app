@@ -174,6 +174,7 @@ def create_user(
     email: str,
     password: str,
     role: str = "crew",
+    employee_id: int = None,
     db: Session = Depends(get_db)
 ):
     existing = db.query(models.User).filter(models.User.email == email).first()
@@ -183,7 +184,8 @@ def create_user(
         company_id=company_id,
         email=email,
         hashed_password=hash_password(password),
-        role=role
+        role=role,
+        employee_id=employee_id
     )
     db.add(user)
     db.commit()
@@ -192,7 +194,7 @@ def create_user(
 
 @app.get("/me")
 def get_me(current_user: models.User = Depends(get_current_user)):
-    return {"user_id": current_user.user_id, "email": current_user.email, "role": current_user.role, "company_id": current_user.company_id}
+    return {"user_id": current_user.user_id, "email": current_user.email, "role": current_user.role, "company_id": current_user.company_id, "employee_id": current_user.employee_id}
 
 # =============================================
 # EMPLOYEES
