@@ -2,6 +2,18 @@ import { useState, useEffect } from "react";
 
 const API = "https://contractor-api-pi7o.onrender.com";
 
+let _logoutFn = null;
+function setLogoutHandler(fn) { _logoutFn = fn; }
+
+async function apiFetch(url, options = {}) {
+  const response = await fetch(url, options);
+  if (response.status === 401) {
+    if (_logoutFn) _logoutFn();
+    return response;
+  }
+  return response;
+}
+
 const theme = {
   primary: "#1a3d2b",
   primaryDark: "#122b1e",
@@ -66,8 +78,6 @@ function PasswordInput({ placeholder, value, onChange, required }) {
   );
 }
 
-// ─── LOGO SVG ─────────────────────────────────────────────────
-
 function VantageLogo({ size = 40, dark = false }) {
   const bg = dark ? "#1a3d2b" : "transparent";
   const textColor = dark ? "white" : "#1a3d2b";
@@ -88,7 +98,6 @@ function VantageLogo({ size = 40, dark = false }) {
   );
 }
 
-// ─── NAVIGATION ───────────────────────────────────────────────
 function NavBar({ view, setView, role, onLogout }) {
   const [mobile, setMobile] = useState(isMobile());
 
@@ -142,7 +151,6 @@ function NavBar({ view, setView, role, onLogout }) {
   );
 }
 
-// ─── COLLAPSIBLE ──────────────────────────────────────────────
 function CollapsibleSection({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -156,15 +164,14 @@ function CollapsibleSection({ title, children, defaultOpen = false }) {
   );
 }
 
-// ─── ONBOARDING ───────────────────────────────────────────────
 function OnboardingChecklist({ token, onDismiss }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(data.length > 0));
-    fetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(data => setHasEmployee(data.length > 0));
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(data.length > 0));
+    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(data => setHasEmployee(data.length > 0));
   }, [token]);
 
   const steps = [
@@ -202,7 +209,7 @@ function OnboardingChecklist({ token, onDismiss }) {
   );
 }
 
-// ─── LOGIN ────────────────────────────────────────────────────
+// ─── LOGIN — uses regular fetch intentionally (401 = wrong password, not expired token)
 function Login({ onLogin, onSignUp }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -262,7 +269,7 @@ function Login({ onLogin, onSignUp }) {
   );
 }
 
-// ─── SIGN UP ──────────────────────────────────────────────────
+// ─── SIGN UP — uses regular fetch intentionally (401 = wrong password, not expired token)
 function SignUp({ onLogin, onBack }) {
   const [form, setForm] = useState({ company_name: "", email: "", password: "", confirm_password: "" });
   const [error, setError] = useState("");
@@ -317,7 +324,6 @@ function SignUp({ onLogin, onBack }) {
   );
 }
 
-// ─── TIMESHEET ────────────────────────────────────────────────
 function TimesheetForm({ token }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: "", hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
@@ -327,16 +333,16 @@ function TimesheetForm({ token }) {
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
-    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
-    fetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
+    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
+    apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
   }, [token]);
 
   function handleChange(e) { setFormData({ ...formData, [e.target.name]: e.target.value }); }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const response = await fetch(`${API}/timesheets?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const response = await apiFetch(`${API}/timesheets?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
@@ -387,7 +393,6 @@ function TimesheetForm({ token }) {
   );
 }
 
-// ─── MATERIALS ────────────────────────────────────────────────
 function MaterialsForm({ token }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
@@ -396,13 +401,13 @@ function MaterialsForm({ token }) {
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
-    fetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
+    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
   }, [token]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const response = await fetch(`${API}/materials?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const response = await apiFetch(`${API}/materials?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
@@ -452,7 +457,6 @@ function MaterialsForm({ token }) {
   );
 }
 
-// ─── ADMIN ────────────────────────────────────────────────────
 function AdminScreen({ token }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
@@ -473,52 +477,52 @@ function AdminScreen({ token }) {
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/me`, { headers: h }).then(r => r.json()).then(d => setCompanyId(d.company_id));
-    fetch(`${API}/employees/all`, { headers: h }).then(r => r.json()).then(setEmployees);
-    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(setJobs);
-    fetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
+    apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(d => setCompanyId(d.company_id));
+    apiFetch(`${API}/employees/all`, { headers: h }).then(r => r.json()).then(setEmployees);
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(setJobs);
+    apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
   }, [token]);
 
   function refresh() {
-    fetch(`${API}/employees/all`, { headers }).then(r => r.json()).then(setEmployees);
-    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(setJobs);
-    fetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
+    apiFetch(`${API}/employees/all`, { headers }).then(r => r.json()).then(setEmployees);
+    apiFetch(`${API}/jobs`, { headers }).then(r => r.json()).then(setJobs);
+    apiFetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
   }
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
   async function addEmployee() {
-    const res = await fetch(`${API}/employees?${new URLSearchParams(empForm)}`, { method: "POST", headers });
+    const res = await apiFetch(`${API}/employees?${new URLSearchParams(empForm)}`, { method: "POST", headers });
     if (res.ok) { showMsg("Employee added."); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); refresh(); }
     else showMsg("Error adding employee.");
   }
 
   async function updateEmployee() {
-    const res = await fetch(`${API}/employees/${editingEmp.employee_id}?${new URLSearchParams(empForm)}`, { method: "PATCH", headers });
+    const res = await apiFetch(`${API}/employees/${editingEmp.employee_id}?${new URLSearchParams(empForm)}`, { method: "PATCH", headers });
     if (res.ok) { showMsg("Employee updated."); setEditingEmp(null); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); refresh(); }
     else showMsg("Error updating employee.");
   }
 
   async function addJob() {
-    const res = await fetch(`${API}/jobs?${new URLSearchParams(jobForm)}`, { method: "POST", headers });
+    const res = await apiFetch(`${API}/jobs?${new URLSearchParams(jobForm)}`, { method: "POST", headers });
     if (res.ok) { showMsg("Job added."); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
     else showMsg("Error adding job.");
   }
 
   async function updateJob() {
-    const res = await fetch(`${API}/jobs/${editingJob.job_id}?${new URLSearchParams(jobForm)}`, { method: "PATCH", headers });
+    const res = await apiFetch(`${API}/jobs/${editingJob.job_id}?${new URLSearchParams(jobForm)}`, { method: "PATCH", headers });
     if (res.ok) { showMsg("Job updated."); setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
     else showMsg("Error updating job.");
   }
 
   async function addCostCode() {
-    const res = await fetch(`${API}/cost-codes?${new URLSearchParams(ccForm)}`, { method: "POST", headers });
+    const res = await apiFetch(`${API}/cost-codes?${new URLSearchParams(ccForm)}`, { method: "POST", headers });
     if (res.ok) { showMsg("Cost code added."); setCcForm({ code: "", description: "", category: "" }); refresh(); }
     else showMsg("Error adding cost code.");
   }
 
   async function updateCostCode() {
-    const res = await fetch(`${API}/cost-codes/${editingCc.cost_code_id}?${new URLSearchParams(ccForm)}`, { method: "PATCH", headers });
+    const res = await apiFetch(`${API}/cost-codes/${editingCc.cost_code_id}?${new URLSearchParams(ccForm)}`, { method: "PATCH", headers });
     if (res.ok) { showMsg("Cost code updated."); setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); refresh(); }
     else showMsg("Error updating cost code.");
   }
@@ -527,19 +531,19 @@ function AdminScreen({ token }) {
     if (!companyId) return;
     if (loginForm.password !== loginForm.confirm_password) { setLoginError("Passwords do not match"); return; }
     setLoginError("");
-    const res = await fetch(`${API}/users?${new URLSearchParams({ company_id: companyId, email: loginForm.email, password: loginForm.password, role: loginForm.employee_role })}`, { method: "POST" });
+    const res = await apiFetch(`${API}/users?${new URLSearchParams({ company_id: companyId, email: loginForm.email, password: loginForm.password, role: loginForm.employee_role })}`, { method: "POST" });
     if (res.ok) { showMsg(`Login created for ${loginForm.email}`); setLoginForm({ email: "", password: "", confirm_password: "", employee_role: "crew" }); }
     else { const d = await res.json(); showMsg(`Error: ${d.detail}`); }
   }
 
   async function toggleEmployee(emp) {
     const endpoint = emp.active ? "deactivate" : "activate";
-    const res = await fetch(`${API}/employees/${emp.employee_id}/${endpoint}`, { method: "PATCH", headers });
+    const res = await apiFetch(`${API}/employees/${emp.employee_id}/${endpoint}`, { method: "PATCH", headers });
     if (res.ok) { showMsg(`${emp.first_name} ${emp.active ? "archived" : "restored"}.`); refresh(); }
   }
 
   async function setJobStatus(job, status) {
-    const res = await fetch(`${API}/jobs/${job.job_id}/status?status=${status}`, { method: "PATCH", headers });
+    const res = await apiFetch(`${API}/jobs/${job.job_id}/status?status=${status}`, { method: "PATCH", headers });
     if (res.ok) { showMsg(`${job.job_name} marked as ${status}.`); refresh(); }
   }
 
@@ -671,7 +675,6 @@ function AdminScreen({ token }) {
   );
 }
 
-// ─── DASHBOARD ────────────────────────────────────────────────
 function Dashboard({ token }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -681,7 +684,7 @@ function Dashboard({ token }) {
   const [timeFilter, setTimeFilter] = useState("all");
 
   useEffect(() => {
-    fetch(`${API}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(data => { setJobs(data); setLoading(false); });
   }, [token]);
 
@@ -704,8 +707,8 @@ function Dashboard({ token }) {
     if (!isOpen && !details[job_id]) {
       const h = { Authorization: `Bearer ${token}` };
       const [tsR, matR] = await Promise.all([
-        fetch(`${API}/jobs/${job_id}/timesheets`, { headers: h }),
-        fetch(`${API}/jobs/${job_id}/materials`, { headers: h })
+        apiFetch(`${API}/jobs/${job_id}/timesheets`, { headers: h }),
+        apiFetch(`${API}/jobs/${job_id}/materials`, { headers: h })
       ]);
       setDetails({...details, [job_id]: { timesheets: await tsR.json(), materials: await matR.json() }});
     }
@@ -722,17 +725,14 @@ function Dashboard({ token }) {
 
   return (
     <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "80px" }}>
-      {/* Header */}
       <div style={{ background: `linear-gradient(135deg, ${theme.primaryDark} 0%, ${theme.primary} 60%, ${theme.accent} 100%)`, padding: "28px 20px 32px", color: "white" }}>
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           <div style={{ marginBottom: "20px" }}>
             <VantageLogo size={32} dark={true} />
           </div>
-<h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.heading }}>Project Overview</h1>
+          <h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.heading }}>Project Overview</h1>
           <p style={{ fontSize: "13px", opacity: 0.6, margin: "0 0 20px" }}>Live job profitability</p>
-
-          {/* Filter pills */}
-<div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
             {["active", "completed", "all"].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 14px", borderRadius: "20px", border: filter === f ? "none" : "1px solid rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "12px", fontWeight: "700", backgroundColor: filter === f ? "white" : "transparent", color: filter === f ? theme.primary : "white", fontFamily: font.body }}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -746,8 +746,6 @@ function Dashboard({ token }) {
               </button>
             ))}
           </div>
-
-          {/* Stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
             {statCards.map((item, i) => (
               <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "rgba(45,106,79,0.9)" : "rgba(184,50,50,0.9)") : "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)", borderRadius: "10px", padding: "14px 10px", textAlign: "center", border: item.highlight ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(255,255,255,0.1)" }}>
@@ -759,7 +757,6 @@ function Dashboard({ token }) {
         </div>
       </div>
 
-      {/* Job cards */}
       <div style={{ padding: "16px", maxWidth: "900px", margin: "0 auto" }}>
         {loading ? (
           <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>Loading...</div>
@@ -777,7 +774,6 @@ function Dashboard({ token }) {
           return (
             <div key={job.job_id} onClick={() => toggleJob(job.job_id)} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", border: `1px solid ${theme.border}`, borderLeft: `4px solid ${barColor}`, cursor: "pointer" }}>
               <div style={{ padding: "16px" }}>
-                {/* Job title row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                   <div>
                     <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary, fontFamily: font.heading }}>{job.job_name}</div>
@@ -801,8 +797,6 @@ function Dashboard({ token }) {
                     <span style={{ fontSize: "11px", color: theme.textLight }}>{isOpen ? "▲" : "▼"}</span>
                   </div>
                 </div>
-
-                {/* Cost grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
                   {[["Labour", job.labour_cost], ["Materials", job.materials_cost], ["Total Cost", job.total_cost]].map(([label, val]) => (
                     <div key={label} style={{ backgroundColor: theme.bg, borderRadius: "6px", padding: "9px 8px", textAlign: "center", border: `1px solid ${theme.border}` }}>
@@ -811,8 +805,6 @@ function Dashboard({ token }) {
                     </div>
                   ))}
                 </div>
-
-                {/* Hours bar */}
                 {job.budgeted_hours > 0 && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textSecondary, marginBottom: "5px" }}>
@@ -824,8 +816,7 @@ function Dashboard({ token }) {
                     </div>
                   </div>
                 )}
-
-{(over || overHours) && (
+                {(over || overHours) && (
                   <div style={{ marginTop: "10px", padding: "8px 12px", backgroundColor: "#fdf0ee", borderRadius: "6px", border: `1px solid ${theme.danger}`, display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "14px" }}>⚠️</span>
                     <span style={{ fontSize: "12px", fontWeight: "700", color: theme.danger }}>
@@ -839,8 +830,6 @@ function Dashboard({ token }) {
                   </div>
                 )}
               </div>
-
-              {/* Expanded detail */}
               {isOpen && (
                 <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${theme.border}` }}>
                   <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", paddingTop: "14px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Timesheet Entries</div>
@@ -860,7 +849,6 @@ function Dashboard({ token }) {
                         </div>
                       ))
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
-
                   {details[job.job_id]?.materials?.length > 0 && (
                     <div style={{ marginTop: "14px" }}>
                       <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Materials</div>
@@ -883,7 +871,6 @@ function Dashboard({ token }) {
   );
 }
 
-// ─── APP ROOT ─────────────────────────────────────────────────
 export default function App() {
   const stored = getStoredAuth();
   const [token, setToken] = useState(stored.token);
@@ -897,6 +884,10 @@ export default function App() {
     const handler = () => setMobile(isMobile());
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  useEffect(() => {
+    setLogoutHandler(handleLogout);
   }, []);
 
   function handleLogin(accessToken, userRole, newUser = false) {
