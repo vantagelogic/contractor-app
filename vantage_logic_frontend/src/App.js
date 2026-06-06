@@ -68,18 +68,17 @@ function PasswordInput({ placeholder, value, onChange, required }) {
 
 // ─── LOGO SVG ─────────────────────────────────────────────────
 function VantageLogo({ size = 40, color = "white", showText = true, textColor = "white" }) {
-  const s = size;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-      <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18 85 C18 85 28 55 35 30 C38 20 42 14 46 14 C48 14 50 17 50 22 C50 35 44 60 44 75" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none"/>
-        <path d="M40 85 C40 85 50 50 58 25 C62 12 67 6 72 6 C75 6 78 9 78 15 C78 30 70 58 68 78" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none" opacity="0.75"/>
-        <path d="M62 85 C62 85 70 55 76 35 C80 22 85 14 90 14" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none" opacity="0.45"/>
+    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 88 C22 88 30 62 36 38 C39 26 43 18 48 18 C51 18 53 22 52 30 C50 45 43 68 43 82" stroke={color} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+        <path d="M44 88 C44 88 53 58 60 32 C64 18 69 10 75 10 C79 10 81 14 80 23 C78 40 69 66 67 82" stroke={color} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7"/>
+        <path d="M66 88 C66 88 73 62 78 40 C82 26 87 16 93 16" stroke={color} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.4"/>
       </svg>
       {showText && (
-        <div>
-          <div style={{ fontSize: s * 0.38 + "px", fontWeight: "700", color: textColor, fontFamily: font.heading, letterSpacing: "0.5px", lineHeight: 1 }}>VANTAGE LOGIC</div>
-          <div style={{ fontSize: s * 0.18 + "px", color: textColor, opacity: 0.6, letterSpacing: "2px", textTransform: "uppercase", marginTop: "2px" }}>Field Management</div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: size * 0.36 + "px", fontWeight: "700", color: textColor, fontFamily: font.heading, letterSpacing: "1px", lineHeight: 1, textTransform: "uppercase" }}>Vantage Logic</span>
+          <span style={{ fontSize: size * 0.16 + "px", color: textColor, opacity: 0.55, letterSpacing: "2.5px", textTransform: "uppercase", marginTop: "3px" }}>Field Management</span>
         </div>
       )}
     </div>
