@@ -78,26 +78,55 @@ function PasswordInput({ placeholder, value, onChange, required }) {
   );
 }
 
+// ─── IDENTITY BADGE (reusable) ────────────────────────────────
+function IdentityBadge({ name }) {
+  return (
+    <div style={{ padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "6px", border: `1px solid ${theme.accent}`, fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
+      <span style={{ fontSize: "16px" }}>👤</span>
+      Logging as {name || "your account"}
+    </div>
+  );
+}
+
+// ─── LOGO SVG ─────────────────────────────────────────────────
 function VantageLogo({ size = 40, dark = false }) {
   const bg = dark ? "#1a3d2b" : "transparent";
   const textColor = dark ? "white" : "#1a3d2b";
-  const subColor = dark ? "rgba(255,255,255,0.6)" : "#5c5c5c";
+  const subColor = dark ? "rgba(255,255,255,0.55)" : "#5c5c5c";
   const lineColor = "#c8973a";
   const scale = size / 40;
 
   return (
-    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", backgroundColor: bg, padding: dark ? "12px 20px" : "0", borderRadius: dark ? "6px" : "0" }}>
-      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: Math.round(16 * scale) + "px", fontWeight: "700", color: textColor, letterSpacing: Math.round(4 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap" }}>
-        VANTAGE
+    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", backgroundColor: bg, padding: dark ? "10px 18px" : "0", borderRadius: dark ? "4px" : "0" }}>
+      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: Math.round(15 * scale) + "px", fontWeight: "700", color: textColor, letterSpacing: Math.round(5 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", textTransform: "uppercase" }}>
+        Vantage
       </span>
-      <div style={{ width: "100%", height: "1px", backgroundColor: lineColor, margin: "4px 0" }} />
-      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: Math.round(8 * scale) + "px", fontWeight: "400", color: subColor, letterSpacing: Math.round(5 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap" }}>
-        LOGIC
+      <div style={{ width: "100%", height: "1px", backgroundColor: lineColor, margin: "3px 0" }} />
+      <span style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", fontSize: Math.round(7 * scale) + "px", fontWeight: "400", color: subColor, letterSpacing: Math.round(6 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", textTransform: "uppercase" }}>
+        Logic
       </span>
     </div>
   );
 }
 
+// ─── NAV ICONS (clean SVG, no emojis) ─────────────────────────
+function IconHours() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+}
+function IconMaterials() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>;
+}
+function IconMileage() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M5 3l2 2"/><path d="M19 3l-2 2"/></svg>;
+}
+function IconDashboard() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
+}
+function IconAdmin() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>;
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────
 function NavBar({ view, setView, role, onLogout }) {
   const [mobile, setMobile] = useState(isMobile());
 
@@ -108,22 +137,23 @@ function NavBar({ view, setView, role, onLogout }) {
   }, []);
 
   const tabs = [
-    { id: "timesheet", label: "Hours", icon: "⏱" },
-    { id: "materials", label: "Materials", icon: "🔧" },
-    { id: "mileage", label: "Mileage", icon: "🚗" },
+    { id: "timesheet", label: "Hours", Icon: IconHours },
+    { id: "materials", label: "Materials", Icon: IconMaterials },
+    { id: "mileage", label: "Mileage", Icon: IconMileage },
     ...(role === "owner" || role === "admin" ? [
-      { id: "dashboard", label: "Dashboard", icon: "📊" },
-      { id: "admin", label: "Admin", icon: "⚙️" },
+      { id: "dashboard", label: "Dashboard", Icon: IconDashboard },
+      { id: "admin", label: "Admin", Icon: IconAdmin },
     ] : []),
   ];
 
   if (mobile) {
     return (
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primary, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "8px 0 10px", boxShadow: "0 -2px 12px rgba(0,0,0,0.2)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "8px 0 12px", boxShadow: "0 -1px 0 rgba(255,255,255,0.06), 0 -4px 20px rgba(0,0,0,0.3)" }}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "4px 10px", borderRadius: "8px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent" }}>
-            <span style={{ fontSize: "20px" }}>{tab.icon}</span>
-            <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.55)", fontWeight: view === tab.id ? "700" : "400" }}>{tab.label}</span>
+          <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", padding: "4px 12px", borderRadius: "8px" }}>
+            <span style={{ color: view === tab.id ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
+            <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.4)", fontWeight: view === tab.id ? "700" : "400", letterSpacing: "0.3px" }}>{tab.label}</span>
+            {view === tab.id && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold, marginTop: "1px" }} />}
           </button>
         ))}
       </div>
@@ -131,20 +161,21 @@ function NavBar({ view, setView, role, onLogout }) {
   }
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.primary, display: "flex", flexDirection: "column", zIndex: 1000, boxShadow: "2px 0 16px rgba(0,0,0,0.15)" }}>
-      <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.primaryDark, display: "flex", flexDirection: "column", zIndex: 1000, boxShadow: "1px 0 0 rgba(255,255,255,0.06)" }}>
+      <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <VantageLogo size={36} dark={true} />
       </div>
-      <div style={{ flex: 1, padding: "12px" }}>
+      <div style={{ flex: 1, padding: "16px 10px" }}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "8px", border: "none", cursor: "pointer", marginBottom: "4px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.6)", fontFamily: font.body, fontSize: "14px", fontWeight: view === tab.id ? "700" : "400", textAlign: "left" }}>
-            <span style={{ fontSize: "18px" }}>{tab.icon}</span>
+          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "6px", border: "none", cursor: "pointer", marginBottom: "2px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.1)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.45)", fontFamily: font.body, fontSize: "13px", fontWeight: view === tab.id ? "600" : "400", textAlign: "left", transition: "all 0.15s" }}>
+            <span style={{ display: "flex", flexShrink: 0 }}><tab.Icon /></span>
             <span>{tab.label}</span>
+            {view === tab.id && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
           </button>
         ))}
       </div>
-      <div style={{ padding: "16px 12px 28px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-        <button onClick={onLogout} style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "transparent", color: "rgba(255,255,255,0.75)", cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "600", textAlign: "center" }}>
+      <div style={{ padding: "16px 10px 28px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+        <button onClick={onLogout} style={{ width: "100%", padding: "9px 12px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.12)", backgroundColor: "transparent", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontFamily: font.body, fontSize: "12px", fontWeight: "500", textAlign: "center", letterSpacing: "0.3px" }}>
           Sign Out
         </button>
       </div>
@@ -152,6 +183,7 @@ function NavBar({ view, setView, role, onLogout }) {
   );
 }
 
+// ─── COLLAPSIBLE ──────────────────────────────────────────────
 function CollapsibleSection({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -165,6 +197,7 @@ function CollapsibleSection({ title, children, defaultOpen = false }) {
   );
 }
 
+// ─── ONBOARDING ───────────────────────────────────────────────
 function OnboardingChecklist({ token, onDismiss }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
@@ -210,7 +243,7 @@ function OnboardingChecklist({ token, onDismiss }) {
   );
 }
 
-// ─── LOGIN — uses regular fetch intentionally (401 = wrong password, not expired token)
+// ─── LOGIN ────────────────────────────────────────────────────
 function Login({ onLogin, onSignUp }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -236,7 +269,7 @@ function Login({ onLogin, onSignUp }) {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", fontFamily: font.body }}>
       <div style={{ display: "none", flex: 1, backgroundColor: theme.primary, flexDirection: "column", justifyContent: "center", padding: "60px", minHeight: "100vh" }} className="vl-login-panel">
-        <VantageLogo size={52} color="white" textColor="white" />
+        <VantageLogo size={52} dark={true} />
         <div style={{ marginTop: "48px" }}>
           <div style={{ fontSize: "32px", fontWeight: "700", color: "white", fontFamily: font.heading, lineHeight: 1.3, marginBottom: "16px" }}>Built for trades.<br />Built for the field.</div>
           <div style={{ fontSize: "15px", color: "rgba(255,255,255,0.65)", lineHeight: 1.7 }}>Real-time job costing, crew tracking, and profit visibility — purpose-built for how contractors actually work.</div>
@@ -270,7 +303,7 @@ function Login({ onLogin, onSignUp }) {
   );
 }
 
-// ─── SIGN UP — uses regular fetch intentionally (401 = wrong password, not expired token)
+// ─── SIGN UP ──────────────────────────────────────────────────
 function SignUp({ onLogin, onBack }) {
   const [form, setForm] = useState({ company_name: "", email: "", password: "", confirm_password: "" });
   const [error, setError] = useState("");
@@ -325,6 +358,7 @@ function SignUp({ onLogin, onBack }) {
   );
 }
 
+// ─── TIMESHEET ────────────────────────────────────────────────
 function TimesheetForm({ token }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: "", hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
@@ -366,7 +400,9 @@ function TimesheetForm({ token }) {
     return (
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginTop: "80px" }}>
-          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "28px" }}>✓</div>
+          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
           <h2 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, margin: "0 0 8px" }}>Hours logged.</h2>
           <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Entry saved successfully.</p>
           <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
@@ -382,9 +418,7 @@ function TimesheetForm({ token }) {
       <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
-            <div style={{ padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "6px", border: `1px solid ${theme.accent}`, fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "4px" }}>
-              Logging as {linkedEmployeeName || "your account"}
-            </div>
+            <IdentityBadge name={linkedEmployeeName} />
           ) : (
             <>
               <label style={styles.label}>Employee</label>
@@ -417,21 +451,46 @@ function TimesheetForm({ token }) {
   );
 }
 
+// ─── MATERIALS ────────────────────────────────────────────────
 function MaterialsForm({ token }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [linkedEmployeeId, setLinkedEmployeeId] = useState(null);
+  const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
   const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
+    apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => {
+      if (data.employee_id) {
+        setLinkedEmployeeId(data.employee_id);
+        setFormData(prev => ({ ...prev, employee_id: data.employee_id }));
+      }
+    });
     apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
     apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
   }, [token]);
 
+  useEffect(() => {
+    if (linkedEmployeeId && employees.length > 0) {
+      const emp = employees.find(e => e.employee_id === linkedEmployeeId);
+      if (emp) setLinkedEmployeeName(`${emp.first_name} ${emp.last_name}`);
+    }
+  }, [linkedEmployeeId, employees]);
+
   async function handleSubmit(e) {
     e.preventDefault();
-    const response = await apiFetch(`${API}/materials?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const params = {
+      job_id: formData.job_id,
+      description: formData.description,
+      total_cost: formData.total_cost,
+      purchase_date: formData.purchase_date,
+    };
+    if (formData.employee_id) params.purchased_by = formData.employee_id;
+    if (formData.supplier) params.supplier = formData.supplier;
+    if (formData.notes) params.notes = formData.notes;
+    const response = await apiFetch(`${API}/materials?${new URLSearchParams(params)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
@@ -439,7 +498,9 @@ function MaterialsForm({ token }) {
     return (
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginTop: "80px" }}>
-          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "28px" }}>✓</div>
+          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
           <h2 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, margin: "0 0 8px" }}>Materials logged.</h2>
           <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Purchase recorded successfully.</p>
           <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
@@ -454,15 +515,21 @@ function MaterialsForm({ token }) {
       <p style={styles.subtitle}>Record a material purchase</p>
       <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
         <form onSubmit={handleSubmit} style={styles.form}>
+          {linkedEmployeeId ? (
+            <IdentityBadge name={linkedEmployeeName} />
+          ) : (
+            <>
+              <label style={styles.label}>Purchased By</label>
+              <select style={styles.input} value={formData.employee_id} onChange={e => setFormData({...formData, employee_id: e.target.value})}>
+                <option value="">Select employee</option>
+                {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+              </select>
+            </>
+          )}
           <label style={styles.label}>Job</label>
           <select style={styles.input} value={formData.job_id} onChange={e => setFormData({...formData, job_id: e.target.value})} required>
             <option value="">Select job</option>
             {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
-          </select>
-          <label style={styles.label}>Purchased By</label>
-          <select style={styles.input} value={formData.employee_id} onChange={e => setFormData({...formData, employee_id: e.target.value})}>
-            <option value="">Select employee</option>
-            {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
           </select>
           <label style={styles.label}>Supplier</label>
           <input style={styles.input} placeholder="e.g. Home Depot" value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} />
@@ -481,26 +548,25 @@ function MaterialsForm({ token }) {
   );
 }
 
+// ─── MILEAGE ──────────────────────────────────────────────────
 function MileageForm({ token }) {
-  const [formData, setFormData] = useState({ job_id: "", employee_id: "", trip_date: "", km_driven: "", purpose: "", notes: "" });
+  const [formData, setFormData] = useState({ job_id: "", trip_date: "", km_driven: "", purpose: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [linkedEmployeeId, setLinkedEmployeeId] = useState(null);
   const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
   const [employees, setEmployees] = useState([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
     apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => {
       if (data.employee_id) {
         setLinkedEmployeeId(data.employee_id);
-        setFormData(prev => ({ ...prev, employee_id: data.employee_id }));
       }
     });
     apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
-    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(emps => {
-      setEmployees(emps);
-    });
+    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
   }, [token]);
 
   useEffect(() => {
@@ -514,7 +580,17 @@ function MileageForm({ token }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const response = await apiFetch(`${API}/mileage?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const empId = linkedEmployeeId || parseInt(selectedEmployeeId);
+    if (!empId) { alert("Please select an employee."); return; }
+    const params = {
+      job_id: parseInt(formData.job_id),
+      employee_id: empId,
+      trip_date: formData.trip_date,
+      km_driven: parseFloat(formData.km_driven),
+    };
+    if (formData.purpose) params.purpose = formData.purpose;
+    if (formData.notes) params.notes = formData.notes;
+    const response = await apiFetch(`${API}/mileage?${new URLSearchParams(params)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
@@ -522,10 +598,12 @@ function MileageForm({ token }) {
     return (
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginTop: "80px" }}>
-          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "28px" }}>✓</div>
+          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
           <h2 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, margin: "0 0 8px" }}>Mileage logged.</h2>
           <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Trip recorded successfully.</p>
-          <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
+          <button style={styles.button} onClick={() => { setSubmitted(false); setFormData({ job_id: "", trip_date: "", km_driven: "", purpose: "", notes: "" }); }}>Log Another</button>
         </div>
       </div>
     );
@@ -538,13 +616,11 @@ function MileageForm({ token }) {
       <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
-            <div style={{ padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "6px", border: `1px solid ${theme.accent}`, fontSize: "13px", fontWeight: "600", color: theme.accent, marginBottom: "4px" }}>
-              Logging as {linkedEmployeeName || "your account"}
-            </div>
+            <IdentityBadge name={linkedEmployeeName} />
           ) : (
             <>
               <label style={styles.label}>Employee</label>
-              <select style={styles.input} name="employee_id" value={formData.employee_id} onChange={handleChange} required>
+              <select style={styles.input} value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)} required>
                 <option value="">Select employee</option>
                 {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
               </select>
@@ -570,6 +646,7 @@ function MileageForm({ token }) {
   );
 }
 
+// ─── ADMIN ────────────────────────────────────────────────────
 function AdminScreen({ token }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
@@ -794,14 +871,15 @@ function AdminScreen({ token }) {
   );
 }
 
+// ─── DASHBOARD ────────────────────────────────────────────────
 function Dashboard({ token }) {
   const [jobs, setJobs] = useState([]);
+  const [mileage, setMileage] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
   const [details, setDetails] = useState({});
   const [filter, setFilter] = useState("active");
   const [timeFilter, setTimeFilter] = useState("all");
-  const [mileage, setMileage] = useState([]);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -811,10 +889,7 @@ function Dashboard({ token }) {
       .then(r => r.json()).then(setMileage);
   }, [token]);
 
-  const filtered = jobs.filter(j => {
-    const statusMatch = filter === "all" || j.status === filter;
-    return statusMatch;
-  });
+  const filtered = jobs.filter(j => filter === "all" || j.status === filter);
   const totals = {
     hours: filtered.reduce((s, j) => s + j.total_hours, 0),
     labour: filtered.reduce((s, j) => s + j.labour_cost, 0),
@@ -846,8 +921,11 @@ function Dashboard({ token }) {
     { label: "Margin", value: `$${fmt(totals.margin)}`, highlight: true, positive: totals.margin >= 0 },
   ];
 
+  const totalKm = mileage.reduce((s, m) => s + Number(m.km_driven || 0), 0);
+
   return (
     <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "80px" }}>
+      {/* Header */}
       <div style={{ background: `linear-gradient(135deg, ${theme.primaryDark} 0%, ${theme.primary} 60%, ${theme.accent} 100%)`, padding: "28px 20px 32px", color: "white" }}>
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           <div style={{ marginBottom: "20px" }}>
@@ -880,6 +958,7 @@ function Dashboard({ token }) {
         </div>
       </div>
 
+      {/* Job cards */}
       <div style={{ padding: "16px", maxWidth: "900px", margin: "0 auto" }}>
         {loading ? (
           <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>Loading...</div>
@@ -953,6 +1032,8 @@ function Dashboard({ token }) {
                   </div>
                 )}
               </div>
+
+              {/* Expanded detail */}
               {isOpen && (
                 <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${theme.border}` }}>
                   <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", paddingTop: "14px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Timesheet Entries</div>
@@ -960,26 +1041,33 @@ function Dashboard({ token }) {
                     details[job.job_id].timesheets.length === 0
                       ? <p style={{ fontSize: "12px", color: theme.textSecondary, margin: 0 }}>No entries yet.</p>
                       : details[job.job_id].timesheets.map((t, i) => (
-                        <div key={i} style={{ marginBottom: "6px", padding: "8px 10px", backgroundColor: theme.bg, borderRadius: "6px", border: `1px solid ${theme.border}` }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", fontSize: "12px", alignItems: "center", gap: "12px" }}>
-                            <span style={{ fontWeight: "600", color: theme.textPrimary }}>{t.employee_name}</span>
-                            <span style={{ color: theme.textSecondary, whiteSpace: "nowrap" }}>{t.shift_date}</span>
-                            <span style={{ fontWeight: "700", color: theme.primary, whiteSpace: "nowrap", minWidth: "32px", textAlign: "right" }}>{t.hours_worked}h</span>
+                        <div key={i} style={{ marginBottom: "6px", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "6px", border: `1px solid ${theme.border}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{t.employee_name}</div>
+                              <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{t.shift_date}</div>
+                            </div>
+                            <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{t.hours_worked}h</div>
                           </div>
                           {t.field_notes && t.field_notes.toLowerCase() !== "yes" && t.field_notes.toLowerCase() !== "no" && (
-                            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px", fontStyle: "italic" }}>{t.field_notes}</div>
+                            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "6px", paddingTop: "6px", borderTop: `1px solid ${theme.border}`, fontStyle: "italic" }}>{t.field_notes}</div>
                           )}
                         </div>
                       ))
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
+
                   {details[job.job_id]?.materials?.length > 0 && (
                     <div style={{ marginTop: "14px" }}>
                       <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Materials</div>
                       {details[job.job_id].materials.map((m, i) => (
-                        <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", fontSize: "12px", color: theme.textPrimary, padding: "6px 0", borderBottom: `1px solid ${theme.border}`, alignItems: "center", gap: "12px" }}>
-                          <span style={{ fontWeight: "600" }}>{m.supplier || "Unknown"}</span>
-                          <span style={{ color: theme.textSecondary, whiteSpace: "nowrap" }}>{m.description}</span>
-                          <span style={{ fontWeight: "700", color: theme.gold, whiteSpace: "nowrap", textAlign: "right" }}>${fmt(m.total_cost)}</span>
+                        <div key={i} style={{ marginBottom: "6px", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "6px", border: `1px solid ${theme.border}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{m.description}</div>
+                              <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{m.supplier || "Unknown supplier"} · {m.purchase_date}</div>
+                            </div>
+                            <div style={{ fontSize: "15px", fontWeight: "700", color: theme.gold }}>${fmt(m.total_cost)}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -989,26 +1077,26 @@ function Dashboard({ token }) {
             </div>
           );
         })}
-{mileage.length > 0 && (
+
+        {/* Mileage section */}
+        {mileage.length > 0 && (
           <div style={{ marginTop: "24px" }}>
-            <CollapsibleSection title={`🚗 Mileage Log (${mileage.length} trips)`}>
+            <CollapsibleSection title={`Mileage Log — ${totalKm.toFixed(1)} km total`}>
               {mileage.map((m, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: theme.textPrimary, padding: "8px 0", borderBottom: `1px solid ${theme.border}`, alignItems: "center", gap: "12px" }}>
-                  <div>
-                    <div style={{ fontWeight: "600", color: theme.textPrimary }}>{m.employee_name}</div>
-                    <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{m.job_name}</div>
-                  </div>
-                  <div>
-                    <div style={{ color: theme.textSecondary }}>{m.trip_date}</div>
-                    {m.purpose && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px", fontStyle: "italic" }}>{m.purpose}</div>}
-                  </div>
-                  <div style={{ fontWeight: "700", color: theme.primary, whiteSpace: "nowrap", textAlign: "right" }}>
-                    {m.km_driven} km
+                <div key={i} style={{ marginBottom: "6px", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "6px", border: `1px solid ${theme.border}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{m.employee_name}</div>
+                      <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{m.job_name} · {m.trip_date}</div>
+                      {m.purpose && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px", fontStyle: "italic" }}>{m.purpose}</div>}
+                    </div>
+                    <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, whiteSpace: "nowrap" }}>{Number(m.km_driven).toFixed(1)} km</div>
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, fontSize: "13px", fontWeight: "700", color: theme.primary, textAlign: "right" }}>
-                Total: {mileage.reduce((s, m) => s + m.km_driven, 0).toFixed(1)} km
+              <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: theme.textSecondary }}>{mileage.length} trip{mileage.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{totalKm.toFixed(1)} km</span>
               </div>
             </CollapsibleSection>
           </div>
@@ -1018,6 +1106,7 @@ function Dashboard({ token }) {
   );
 }
 
+// ─── APP ROOT ─────────────────────────────────────────────────
 export default function App() {
   const stored = getStoredAuth();
   const [token, setToken] = useState(stored.token);
