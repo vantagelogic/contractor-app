@@ -100,7 +100,6 @@ function CollapsibleSection({ title, color, children }) {
 }
 
 function OnboardingChecklist({ token, onDismiss }) {
-  const headers = { Authorization: `Bearer ${token}` };
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
 
