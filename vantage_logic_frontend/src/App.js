@@ -555,7 +555,7 @@ function AdminScreen({ token }) {
     if (loginForm.password !== loginForm.confirm_password) { setLoginError("Passwords do not match"); return; }
     setLoginError("");
     const params = { company_id: companyId, email: loginForm.email, password: loginForm.password, role: loginForm.employee_role };
-    if (loginForm.employee_id) params.employee_id = loginForm.employee_id;
+    if (loginForm.employee_id) params.employee_id = parseInt(loginForm.employee_id);
     const res = await apiFetch(`${API}/users?${new URLSearchParams(params)}`, { method: "POST" });
     if (res.ok) { showMsg(`Login created for ${loginForm.email}`); setLoginForm({ email: "", password: "", confirm_password: "", employee_role: "crew", employee_id: "" }); }
     else { const d = await res.json(); showMsg(`Error: ${d.detail}`); }
