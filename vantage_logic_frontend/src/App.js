@@ -762,7 +762,7 @@ function Dashboard({ token }) {
           const isOpen = expanded[job.job_id];
 
           return (
-            <div key={job.job_id} onClick={() => toggleJob(job.job_id)} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", borderLeft: `4px solid ${barColor}`, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${barColor}`, cursor: "pointer" }}>
+            <div key={job.job_id} onClick={() => toggleJob(job.job_id)} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", border: `1px solid ${theme.border}`, borderLeft: `4px solid ${barColor}`, cursor: "pointer" }}>
               <div style={{ padding: "16px" }}>
                 {/* Job title row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
