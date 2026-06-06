@@ -4,21 +4,19 @@ const API = "https://contractor-api-pi7o.onrender.com";
 
 const theme = {
   primary: "#1a3d2b",
-  primaryHover: "#2d6a4f",
+  primaryDark: "#122b1e",
   accent: "#2d6a4f",
   accentLight: "#e8f5ee",
-  gold: "#E8A020",
-  danger: "#c0392b",
+  gold: "#c8973a",
+  danger: "#b83232",
   dangerLight: "#fdf0ee",
-  warning: "#d68910",
+  warning: "#c47d1a",
   bg: "#f8f7f4",
-  bgDark: "#1a3d2b",
   card: "#ffffff",
   border: "#e0ddd8",
   textPrimary: "#1a1a1a",
-  textSecondary: "#5a5a5a",
+  textSecondary: "#5c5c5c",
   textLight: "#9a9a9a",
-  navBg: "#1a3d2b",
   sidebarWidth: "220px",
 };
 
@@ -27,24 +25,17 @@ const font = {
   body: "'Segoe UI', system-ui, -apple-system, Arial, sans-serif",
 };
 
+const isMobile = () => window.innerWidth < 768;
+
 const styles = {
-  container: {
-    maxWidth: "560px",
-    margin: "0 auto",
-    padding: "20px 16px 100px",
-    fontFamily: font.body,
-    backgroundColor: theme.bg,
-    minHeight: "100vh",
-  },
+  container: { maxWidth: "580px", margin: "0 auto", padding: "20px 16px 100px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
   title: { fontSize: "22px", fontWeight: "700", color: theme.primary, marginBottom: "4px", fontFamily: font.heading },
   subtitle: { fontSize: "13px", color: theme.textSecondary, marginBottom: "20px" },
   form: { display: "flex", flexDirection: "column", gap: "4px" },
-  label: { fontSize: "12px", fontWeight: "600", color: theme.textSecondary, marginTop: "10px", textTransform: "uppercase", letterSpacing: "0.5px" },
-  input: { padding: "11px 14px", fontSize: "15px", borderRadius: "6px", border: `1.5px solid ${theme.border}`, width: "100%", boxSizing: "border-box", backgroundColor: "white", outline: "none", fontFamily: font.body, transition: "border-color 0.2s" },
+  label: { fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginTop: "12px", textTransform: "uppercase", letterSpacing: "0.6px" },
+  input: { padding: "11px 14px", fontSize: "15px", borderRadius: "6px", border: `1.5px solid ${theme.border}`, width: "100%", boxSizing: "border-box", backgroundColor: "white", outline: "none", fontFamily: font.body },
   textarea: { padding: "11px 14px", fontSize: "15px", borderRadius: "6px", border: `1.5px solid ${theme.border}`, width: "100%", boxSizing: "border-box", minHeight: "80px", backgroundColor: "white", fontFamily: font.body },
-  button: { marginTop: "14px", padding: "13px 20px", fontSize: "15px", backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontFamily: font.body, letterSpacing: "0.3px" },
-  card: { backgroundColor: "white", borderRadius: "10px", padding: "16px", marginBottom: "12px", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", border: `1px solid ${theme.border}` },
-  success: { color: theme.accent, textAlign: "center", marginTop: "40px", fontSize: "20px", fontWeight: "700", fontFamily: font.heading },
+  button: { marginTop: "14px", padding: "13px 20px", fontSize: "15px", backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "700", fontFamily: font.body },
 };
 
 function fmt(n) {
@@ -52,9 +43,8 @@ function fmt(n) {
 }
 
 function getStoredAuth() {
-  try {
-    return { token: localStorage.getItem("vl_token"), role: localStorage.getItem("vl_role") };
-  } catch { return { token: null, role: null }; }
+  try { return { token: localStorage.getItem("vl_token"), role: localStorage.getItem("vl_role") }; }
+  catch { return { token: null, role: null }; }
 }
 
 function setStoredAuth(token, role) {
@@ -69,15 +59,43 @@ function PasswordInput({ placeholder, value, onChange, required }) {
   return (
     <div style={{ position: "relative" }}>
       <input style={{...styles.input, paddingRight: "60px"}} type={show ? "text" : "password"} placeholder={placeholder || "Password"} value={value} onChange={onChange} required={required} />
-      <button type="button" onClick={() => setShow(!show)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: theme.accent, fontWeight: "700", padding: 0, fontFamily: font.body }}>
+      <button type="button" onClick={() => setShow(!show)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: theme.accent, fontWeight: "700", padding: 0 }}>
         {show ? "Hide" : "Show"}
       </button>
     </div>
   );
 }
 
-// ─── NAVIGATION ──────────────────────────────────────────────
+// ─── LOGO SVG ─────────────────────────────────────────────────
+function VantageLogo({ size = 40, color = "white", showText = true, textColor = "white" }) {
+  const s = size;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <svg width={s} height={s} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 85 C18 85 28 55 35 30 C38 20 42 14 46 14 C48 14 50 17 50 22 C50 35 44 60 44 75" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none"/>
+        <path d="M40 85 C40 85 50 50 58 25 C62 12 67 6 72 6 C75 6 78 9 78 15 C78 30 70 58 68 78" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none" opacity="0.75"/>
+        <path d="M62 85 C62 85 70 55 76 35 C80 22 85 14 90 14" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none" opacity="0.45"/>
+      </svg>
+      {showText && (
+        <div>
+          <div style={{ fontSize: s * 0.38 + "px", fontWeight: "700", color: textColor, fontFamily: font.heading, letterSpacing: "0.5px", lineHeight: 1 }}>VANTAGE LOGIC</div>
+          <div style={{ fontSize: s * 0.18 + "px", color: textColor, opacity: 0.6, letterSpacing: "2px", textTransform: "uppercase", marginTop: "2px" }}>Field Management</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────
 function NavBar({ view, setView, role, onLogout }) {
+  const [mobile, setMobile] = useState(isMobile());
+
+  useEffect(() => {
+    const handler = () => setMobile(isMobile());
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
   const tabs = [
     { id: "timesheet", label: "Hours", icon: "⏱" },
     { id: "materials", label: "Materials", icon: "🔧" },
@@ -87,71 +105,56 @@ function NavBar({ view, setView, role, onLogout }) {
     ] : []),
   ];
 
-  return (
-    <>
-      {/* Desktop: left sidebar */}
-      <style>{`
-        @media (min-width: 768px) {
-          .vl-bottom-nav { display: none !important; }
-          .vl-sidebar { display: flex !important; }
-          .vl-main-content { margin-left: ${theme.sidebarWidth} !important; }
-        }
-        @media (max-width: 767px) {
-          .vl-bottom-nav { display: flex !important; }
-          .vl-sidebar { display: none !important; }
-          .vl-main-content { margin-left: 0 !important; }
-        }
-      `}</style>
-
-      {/* Sidebar for desktop */}
-      <div className="vl-sidebar" style={{ display: "none", position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.navBg, flexDirection: "column", zIndex: 1000, boxShadow: "2px 0 12px rgba(0,0,0,0.15)" }}>
-        <div style={{ padding: "24px 20px 20px" }}>
-          <div style={{ fontSize: "18px", fontWeight: "700", color: "white", fontFamily: font.heading, letterSpacing: "0.3px" }}>Vantage Logic</div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)", marginTop: "3px" }}>Field Management</div>
-        </div>
-        <div style={{ flex: 1, padding: "8px 12px" }}>
-          {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "8px", border: "none", cursor: "pointer", marginBottom: "4px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.6)", fontFamily: font.body, fontSize: "14px", fontWeight: view === tab.id ? "700" : "400", textAlign: "left", transition: "all 0.15s" }}>
-              <span style={{ fontSize: "18px" }}>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-        <div style={{ padding: "16px 12px 24px" }}>
-          <button onClick={onLogout} style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "transparent", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "600", textAlign: "left" }}>
-            Sign Out
-          </button>
-        </div>
-      </div>
-
-      {/* Bottom nav for mobile */}
-      <div className="vl-bottom-nav" style={{ display: "none", position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.navBg, zIndex: 1000, justifyContent: "space-around", padding: "8px 0 10px", boxShadow: "0 -2px 10px rgba(0,0,0,0.15)" }}>
+  if (mobile) {
+    return (
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primary, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "8px 0 10px", boxShadow: "0 -2px 12px rgba(0,0,0,0.2)" }}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "4px 12px", borderRadius: "8px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent" }}>
+          <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "4px 10px", borderRadius: "8px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent" }}>
             <span style={{ fontSize: "20px" }}>{tab.icon}</span>
             <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.55)", fontWeight: view === tab.id ? "700" : "400" }}>{tab.label}</span>
           </button>
         ))}
       </div>
-    </>
+    );
+  }
+
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.primary, display: "flex", flexDirection: "column", zIndex: 1000, boxShadow: "2px 0 16px rgba(0,0,0,0.15)" }}>
+      <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+        <VantageLogo size={36} color="white" textColor="white" />
+      </div>
+      <div style={{ flex: 1, padding: "12px" }}>
+        {tabs.map(tab => (
+          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "8px", border: "none", cursor: "pointer", marginBottom: "4px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.15)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.6)", fontFamily: font.body, fontSize: "14px", fontWeight: view === tab.id ? "700" : "400", textAlign: "left" }}>
+            <span style={{ fontSize: "18px" }}>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+      <div style={{ padding: "16px 12px 28px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+        <button onClick={onLogout} style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "transparent", color: "rgba(255,255,255,0.75)", cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "600", textAlign: "center" }}>
+          Sign Out
+        </button>
+      </div>
+    </div>
   );
 }
 
-// ─── COLLAPSIBLE SECTION ──────────────────────────────────────
+// ─── COLLAPSIBLE ──────────────────────────────────────────────
 function CollapsibleSection({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ marginBottom: "10px", borderRadius: "8px", overflow: "hidden", border: `1px solid ${theme.border}` }}>
       <div onClick={() => setOpen(!open)} style={{ backgroundColor: theme.primary, color: "white", padding: "13px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: "700", fontSize: "14px", fontFamily: font.body }}>
         <span>{title}</span>
-        <span style={{ fontSize: "11px", opacity: 0.7 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ fontSize: "11px", opacity: 0.6 }}>{open ? "▲" : "▼"}</span>
       </div>
       {open && <div style={{ backgroundColor: "white", padding: "16px" }}>{children}</div>}
     </div>
   );
 }
 
-// ─── ONBOARDING CHECKLIST ─────────────────────────────────────
+// ─── ONBOARDING ───────────────────────────────────────────────
 function OnboardingChecklist({ token, onDismiss }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
@@ -169,13 +172,13 @@ function OnboardingChecklist({ token, onDismiss }) {
   ];
 
   return (
-    <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "16px", marginBottom: "16px", border: `2px solid ${theme.accent}`, boxShadow: "0 2px 8px rgba(45,106,79,0.12)" }}>
+    <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "18px", marginBottom: "16px", border: `2px solid ${theme.accent}`, boxShadow: "0 2px 12px rgba(45,106,79,0.12)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
         <div>
           <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary, fontFamily: font.heading }}>Get started</div>
           <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>Three steps to get your team running</div>
         </div>
-        <button onClick={onDismiss} style={{ fontSize: "18px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", lineHeight: 1, padding: "0 0 0 8px" }}>×</button>
+        <button onClick={onDismiss} style={{ fontSize: "22px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", lineHeight: 1, padding: "0 0 0 12px", fontWeight: "300" }}>×</button>
       </div>
       {steps.map((step, i) => (
         <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "10px 0", borderBottom: i < steps.length - 1 ? `1px solid ${theme.border}` : "none" }}>
@@ -221,29 +224,37 @@ function Login({ onLogin, onSignUp }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body }}>
-      <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.1)", margin: "24px", border: `1px solid ${theme.border}` }}>
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, letterSpacing: "-0.5px" }}>Vantage Logic</div>
-          <div style={{ fontSize: "13px", color: theme.textSecondary, marginTop: "6px" }}>Field Management for Trades</div>
+    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", fontFamily: font.body }}>
+      <div style={{ display: "none", flex: 1, backgroundColor: theme.primary, flexDirection: "column", justifyContent: "center", padding: "60px", minHeight: "100vh" }} className="vl-login-panel">
+        <VantageLogo size={52} color="white" textColor="white" />
+        <div style={{ marginTop: "48px" }}>
+          <div style={{ fontSize: "32px", fontWeight: "700", color: "white", fontFamily: font.heading, lineHeight: 1.3, marginBottom: "16px" }}>Built for trades.<br />Built for the field.</div>
+          <div style={{ fontSize: "15px", color: "rgba(255,255,255,0.65)", lineHeight: 1.7 }}>Real-time job costing, crew tracking, and profit visibility — purpose-built for how contractors actually work.</div>
         </div>
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Email</label>
-          <input style={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@yourcompany.com" />
-          <label style={styles.label}>Password</label>
-          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {error && <p style={{ color: theme.danger, fontSize: "13px", margin: "6px 0 0" }}>{error}</p>}
-          <button style={{...styles.button, marginTop: "24px", backgroundColor: theme.primary}} type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-        <div style={{ textAlign: "center", marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${theme.border}` }}>
-          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 10px" }}>No account yet?</p>
-          <button onClick={onSignUp} style={{ fontSize: "14px", color: "white", background: theme.accent, border: "none", borderRadius: "6px", padding: "10px 24px", cursor: "pointer", fontWeight: "700", fontFamily: font.body }}>
-            Start Free Trial
-          </button>
+      </div>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+        <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.08)", border: `1px solid ${theme.border}` }}>
+          <div style={{ marginBottom: "32px" }}>
+            <VantageLogo size={40} color={theme.primary} textColor={theme.primary} showText={true} />
+          </div>
+          <form onSubmit={handleSubmit} style={styles.form}>
+            <label style={styles.label}>Email</label>
+            <input style={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@yourcompany.com" />
+            <label style={styles.label}>Password</label>
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
+            {error && <p style={{ color: theme.danger, fontSize: "13px", margin: "6px 0 0" }}>{error}</p>}
+            <button style={{...styles.button, marginTop: "24px"}} type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
+          <div style={{ textAlign: "center", marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${theme.border}` }}>
+            <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 12px" }}>No account yet?</p>
+            <button onClick={onSignUp} style={{ fontSize: "14px", color: "white", background: theme.accent, border: "none", borderRadius: "6px", padding: "10px 28px", cursor: "pointer", fontWeight: "700", fontFamily: font.body }}>
+              Start Free Trial
+            </button>
+          </div>
+          <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "16px" }}>Forgot your password? Contact your administrator.</p>
         </div>
-        <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "16px" }}>Forgot your password? Contact your administrator.</p>
       </div>
     </div>
   );
@@ -273,10 +284,13 @@ function SignUp({ onLogin, onBack }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body }}>
-      <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.1)", margin: "24px", border: `1px solid ${theme.border}` }}>
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: theme.primary, fontFamily: font.heading }}>Start Your Free Trial</div>
+    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "24px" }}>
+      <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.08)", border: `1px solid ${theme.border}` }}>
+        <div style={{ marginBottom: "28px" }}>
+          <VantageLogo size={36} color={theme.primary} textColor={theme.primary} />
+        </div>
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading }}>Start Your Free Trial</div>
           <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "6px 0 0" }}>30 days free — no credit card required</p>
         </div>
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -301,7 +315,7 @@ function SignUp({ onLogin, onBack }) {
   );
 }
 
-// ─── TIMESHEET FORM ───────────────────────────────────────────
+// ─── TIMESHEET ────────────────────────────────────────────────
 function TimesheetForm({ token }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: "", hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
@@ -310,29 +324,28 @@ function TimesheetForm({ token }) {
   const [costCodes, setCostCodes] = useState([]);
 
   useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/employees`, { headers }).then(r => r.json()).then(setEmployees);
-    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
-    fetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
+    const h = { Authorization: `Bearer ${token}` };
+    fetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
+    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
+    fetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
   }, [token]);
 
   function handleChange(e) { setFormData({ ...formData, [e.target.name]: e.target.value }); }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const params = new URLSearchParams(formData);
-    const response = await fetch(`${API}/timesheets?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`${API}/timesheets?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
   if (submitted) {
     return (
       <div style={styles.container}>
-        <div style={{ textAlign: "center", marginTop: "60px" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
-          <h2 style={{ ...styles.success }}>Hours logged.</h2>
-          <p style={{ color: theme.textSecondary, fontSize: "14px" }}>Entry saved successfully.</p>
-          <button style={{...styles.button, marginTop: "24px"}} onClick={() => setSubmitted(false)}>Log Another</button>
+        <div style={{ textAlign: "center", marginTop: "80px" }}>
+          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "28px" }}>✓</div>
+          <h2 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, margin: "0 0 8px" }}>Hours logged.</h2>
+          <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Entry saved successfully.</p>
+          <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
         </div>
       </div>
     );
@@ -342,7 +355,7 @@ function TimesheetForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Hours</h1>
       <p style={styles.subtitle}>Field entry — Vantage Logic</p>
-      <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.06)" }}>
+      <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Employee</label>
           <select style={styles.input} name="employee_id" value={formData.employee_id} onChange={handleChange} required>
@@ -364,7 +377,7 @@ function TimesheetForm({ token }) {
           <label style={styles.label}>Hours Worked</label>
           <input style={styles.input} name="hours_worked" type="number" step="0.5" placeholder="e.g. 8.5" value={formData.hours_worked} onChange={handleChange} required />
           <label style={styles.label}>Field Notes</label>
-          <textarea style={styles.textarea} name="field_notes" placeholder="What did you work on today?" value={formData.field_notes} onChange={handleChange} />
+          <textarea style={styles.textarea} name="field_notes" placeholder="What did you work on today? (optional)" value={formData.field_notes} onChange={handleChange} />
           <button style={styles.button} type="submit">Submit Timesheet</button>
         </form>
       </div>
@@ -372,7 +385,7 @@ function TimesheetForm({ token }) {
   );
 }
 
-// ─── MATERIALS FORM ───────────────────────────────────────────
+// ─── MATERIALS ────────────────────────────────────────────────
 function MaterialsForm({ token }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
@@ -380,26 +393,25 @@ function MaterialsForm({ token }) {
   const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/jobs`, { headers }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
-    fetch(`${API}/employees`, { headers }).then(r => r.json()).then(setEmployees);
+    const h = { Authorization: `Bearer ${token}` };
+    fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(data.filter(j => j.status === "active")));
+    fetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(setEmployees);
   }, [token]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const params = new URLSearchParams(formData);
-    const response = await fetch(`${API}/materials?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`${API}/materials?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     if (response.ok) setSubmitted(true);
   }
 
   if (submitted) {
     return (
       <div style={styles.container}>
-        <div style={{ textAlign: "center", marginTop: "60px" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
-          <h2 style={{ ...styles.success }}>Materials logged.</h2>
-          <p style={{ color: theme.textSecondary, fontSize: "14px" }}>Purchase recorded successfully.</p>
-          <button style={{...styles.button, marginTop: "24px"}} onClick={() => setSubmitted(false)}>Log Another</button>
+        <div style={{ textAlign: "center", marginTop: "80px" }}>
+          <div style={{ width: "64px", height: "64px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "28px" }}>✓</div>
+          <h2 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading, margin: "0 0 8px" }}>Materials logged.</h2>
+          <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Purchase recorded successfully.</p>
+          <button style={styles.button} onClick={() => setSubmitted(false)}>Log Another</button>
         </div>
       </div>
     );
@@ -409,7 +421,7 @@ function MaterialsForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Materials</h1>
       <p style={styles.subtitle}>Record a material purchase</p>
-      <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.06)" }}>
+      <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "20px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 6px rgba(26,61,43,0.05)" }}>
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Job</label>
           <select style={styles.input} value={formData.job_id} onChange={e => setFormData({...formData, job_id: e.target.value})} required>
@@ -438,7 +450,7 @@ function MaterialsForm({ token }) {
   );
 }
 
-// ─── ADMIN SCREEN ─────────────────────────────────────────────
+// ─── ADMIN ────────────────────────────────────────────────────
 function AdminScreen({ token }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
@@ -459,7 +471,7 @@ function AdminScreen({ token }) {
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
-    fetch(`${API}/me`, { headers: h }).then(r => r.json()).then(data => setCompanyId(data.company_id));
+    fetch(`${API}/me`, { headers: h }).then(r => r.json()).then(d => setCompanyId(d.company_id));
     fetch(`${API}/employees/all`, { headers: h }).then(r => r.json()).then(setEmployees);
     fetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(setJobs);
     fetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(setCostCodes);
@@ -471,42 +483,42 @@ function AdminScreen({ token }) {
     fetch(`${API}/cost-codes`, { headers }).then(r => r.json()).then(setCostCodes);
   }
 
-  function showMessage(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
+  function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
   async function addEmployee() {
     const res = await fetch(`${API}/employees?${new URLSearchParams(empForm)}`, { method: "POST", headers });
-    if (res.ok) { showMessage("Employee added."); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); refresh(); }
-    else showMessage("Error adding employee.");
+    if (res.ok) { showMsg("Employee added."); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); refresh(); }
+    else showMsg("Error adding employee.");
   }
 
   async function updateEmployee() {
     const res = await fetch(`${API}/employees/${editingEmp.employee_id}?${new URLSearchParams(empForm)}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage("Employee updated."); setEditingEmp(null); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); refresh(); }
-    else showMessage("Error updating employee.");
+    if (res.ok) { showMsg("Employee updated."); setEditingEmp(null); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "" }); refresh(); }
+    else showMsg("Error updating employee.");
   }
 
   async function addJob() {
     const res = await fetch(`${API}/jobs?${new URLSearchParams(jobForm)}`, { method: "POST", headers });
-    if (res.ok) { showMessage("Job added."); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
-    else showMessage("Error adding job.");
+    if (res.ok) { showMsg("Job added."); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
+    else showMsg("Error adding job.");
   }
 
   async function updateJob() {
     const res = await fetch(`${API}/jobs/${editingJob.job_id}?${new URLSearchParams(jobForm)}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage("Job updated."); setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
-    else showMessage("Error updating job.");
+    if (res.ok) { showMsg("Job updated."); setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
+    else showMsg("Error updating job.");
   }
 
   async function addCostCode() {
     const res = await fetch(`${API}/cost-codes?${new URLSearchParams(ccForm)}`, { method: "POST", headers });
-    if (res.ok) { showMessage("Cost code added."); setCcForm({ code: "", description: "", category: "" }); refresh(); }
-    else showMessage("Error adding cost code.");
+    if (res.ok) { showMsg("Cost code added."); setCcForm({ code: "", description: "", category: "" }); refresh(); }
+    else showMsg("Error adding cost code.");
   }
 
   async function updateCostCode() {
     const res = await fetch(`${API}/cost-codes/${editingCc.cost_code_id}?${new URLSearchParams(ccForm)}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage("Cost code updated."); setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); refresh(); }
-    else showMessage("Error updating cost code.");
+    if (res.ok) { showMsg("Cost code updated."); setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); refresh(); }
+    else showMsg("Error updating cost code.");
   }
 
   async function createLogin() {
@@ -514,19 +526,19 @@ function AdminScreen({ token }) {
     if (loginForm.password !== loginForm.confirm_password) { setLoginError("Passwords do not match"); return; }
     setLoginError("");
     const res = await fetch(`${API}/users?${new URLSearchParams({ company_id: companyId, email: loginForm.email, password: loginForm.password, role: loginForm.employee_role })}`, { method: "POST" });
-    if (res.ok) { showMessage(`Login created for ${loginForm.email}`); setLoginForm({ email: "", password: "", confirm_password: "", employee_role: "crew" }); }
-    else { const d = await res.json(); showMessage(`Error: ${d.detail}`); }
+    if (res.ok) { showMsg(`Login created for ${loginForm.email}`); setLoginForm({ email: "", password: "", confirm_password: "", employee_role: "crew" }); }
+    else { const d = await res.json(); showMsg(`Error: ${d.detail}`); }
   }
 
   async function toggleEmployee(emp) {
     const endpoint = emp.active ? "deactivate" : "activate";
     const res = await fetch(`${API}/employees/${emp.employee_id}/${endpoint}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage(`${emp.first_name} ${emp.active ? "archived" : "restored"}.`); refresh(); }
+    if (res.ok) { showMsg(`${emp.first_name} ${emp.active ? "archived" : "restored"}.`); refresh(); }
   }
 
   async function setJobStatus(job, status) {
     const res = await fetch(`${API}/jobs/${job.job_id}/status?status=${status}`, { method: "PATCH", headers });
-    if (res.ok) { showMessage(`${job.job_name} marked as ${status}.`); refresh(); }
+    if (res.ok) { showMsg(`${job.job_name} marked as ${status}.`); refresh(); }
   }
 
   function startEditEmp(emp) { setEditingEmp(emp); setEmpForm({ first_name: emp.first_name, last_name: emp.last_name, role: emp.role || "", hourly_rate: emp.hourly_rate || "", burden_rate: emp.burden_rate || "" }); }
@@ -539,12 +551,17 @@ function AdminScreen({ token }) {
   const completedJobs = jobs.filter(j => j.status === "completed");
   const inactiveJobs = jobs.filter(j => j.status === "inactive");
 
-  const tag = (bg, color) => ({ fontSize: "11px", padding: "3px 10px", borderRadius: "4px", border: "none", cursor: "pointer", backgroundColor: bg, color: color, fontWeight: "700", fontFamily: font.body });
+  const Btn = ({ label, bg, color, onClick }) => (
+    <button onClick={onClick} style={{ fontSize: "11px", padding: "4px 10px", borderRadius: "4px", border: "none", cursor: "pointer", backgroundColor: bg, color, fontWeight: "700", fontFamily: font.body, whiteSpace: "nowrap" }}>{label}</button>
+  );
 
-  const ItemRow = ({ left, right }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "6px", marginBottom: "6px", border: `1px solid ${theme.border}` }}>
-      {left}
-      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>{right}</div>
+  const Row = ({ main, sub, actions }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "6px", marginBottom: "6px", border: `1px solid ${theme.border}`, gap: "8px" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: "600", fontSize: "13px", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{main}</div>
+        {sub && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{sub}</div>}
+      </div>
+      <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>{actions}</div>
     </div>
   );
 
@@ -555,14 +572,17 @@ function AdminScreen({ token }) {
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "10px 14px", borderRadius: "6px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
       <CollapsibleSection title="Employees">
-        <p style={{ fontSize: "12px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        <p style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
           {editingEmp ? `Editing: ${editingEmp.first_name} ${editingEmp.last_name}` : "Add New Employee"}
         </p>
-        <input style={styles.input} placeholder="First Name" value={empForm.first_name} onChange={e => setEmpForm({...empForm, first_name: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Last Name" value={empForm.last_name} onChange={e => setEmpForm({...empForm, last_name: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Role (e.g. Electrician)" value={empForm.role} onChange={e => setEmpForm({...empForm, role: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Hourly Rate" type="number" value={empForm.hourly_rate} onChange={e => setEmpForm({...empForm, hourly_rate: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Burden Rate" type="number" value={empForm.burden_rate} onChange={e => setEmpForm({...empForm, burden_rate: e.target.value})} />
+        {["first_name:First Name", "last_name:Last Name", "role:Role (e.g. Electrician)"].map(f => {
+          const [key, ph] = f.split(":");
+          return <input key={key} style={{...styles.input, marginBottom: "6px"}} placeholder={ph} value={empForm[key]} onChange={e => setEmpForm({...empForm, [key]: e.target.value})} />;
+        })}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+          <input style={styles.input} placeholder="Hourly Rate" type="number" value={empForm.hourly_rate} onChange={e => setEmpForm({...empForm, hourly_rate: e.target.value})} />
+          <input style={styles.input} placeholder="Burden Rate" type="number" value={empForm.burden_rate} onChange={e => setEmpForm({...empForm, burden_rate: e.target.value})} />
+        </div>
         {editingEmp ? (
           <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
             <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateEmployee}>Save Changes</button>
@@ -570,124 +590,75 @@ function AdminScreen({ token }) {
           </div>
         ) : <button style={styles.button} onClick={addEmployee}>Add Employee</button>}
 
-        {activeEmps.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
-            <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
-            {activeEmps.map(emp => (
-              <ItemRow key={emp.employee_id}
-                left={<div><div style={{ fontWeight: "600", fontSize: "13px", color: theme.textPrimary }}>{emp.first_name} {emp.last_name}</div><div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{emp.role} · ${emp.hourly_rate}/hr · Burden ${emp.burden_rate}/hr</div></div>}
-                right={[
-                  <button key="edit" onClick={() => startEditEmp(emp)} style={tag(theme.accentLight, theme.accent)}>Edit</button>,
-                  <button key="arch" onClick={() => toggleEmployee(emp)} style={tag(theme.dangerLight, theme.danger)}>Archive</button>
-                ]}
-              />
-            ))}
-          </div>
-        )}
-        {inactiveEmps.length > 0 && (
-          <div style={{ marginTop: "8px" }}>
-            <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-              {showInactiveEmp ? "Hide" : "Show"} archived ({inactiveEmps.length})
-            </button>
-            {showInactiveEmp && inactiveEmps.map(emp => (
-              <ItemRow key={emp.employee_id}
-                left={<span style={{ fontWeight: "600", fontSize: "13px", color: theme.textSecondary }}>{emp.first_name} {emp.last_name}</span>}
-                right={[<button key="res" onClick={() => toggleEmployee(emp)} style={tag(theme.accentLight, theme.accent)}>Restore</button>]}
-              />
-            ))}
-          </div>
-        )}
+        {activeEmps.length > 0 && <div style={{ marginTop: "16px" }}>
+          <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>Active</p>
+          {activeEmps.map(emp => <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} sub={`${emp.role || "—"} · $${emp.hourly_rate}/hr · Burden $${emp.burden_rate}/hr`} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditEmp(emp)} />, <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => toggleEmployee(emp)} />]} />)}
+        </div>}
+        {inactiveEmps.length > 0 && <div style={{ marginTop: "8px" }}>
+          <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{showInactiveEmp ? "Hide" : "Show"} archived ({inactiveEmps.length})</button>
+          {showInactiveEmp && inactiveEmps.map(emp => <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => toggleEmployee(emp)} />]} />)}
+        </div>}
       </CollapsibleSection>
 
       <CollapsibleSection title="Jobs">
-        <p style={{ fontSize: "12px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        <p style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
           {editingJob ? `Editing: ${editingJob.job_name}` : "Add New Job"}
         </p>
-        <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Contract Value (optional)" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Budgeted Hours (optional)" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+          <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
+          <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
+          <input style={styles.input} placeholder="Contract Value" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
+          <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+        </div>
         {editingJob ? (
-          <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+          <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
             <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
             <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
           </div>
         ) : <button style={styles.button} onClick={addJob}>Add Job</button>}
 
-        {activeJobs.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
-            <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
-            {activeJobs.map(job => (
-              <ItemRow key={job.job_id}
-                left={<div><div style={{ fontWeight: "600", fontSize: "13px", color: theme.textPrimary }}>{job.job_name}</div><div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{job.city}{job.contract_value ? ` · $${fmt(job.contract_value)}` : ""}{job.budgeted_hours ? ` · ${job.budgeted_hours}h` : ""}</div></div>}
-                right={[
-                  <button key="edit" onClick={() => startEditJob(job)} style={tag(theme.accentLight, theme.accent)}>Edit</button>,
-                  <button key="comp" onClick={() => setJobStatus(job, "completed")} style={tag("#e8f5ee", theme.accent)}>Complete</button>,
-                  <button key="arch" onClick={() => setJobStatus(job, "inactive")} style={tag(theme.dangerLight, theme.danger)}>Archive</button>
-                ]}
-              />
-            ))}
-          </div>
-        )}
-        {completedJobs.length > 0 && (
-          <div style={{ marginTop: "8px" }}>
-            <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Completed</p>
-            {completedJobs.map(job => (
-              <ItemRow key={job.job_id}
-                left={<span style={{ fontWeight: "600", fontSize: "13px", color: theme.accent }}>{job.job_name}</span>}
-                right={[<button key="react" onClick={() => setJobStatus(job, "active")} style={tag(theme.accentLight, theme.accent)}>Reactivate</button>]}
-              />
-            ))}
-          </div>
-        )}
-        {inactiveJobs.length > 0 && (
-          <div style={{ marginTop: "8px" }}>
-            <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-              {showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})
-            </button>
-            {showInactiveJob && inactiveJobs.map(job => (
-              <ItemRow key={job.job_id}
-                left={<span style={{ fontWeight: "600", fontSize: "13px", color: theme.textSecondary }}>{job.job_name}</span>}
-                right={[<button key="res" onClick={() => setJobStatus(job, "active")} style={tag(theme.accentLight, theme.accent)}>Restore</button>]}
-              />
-            ))}
-          </div>
-        )}
+        {activeJobs.length > 0 && <div style={{ marginTop: "16px" }}>
+          <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>Active</p>
+          {activeJobs.map(job => <Row key={job.job_id} main={job.job_name} sub={`${job.city || ""}${job.contract_value ? ` · $${fmt(job.contract_value)}` : ""}${job.budgeted_hours ? ` · ${job.budgeted_hours}h` : ""}`} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJob(job)} />, <Btn key="c" label="Complete" bg="#e8f5ee" color={theme.accent} onClick={() => setJobStatus(job, "completed")} />, <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => setJobStatus(job, "inactive")} />]} />)}
+        </div>}
+        {completedJobs.length > 0 && <div style={{ marginTop: "8px" }}>
+          <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>Completed</p>
+          {completedJobs.map(job => <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />)}
+        </div>}
+        {inactiveJobs.length > 0 && <div style={{ marginTop: "8px" }}>
+          <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})</button>
+          {showInactiveJob && inactiveJobs.map(job => <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />)}
+        </div>}
       </CollapsibleSection>
 
       <CollapsibleSection title="Cost Codes">
-        <p style={{ fontSize: "12px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        <p style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
           {editingCc ? `Editing: ${editingCc.code}` : "Add New Cost Code"}
         </p>
-        <input style={styles.input} placeholder="Code (e.g. 001)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Description" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
-        <input style={{...styles.input, marginTop: "6px"}} placeholder="Category (e.g. Labour)" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+          <input style={styles.input} placeholder="Code (e.g. 001)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
+          <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
+        </div>
+        <input style={{...styles.input, marginBottom: "6px"}} placeholder="Description" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
         {editingCc ? (
-          <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateCostCode}>Save Changes</button>
             <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
           </div>
         ) : <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>}
-        {costCodes.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
-            <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Current</p>
-            {costCodes.map(cc => (
-              <ItemRow key={cc.cost_code_id}
-                left={<div><span style={{ fontWeight: "600", fontSize: "13px" }}>{cc.code}</span><span style={{ color: theme.textSecondary, fontSize: "12px", marginLeft: "8px" }}>{cc.description}</span>{cc.category && <span style={{ fontSize: "11px", color: theme.textLight, marginLeft: "6px" }}>· {cc.category}</span>}</div>}
-                right={[<button key="edit" onClick={() => startEditCc(cc)} style={tag(theme.accentLight, theme.accent)}>Edit</button>]}
-              />
-            ))}
-          </div>
-        )}
+        {costCodes.length > 0 && <div style={{ marginTop: "16px" }}>
+          <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>Current</p>
+          {costCodes.map(cc => <Row key={cc.cost_code_id} main={`${cc.code} — ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />)}
+        </div>}
       </CollapsibleSection>
 
       <CollapsibleSection title="Create Crew Login">
         <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "12px" }}>Give a crew member access to the app</p>
-        <input style={styles.input} placeholder="Email" type="email" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
-        <div style={{ marginTop: "6px" }}><PasswordInput placeholder="Password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} /></div>
-        <div style={{ marginTop: "6px" }}><PasswordInput placeholder="Confirm Password" value={loginForm.confirm_password} onChange={e => setLoginForm({...loginForm, confirm_password: e.target.value})} /></div>
-        {loginError && <p style={{ color: theme.danger, fontSize: "13px", margin: "6px 0 0" }}>{loginError}</p>}
-        <select style={{...styles.input, marginTop: "6px"}} value={loginForm.employee_role} onChange={e => setLoginForm({...loginForm, employee_role: e.target.value})}>
+        <input style={{...styles.input, marginBottom: "6px"}} placeholder="Email" type="email" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
+        <div style={{ marginBottom: "6px" }}><PasswordInput placeholder="Password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} /></div>
+        <div style={{ marginBottom: "6px" }}><PasswordInput placeholder="Confirm Password" value={loginForm.confirm_password} onChange={e => setLoginForm({...loginForm, confirm_password: e.target.value})} /></div>
+        {loginError && <p style={{ color: theme.danger, fontSize: "13px", margin: "0 0 8px" }}>{loginError}</p>}
+        <select style={{...styles.input, marginBottom: "6px"}} value={loginForm.employee_role} onChange={e => setLoginForm({...loginForm, employee_role: e.target.value})}>
           <option value="crew">Crew</option>
           <option value="admin">Admin</option>
           <option value="owner">Owner</option>
@@ -708,177 +679,184 @@ function Dashboard({ token }) {
 
   useEffect(() => {
     fetch(`${API}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(data => { setJobs(data); setLoading(false); });
+      .then(r => r.json()).then(data => { setJobs(data); setLoading(false); });
   }, [token]);
 
-  const filteredJobs = filter === "all" ? jobs : jobs.filter(j => j.status === filter);
-  const totalHours = filteredJobs.reduce((sum, j) => sum + j.total_hours, 0);
-  const totalLabour = filteredJobs.reduce((sum, j) => sum + j.labour_cost, 0);
-  const totalMaterials = filteredJobs.reduce((sum, j) => sum + j.materials_cost, 0);
-  const totalRevenue = filteredJobs.reduce((sum, j) => sum + j.contract_value, 0);
-  const totalCost = filteredJobs.reduce((sum, j) => sum + j.total_cost, 0);
-  const totalMargin = totalRevenue - totalCost;
+  const filtered = filter === "all" ? jobs : jobs.filter(j => j.status === filter);
+  const totals = {
+    hours: filtered.reduce((s, j) => s + j.total_hours, 0),
+    labour: filtered.reduce((s, j) => s + j.labour_cost, 0),
+    materials: filtered.reduce((s, j) => s + j.materials_cost, 0),
+    revenue: filtered.reduce((s, j) => s + j.contract_value, 0),
+    cost: filtered.reduce((s, j) => s + j.total_cost, 0),
+  };
+  totals.margin = totals.revenue - totals.cost;
 
   async function toggleJob(job_id) {
     const isOpen = expanded[job_id];
     setExpanded({...expanded, [job_id]: !isOpen});
     if (!isOpen && !details[job_id]) {
-      const headers = { Authorization: `Bearer ${token}` };
-      const [tsRes, matRes] = await Promise.all([
-        fetch(`${API}/jobs/${job_id}/timesheets`, { headers }),
-        fetch(`${API}/jobs/${job_id}/materials`, { headers })
+      const h = { Authorization: `Bearer ${token}` };
+      const [tsR, matR] = await Promise.all([
+        fetch(`${API}/jobs/${job_id}/timesheets`, { headers: h }),
+        fetch(`${API}/jobs/${job_id}/materials`, { headers: h })
       ]);
-      setDetails({...details, [job_id]: { timesheets: await tsRes.json(), materials: await matRes.json() }});
+      setDetails({...details, [job_id]: { timesheets: await tsR.json(), materials: await matR.json() }});
     }
   }
 
+  const statCards = [
+    { label: "Hours", value: totals.hours.toFixed(1) },
+    { label: "Labour", value: `$${fmt(totals.labour)}` },
+    { label: "Materials", value: `$${fmt(totals.materials)}` },
+    { label: "Contract", value: `$${fmt(totals.revenue)}` },
+    { label: "Cost", value: `$${fmt(totals.cost)}` },
+    { label: "Margin", value: `$${fmt(totals.margin)}`, highlight: true, positive: totals.margin >= 0 },
+  ];
+
   return (
     <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "80px" }}>
-      <div style={{ backgroundColor: theme.primary, padding: "24px 20px 28px", color: "white" }}>
+      {/* Header */}
+      <div style={{ background: `linear-gradient(135deg, ${theme.primaryDark} 0%, ${theme.primary} 60%, ${theme.accent} 100%)`, padding: "28px 20px 32px", color: "white" }}>
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-          <div style={{ fontSize: "11px", opacity: 0.6, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "4px" }}>Vantage Logic</div>
-          <h1 style={{ fontSize: "22px", fontWeight: "700", margin: "0 0 2px", fontFamily: font.heading }}>Burn Rate Scoreboard</h1>
-          <p style={{ fontSize: "13px", opacity: 0.65, margin: "0 0 18px" }}>Live job profitability</p>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "18px" }}>
+          <div style={{ marginBottom: "20px" }}>
+            <VantageLogo size={32} color="white" textColor="white" />
+          </div>
+          <h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.heading }}>Burn Rate Scoreboard</h1>
+          <p style={{ fontSize: "13px", opacity: 0.6, margin: "0 0 20px" }}>Live job profitability</p>
+
+          {/* Filter pills */}
+          <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
             {["active", "completed", "all"].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 14px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "700", backgroundColor: filter === f ? "white" : "rgba(255,255,255,0.15)", color: filter === f ? theme.primary : "white", fontFamily: font.body }}>
+              <button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 16px", borderRadius: "20px", border: filter === f ? "none" : "1px solid rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "12px", fontWeight: "700", backgroundColor: filter === f ? "white" : "transparent", color: filter === f ? theme.primary : "white", fontFamily: font.body }}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
+
+          {/* Stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
-            {[
-              { label: "Total Hours", value: totalHours.toFixed(1) },
-              { label: "Labour", value: `$${fmt(totalLabour)}` },
-              { label: "Materials", value: `$${fmt(totalMaterials)}` },
-              { label: "Contract", value: `$${fmt(totalRevenue)}` },
-              { label: "Total Cost", value: `$${fmt(totalCost)}` },
-              { label: "Margin", value: `$${fmt(totalMargin)}`, highlight: true, positive: totalMargin >= 0 },
-            ].map((item, i) => (
-              <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "#2d6a4f" : "#a93226") : "rgba(255,255,255,0.1)", borderRadius: "8px", padding: "12px 10px", textAlign: "center", border: item.highlight ? "none" : "1px solid rgba(255,255,255,0.1)" }}>
-                <div style={{ fontSize: "15px", fontWeight: "700" }}>{item.value}</div>
-                <div style={{ fontSize: "10px", opacity: 0.75, marginTop: "3px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{item.label}</div>
+            {statCards.map((item, i) => (
+              <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "rgba(45,106,79,0.9)" : "rgba(184,50,50,0.9)") : "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)", borderRadius: "10px", padding: "14px 10px", textAlign: "center", border: item.highlight ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(255,255,255,0.1)" }}>
+                <div style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>{item.value}</div>
+                <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "4px", textTransform: "uppercase", letterSpacing: "0.6px" }}>{item.label}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {/* Job cards */}
       <div style={{ padding: "16px", maxWidth: "900px", margin: "0 auto" }}>
         {loading ? (
-          <p style={{ color: theme.textSecondary, textAlign: "center", marginTop: "48px" }}>Loading...</p>
-        ) : filteredJobs.length === 0 ? (
-          <p style={{ color: theme.textSecondary, textAlign: "center", marginTop: "48px" }}>No {filter} jobs.</p>
-        ) : (
-          filteredJobs.map(job => {
-            const hasBudget = job.contract_value > 0;
-            const hoursPercent = job.budgeted_hours > 0 ? Math.min((job.total_hours / job.budgeted_hours) * 100, 100) : 0;
-            const isOverBudget = job.margin !== null && job.margin < 0;
-            const isTight = hoursPercent > 70 && hoursPercent <= 90;
-            const isOver = hoursPercent > 90;
-            const borderColor = job.status === "completed" ? theme.accent : isOverBudget || isOver ? theme.danger : isTight ? theme.warning : theme.accent;
-            const isExpanded = expanded[job.job_id];
+          <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>Loading...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>No {filter} jobs.</div>
+        ) : filtered.map(job => {
+          const hasBudget = job.contract_value > 0;
+          const pct = job.budgeted_hours > 0 ? Math.min((job.total_hours / job.budgeted_hours) * 100, 100) : 0;
+          const over = job.margin !== null && job.margin < 0;
+          const tight = pct > 70 && pct <= 90;
+          const overHours = pct > 90;
+          const barColor = over || overHours ? theme.danger : tight ? theme.warning : theme.accent;
+          const isOpen = expanded[job.job_id];
 
-            return (
-              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "10px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", cursor: "pointer", border: `1px solid ${theme.border}`, borderLeft: `4px solid ${borderColor}` }} onClick={() => toggleJob(job.job_id)}>
-                <div style={{ padding: "16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                    <div>
-                      <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary, fontFamily: font.heading }}>{job.job_name}</div>
-                      <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px" }}>
-                        {job.city && `${job.city} · `}
-                        <span style={{ backgroundColor: job.status === "active" || job.status === "completed" ? theme.accentLight : "#f5f5f5", color: job.status === "active" || job.status === "completed" ? theme.accent : "#666", padding: "1px 7px", borderRadius: "4px", fontSize: "11px", fontWeight: "600" }}>
-                          {job.status}
-                        </span>
-                      </div>
+          return (
+            <div key={job.job_id} onClick={() => toggleJob(job.job_id)} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", borderLeft: `4px solid ${barColor}`, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${barColor}`, cursor: "pointer" }}>
+              <div style={{ padding: "16px" }}>
+                {/* Job title row */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                  <div>
+                    <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary, fontFamily: font.heading }}>{job.job_name}</div>
+                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      {job.city && <span>{job.city}</span>}
+                      {job.city && <span style={{ opacity: 0.4 }}>·</span>}
+                      <span style={{ backgroundColor: job.status === "active" ? theme.accentLight : job.status === "completed" ? "#e8f5ee" : "#f5f5f5", color: job.status === "active" || job.status === "completed" ? theme.accent : "#888", padding: "1px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "600" }}>
+                        {job.status}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      {hasBudget && job.margin !== null && (
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "17px", fontWeight: "700", color: isOverBudget ? theme.danger : theme.accent }}>
-                            {isOverBudget ? "-" : ""}${fmt(Math.abs(job.margin))}
-                          </div>
-                          <div style={{ fontSize: "11px", color: theme.textSecondary }}>
-                            {isOverBudget ? "over budget" : `${job.margin_percent}% margin`}
-                          </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {hasBudget && job.margin !== null && (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "17px", fontWeight: "700", color: over ? theme.danger : theme.accent, fontFamily: font.heading }}>
+                          {over ? "-" : ""}${fmt(Math.abs(job.margin))}
                         </div>
-                      )}
-                      <div style={{ fontSize: "12px", color: theme.textLight }}>{isExpanded ? "▲" : "▼"}</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                    {[
-                      { label: "Labour", value: `$${fmt(job.labour_cost)}` },
-                      { label: "Materials", value: `$${fmt(job.materials_cost)}` },
-                      { label: "Total Cost", value: `$${fmt(job.total_cost)}` },
-                    ].map((item, i) => (
-                      <div key={i} style={{ backgroundColor: theme.bg, borderRadius: "6px", padding: "9px 8px", textAlign: "center", border: `1px solid ${theme.border}` }}>
-                        <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{item.value}</div>
-                        <div style={{ fontSize: "10px", color: theme.textSecondary, marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{item.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {job.budgeted_hours > 0 && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textSecondary, marginBottom: "5px" }}>
-                        <span>{job.total_hours}h of {job.budgeted_hours}h budgeted</span>
-                        <span style={{ color: isOver ? theme.danger : isTight ? theme.warning : theme.textSecondary, fontWeight: "700" }}>{hoursPercent.toFixed(0)}%</span>
-                      </div>
-                      <div style={{ backgroundColor: theme.border, borderRadius: "3px", height: "5px" }}>
-                        <div style={{ width: `${hoursPercent}%`, height: "5px", borderRadius: "3px", backgroundColor: isOver ? theme.danger : isTight ? theme.warning : theme.accent }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {hasBudget && (
-                    <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", fontSize: "12px", color: theme.textSecondary }}>
-                      <span>Contract: ${fmt(job.contract_value)}</span>
-                      {job.overtime_hours > 0 && <span style={{ color: theme.warning }}>OT: {job.overtime_hours}h</span>}
-                    </div>
-                  )}
-                </div>
-
-                {isExpanded && (
-                  <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${theme.border}` }}>
-                    <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", paddingTop: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Timesheet Entries</div>
-                    {details[job.job_id] ? (
-                      details[job.job_id].timesheets.length === 0 ? (
-                        <p style={{ fontSize: "12px", color: theme.textSecondary }}>No entries yet.</p>
-                      ) : (
-                        details[job.job_id].timesheets.map((t, i) => (
-                          <div key={i} style={{ marginBottom: "6px", padding: "8px 10px", backgroundColor: theme.bg, borderRadius: "6px", border: `1px solid ${theme.border}` }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: theme.textPrimary, alignItems: "center" }}>
-                              <span style={{ fontWeight: "600" }}>{t.employee_name}</span>
-                              <span style={{ color: theme.textSecondary, textAlign: "center" }}>{t.shift_date}</span>
-                              <span style={{ fontWeight: "700", color: theme.primary, textAlign: "right" }}>{t.hours_worked}h</span>
-                            </div>
-                            {t.field_notes && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px", fontStyle: "italic" }}>{t.field_notes}</div>}
-                          </div>
-                        ))
-                      )
-                    ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
-
-                    {details[job.job_id] && details[job.job_id].materials.length > 0 && (
-                      <div style={{ marginTop: "14px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Materials</div>
-                        {details[job.job_id].materials.map((m, i) => (
-                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: theme.textPrimary, padding: "6px 0", borderBottom: `1px solid ${theme.border}`, alignItems: "center" }}>
-                            <span style={{ fontWeight: "600" }}>{m.supplier || "Unknown"}</span>
-                            <span style={{ color: theme.textSecondary, textAlign: "center" }}>{m.description}</span>
-                            <span style={{ fontWeight: "700", color: theme.warning, textAlign: "right" }}>${fmt(m.total_cost)}</span>
-                          </div>
-                        ))}
+                        <div style={{ fontSize: "11px", color: theme.textSecondary }}>{over ? "over budget" : `${job.margin_percent}% margin`}</div>
                       </div>
                     )}
+                    <span style={{ fontSize: "11px", color: theme.textLight }}>{isOpen ? "▲" : "▼"}</span>
+                  </div>
+                </div>
+
+                {/* Cost grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                  {[["Labour", job.labour_cost], ["Materials", job.materials_cost], ["Total Cost", job.total_cost]].map(([label, val]) => (
+                    <div key={label} style={{ backgroundColor: theme.bg, borderRadius: "6px", padding: "9px 8px", textAlign: "center", border: `1px solid ${theme.border}` }}>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>${fmt(val)}</div>
+                      <div style={{ fontSize: "10px", color: theme.textSecondary, marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Hours bar */}
+                {job.budgeted_hours > 0 && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textSecondary, marginBottom: "5px" }}>
+                      <span>{job.total_hours}h of {job.budgeted_hours}h budgeted</span>
+                      <span style={{ color: overHours ? theme.danger : tight ? theme.warning : theme.textSecondary, fontWeight: "700" }}>{pct.toFixed(0)}%</span>
+                    </div>
+                    <div style={{ backgroundColor: theme.border, borderRadius: "3px", height: "5px" }}>
+                      <div style={{ width: `${pct}%`, height: "5px", borderRadius: "3px", backgroundColor: barColor, transition: "width 0.3s" }} />
+                    </div>
+                  </div>
+                )}
+
+                {hasBudget && (
+                  <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, fontSize: "12px", color: theme.textSecondary }}>
+                    Contract: ${fmt(job.contract_value)}
                   </div>
                 )}
               </div>
-            );
-          })
-        )}
+
+              {/* Expanded detail */}
+              {isOpen && (
+                <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${theme.border}` }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "10px", paddingTop: "14px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Timesheet Entries</div>
+                  {details[job.job_id] ? (
+                    details[job.job_id].timesheets.length === 0
+                      ? <p style={{ fontSize: "12px", color: theme.textSecondary, margin: 0 }}>No entries yet.</p>
+                      : details[job.job_id].timesheets.map((t, i) => (
+                        <div key={i} style={{ marginBottom: "6px", padding: "8px 10px", backgroundColor: theme.bg, borderRadius: "6px", border: `1px solid ${theme.border}` }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", fontSize: "12px", alignItems: "center", gap: "12px" }}>
+                            <span style={{ fontWeight: "600", color: theme.textPrimary }}>{t.employee_name}</span>
+                            <span style={{ color: theme.textSecondary, whiteSpace: "nowrap" }}>{t.shift_date}</span>
+                            <span style={{ fontWeight: "700", color: theme.primary, whiteSpace: "nowrap", minWidth: "32px", textAlign: "right" }}>{t.hours_worked}h</span>
+                          </div>
+                          {t.field_notes && t.field_notes.toLowerCase() !== "yes" && t.field_notes.toLowerCase() !== "no" && (
+                            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "4px", fontStyle: "italic" }}>{t.field_notes}</div>
+                          )}
+                        </div>
+                      ))
+                  ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
+
+                  {details[job.job_id]?.materials?.length > 0 && (
+                    <div style={{ marginTop: "14px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Materials</div>
+                      {details[job.job_id].materials.map((m, i) => (
+                        <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", fontSize: "12px", color: theme.textPrimary, padding: "6px 0", borderBottom: `1px solid ${theme.border}`, alignItems: "center", gap: "12px" }}>
+                          <span style={{ fontWeight: "600" }}>{m.supplier || "Unknown"}</span>
+                          <span style={{ color: theme.textSecondary, whiteSpace: "nowrap" }}>{m.description}</span>
+                          <span style={{ fontWeight: "700", color: theme.gold, whiteSpace: "nowrap", textAlign: "right" }}>${fmt(m.total_cost)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -892,6 +870,13 @@ export default function App() {
   const [view, setView] = useState("timesheet");
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [mobile, setMobile] = useState(isMobile());
+
+  useEffect(() => {
+    const handler = () => setMobile(isMobile());
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   function handleLogin(accessToken, userRole, newUser = false) {
     setStoredAuth(accessToken, userRole);
@@ -915,12 +900,14 @@ export default function App() {
     return <Login onLogin={handleLogin} onSignUp={() => setShowSignUp(true)} />;
   }
 
+  const sidebarOffset = !mobile ? theme.sidebarWidth : "0px";
+
   return (
-    <div className="vl-main-content" style={{ backgroundColor: theme.bg, minHeight: "100vh" }}>
+    <div style={{ backgroundColor: theme.bg, minHeight: "100vh" }}>
       <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
-      <div>
+      <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
         {showOnboarding && (role === "owner" || role === "admin") && view === "timesheet" && (
-          <div style={{ maxWidth: "560px", margin: "0 auto", padding: "16px 16px 0" }}>
+          <div style={{ maxWidth: "580px", margin: "0 auto", padding: "16px 16px 0" }}>
             <OnboardingChecklist token={token} onDismiss={() => setShowOnboarding(false)} />
           </div>
         )}
@@ -928,11 +915,13 @@ export default function App() {
         {view === "materials" && <MaterialsForm token={token} />}
         {view === "dashboard" && <Dashboard token={token} />}
         {view === "admin" && <AdminScreen token={token} />}
-      </div>
-      <div className="vl-bottom-nav" style={{ padding: "12px 16px 90px", textAlign: "center" }}>
-        <button onClick={handleLogout} style={{ fontSize: "13px", color: "white", background: theme.danger, border: "none", borderRadius: "6px", padding: "8px 20px", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>
-          Sign Out
-        </button>
+        {mobile && (
+          <div style={{ padding: "8px 16px 90px", textAlign: "center" }}>
+            <button onClick={handleLogout} style={{ fontSize: "13px", color: "white", background: theme.danger, border: "none", borderRadius: "6px", padding: "9px 24px", cursor: "pointer", fontWeight: "700", fontFamily: font.body }}>
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
