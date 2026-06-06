@@ -685,10 +685,6 @@ function Dashboard({ token }) {
       .then(r => r.json()).then(data => { setJobs(data); setLoading(false); });
   }, [token]);
 
-const now = new Date();
-  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
-  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
-
   const filtered = jobs.filter(j => {
     const statusMatch = filter === "all" || j.status === filter;
     return statusMatch;
