@@ -781,7 +781,7 @@ function Dashboard({ token }) {
             const isExpanded = expanded[job.job_id];
 
             return (
-              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "10px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", borderLeft: `4px solid ${borderColor}`, cursor: "pointer", border: `1px solid ${theme.border}`, borderLeft: `4px solid ${borderColor}` }} onClick={() => toggleJob(job.job_id)}>
+              <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "10px", marginBottom: "10px", overflow: "hidden", boxShadow: "0 1px 6px rgba(26,61,43,0.07)", cursor: "pointer", border: `1px solid ${theme.border}`, borderLeft: `4px solid ${borderColor}` }} onClick={() => toggleJob(job.job_id)}>
                 <div style={{ padding: "16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
                     <div>
