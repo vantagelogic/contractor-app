@@ -801,10 +801,14 @@ function Dashboard({ token }) {
   const [details, setDetails] = useState({});
   const [filter, setFilter] = useState("active");
   const [timeFilter, setTimeFilter] = useState("all");
+  const [mileage, setMileage] = useState([]);
 
   useEffect(() => {
-    apiFetch(`${API}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
+    const h = { Authorization: `Bearer ${token}` };
+    apiFetch(`${API}/dashboard`, { headers: h })
       .then(r => r.json()).then(data => { setJobs(data); setLoading(false); });
+    apiFetch(`${API}/mileage`, { headers: h })
+      .then(r => r.json()).then(setMileage);
   }, [token]);
 
   const filtered = jobs.filter(j => {
@@ -985,6 +989,30 @@ function Dashboard({ token }) {
             </div>
           );
         })}
+{mileage.length > 0 && (
+          <div style={{ marginTop: "24px" }}>
+            <CollapsibleSection title={`🚗 Mileage Log (${mileage.length} trips)`}>
+              {mileage.map((m, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", fontSize: "12px", color: theme.textPrimary, padding: "8px 0", borderBottom: `1px solid ${theme.border}`, alignItems: "center", gap: "12px" }}>
+                  <div>
+                    <div style={{ fontWeight: "600", color: theme.textPrimary }}>{m.employee_name}</div>
+                    <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{m.job_name}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: theme.textSecondary }}>{m.trip_date}</div>
+                    {m.purpose && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px", fontStyle: "italic" }}>{m.purpose}</div>}
+                  </div>
+                  <div style={{ fontWeight: "700", color: theme.primary, whiteSpace: "nowrap", textAlign: "right" }}>
+                    {m.km_driven} km
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, fontSize: "13px", fontWeight: "700", color: theme.primary, textAlign: "right" }}>
+                Total: {mileage.reduce((s, m) => s + m.km_driven, 0).toFixed(1)} km
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
       </div>
     </div>
   );
