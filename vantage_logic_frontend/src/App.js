@@ -67,20 +67,23 @@ function PasswordInput({ placeholder, value, onChange, required }) {
 }
 
 // ─── LOGO SVG ─────────────────────────────────────────────────
-function VantageLogo({ size = 40, color = "white", showText = true, textColor = "white" }) {
+
+function VantageLogo({ size = 40, dark = false }) {
+  const bg = dark ? "#1a3d2b" : "transparent";
+  const textColor = dark ? "white" : "#1a3d2b";
+  const subColor = dark ? "rgba(255,255,255,0.6)" : "#5c5c5c";
+  const lineColor = "#c8973a";
+  const scale = size / 40;
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22 88 C22 88 30 62 36 38 C39 26 43 18 48 18 C51 18 53 22 52 30 C50 45 43 68 43 82" stroke={color} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-        <path d="M44 88 C44 88 53 58 60 32 C64 18 69 10 75 10 C79 10 81 14 80 23 C78 40 69 66 67 82" stroke={color} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.7"/>
-        <path d="M66 88 C66 88 73 62 78 40 C82 26 87 16 93 16" stroke={color} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.4"/>
-      </svg>
-      {showText && (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: size * 0.36 + "px", fontWeight: "700", color: textColor, fontFamily: font.heading, letterSpacing: "1px", lineHeight: 1, textTransform: "uppercase" }}>Vantage Logic</span>
-          <span style={{ fontSize: size * 0.16 + "px", color: textColor, opacity: 0.55, letterSpacing: "2.5px", textTransform: "uppercase", marginTop: "3px" }}>Field Management</span>
-        </div>
-      )}
+    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", backgroundColor: bg, padding: dark ? "12px 20px" : "0", borderRadius: dark ? "6px" : "0" }}>
+      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: Math.round(16 * scale) + "px", fontWeight: "700", color: textColor, letterSpacing: Math.round(4 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap" }}>
+        VANTAGE
+      </span>
+      <div style={{ width: "100%", height: "1px", backgroundColor: lineColor, margin: "4px 0" }} />
+      <span style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: Math.round(8 * scale) + "px", fontWeight: "400", color: subColor, letterSpacing: Math.round(5 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap" }}>
+        LOGIC
+      </span>
     </div>
   );
 }
@@ -120,7 +123,7 @@ function NavBar({ view, setView, role, onLogout }) {
   return (
     <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.primary, display: "flex", flexDirection: "column", zIndex: 1000, boxShadow: "2px 0 16px rgba(0,0,0,0.15)" }}>
       <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-        <VantageLogo size={36} color="white" textColor="white" />
+        <VantageLogo size={36} dark={true} />
       </div>
       <div style={{ flex: 1, padding: "12px" }}>
         {tabs.map(tab => (
@@ -234,7 +237,7 @@ function Login({ onLogin, onSignUp }) {
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
         <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.08)", border: `1px solid ${theme.border}` }}>
           <div style={{ marginBottom: "32px" }}>
-            <VantageLogo size={40} color={theme.primary} textColor={theme.primary} showText={true} />
+            <VantageLogo size={40} dark={false} />
           </div>
           <form onSubmit={handleSubmit} style={styles.form}>
             <label style={styles.label}>Email</label>
@@ -286,7 +289,7 @@ function SignUp({ onLogin, onBack }) {
     <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "24px" }}>
       <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "40px 36px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.08)", border: `1px solid ${theme.border}` }}>
         <div style={{ marginBottom: "28px" }}>
-          <VantageLogo size={36} color={theme.primary} textColor={theme.primary} />
+          <VantageLogo size={36} dark={false} />
         </div>
         <div style={{ marginBottom: "24px" }}>
           <div style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.heading }}>Start Your Free Trial</div>
@@ -719,7 +722,7 @@ function Dashboard({ token }) {
       <div style={{ background: `linear-gradient(135deg, ${theme.primaryDark} 0%, ${theme.primary} 60%, ${theme.accent} 100%)`, padding: "28px 20px 32px", color: "white" }}>
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
           <div style={{ marginBottom: "20px" }}>
-            <VantageLogo size={32} color="white" textColor="white" />
+            <VantageLogo size={32} dark={true} />
           </div>
           <h1 style={{ fontSize: "24px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.heading }}>Burn Rate Scoreboard</h1>
           <p style={{ fontSize: "13px", opacity: 0.6, margin: "0 0 20px" }}>Live job profitability</p>
