@@ -614,6 +614,55 @@ def create_material(
     return material
 
 # =============================================
+# MILEAGE
+# =============================================
+
+@app.post("/mileage")
+def create_mileage(
+    job_id: int,
+    employee_id: int,
+    trip_date: str,
+    km_driven: float,
+    purpose: str = None,
+    notes: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    entry = models.Mileage(
+        company_id=current_user.company_id,
+        job_id=job_id,
+        employee_id=employee_id,
+        trip_date=trip_date,
+        km_driven=km_driven,
+        purpose=purpose,
+        notes=notes
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.get("/mileage")
+def get_mileage(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    entries = db.query(models.Mileage).filter(
+        models.Mileage.company_id == current_user.company_id
+    ).all()
+    result = []
+    for m in entries:
+        emp = db.query(models.Employee).filter(models.Employee.employee_id == m.employee_id).first()
+        job = db.query(models.Job).filter(models.Job.job_id == m.job_id).first()
+        result.append({
+            "mileage_id": m.mileage_id,
+            "job_name": job.job_name if job else "Unknown",
+            "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "trip_date": str(m.trip_date),
+            "km_driven": float(m.km_driven),
+            "purpose": m.purpose,
+            "notes": m.notes,
+        })
+    return result
+
+# =============================================
 # DASHBOARD
 # =============================================
 
