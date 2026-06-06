@@ -102,6 +102,58 @@ def get_companies(db: Session = Depends(get_db)):
     return db.query(models.Company).all()
 
 # =============================================
+# PUBLIC SIGNUP
+# =============================================
+
+@app.post("/signup")
+def signup(
+    company_name: str,
+    email: str,
+    password: str,
+    db: Session = Depends(get_db)
+):
+    # Check if email already exists
+    existing = db.query(models.User).filter(models.User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+    
+    # Create company
+    company = models.Company(
+        company_name=company_name,
+        trial_status="trial"
+    )
+    db.add(company)
+    db.commit()
+    db.refresh(company)
+    
+    # Create owner user
+    user = models.User(
+        company_id=company.company_id,
+        email=email,
+        hashed_password=hash_password(password),
+        role="owner"
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Return token so they're logged in immediately after signup
+    token = create_access_token({
+        "user_id": user.user_id,
+        "company_id": company.company_id,
+        "role": user.role
+    })
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user.role,
+        "company_id": company.company_id,
+        "company_name": company.company_name,
+        "trial_status": company.trial_status
+    }
+
+# =============================================
 # USERS
 # =============================================
 

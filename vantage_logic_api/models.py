@@ -9,6 +9,8 @@ class Company(Base):
     company_id = Column(Integer, primary_key=True, index=True)
     company_name = Column(String(255), nullable=False)
     active = Column(Boolean, default=True)
+    trial_start_date = Column(DateTime, server_default=func.now())
+    trial_status = Column(String(50), default="trial")
     created_at = Column(DateTime, server_default=func.now())
 
 class User(Base):
