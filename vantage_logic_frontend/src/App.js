@@ -98,20 +98,29 @@ function IdentityBadge({ name }) {
 
 // ─── LOGO ─────────────────────────────────────────────────────
 function VantageLogo({ size = 40, dark = false, centered = false }) {
-  const textColor = dark ? "white" : theme.primary;
-  const subColor = dark ? "rgba(255,255,255,0.55)" : theme.textSecondary;
-  const lineColor = theme.gold;
   const scale = size / 40;
+  const textColor = dark ? "white" : theme.primary;
+  const subColor = dark ? "rgba(200,151,58,0.9)" : theme.gold;
+  const dotColor = theme.gold;
 
   return (
-    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", margin: centered ? "0 auto" : "0" }}>
-      <span style={{ fontFamily: font.display, fontSize: Math.round(16 * scale) + "px", fontWeight: "700", color: textColor, letterSpacing: Math.round(6 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", textTransform: "uppercase", paddingLeft: Math.round(6 * scale) + "px" }}>
-        Vantage
-      </span>
-      <div style={{ width: "100%", height: "1.5px", backgroundColor: lineColor, margin: "5px 0" }} />
-      <span style={{ fontFamily: font.display, fontSize: Math.round(7.5 * scale) + "px", fontWeight: "500", color: subColor, letterSpacing: Math.round(7 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", textTransform: "uppercase", paddingLeft: Math.round(7 * scale) + "px" }}>
-        Logic
-      </span>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: Math.round(10 * scale) + "px", margin: centered ? "0 auto" : "0" }}>
+      {/* Icon mark */}
+      <div style={{ width: Math.round(28 * scale) + "px", height: Math.round(28 * scale) + "px", borderRadius: Math.round(6 * scale) + "px", backgroundColor: dark ? "rgba(255,255,255,0.12)" : theme.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <svg width={Math.round(16 * scale)} height={Math.round(16 * scale)} viewBox="0 0 16 16" fill="none">
+          <path d="M2 12 L8 4 L14 12" stroke={theme.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M5 12 L8 7 L11 12" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6"/>
+        </svg>
+      </div>
+      {/* Wordmark */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(15 * scale) + "px", fontWeight: "800", color: textColor, letterSpacing: "-0.3px", lineHeight: 1, whiteSpace: "nowrap" }}>
+          VANTAGE
+        </span>
+        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(7 * scale) + "px", fontWeight: "500", color: subColor, letterSpacing: Math.round(3.5 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", marginTop: "3px", paddingLeft: "1px" }}>
+          LOGIC
+        </span>
+      </div>
     </div>
   );
 }
@@ -488,7 +497,7 @@ function CrewHome({ token, setView }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
           <StatCard label="Hours" value={stats.week.hours} unit="h" />
           <StatCard label="Jobs" value={stats.week.jobs} />
-          <StatCard label="Mileage" value={stats.week.km} unit="km" />
+          <StatCard label="KM Driven" value={stats.week.km} unit="km" />
         </div>
       </div>
 
@@ -960,6 +969,77 @@ function MileageForm({ token }) {
   );
 }
 
+// ─── USER MANAGEMENT ─────────────────────────────────────────
+function UserManagement({ token, activeEmps }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editEmpId, setEditEmpId] = useState("");
+  const [message, setMessage] = useState("");
+
+  function loadUsers() {
+    setLoading(true);
+    apiFetch(`${API}/users`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(data => { setUsers(data); setLoading(false); });
+  }
+
+  function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
+
+  async function saveLink(userId) {
+    const empId = editEmpId ? parseInt(editEmpId) : 0;
+    const res = await apiFetch(`${API}/users/${userId}?employee_id=${empId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) {
+      showMsg("Account updated.");
+      setEditingUser(null);
+      setEditEmpId("");
+      loadUsers();
+    } else {
+      showMsg("Error updating account.");
+    }
+  }
+
+  return (
+    <CollapsibleSection title="Manage Logins">
+      <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px" }}>
+        See which employee is linked to each login and edit the link.
+      </p>
+      {users.length === 0 && !loading && (
+        <button onClick={loadUsers} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent }}>Load Accounts</button>
+      )}
+      {loading && <p style={{ fontSize: "13px", color: theme.textSecondary }}>Loading...</p>}
+      {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "10px", backgroundColor: theme.accentLight, padding: "9px 12px", borderRadius: "7px", fontSize: "13px" }}>{message}</div>}
+      {users.map(u => (
+        <div key={u.user_id} style={{ padding: "12px 13px", backgroundColor: theme.bg, borderRadius: "8px", marginBottom: "6px", border: `1px solid ${theme.border}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</div>
+              <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ backgroundColor: u.role === "owner" ? theme.goldLight : u.role === "admin" ? theme.accentLight : theme.bg, color: u.role === "owner" ? theme.gold : u.role === "admin" ? theme.accent : theme.textSecondary, padding: "1px 7px", borderRadius: "10px", border: `1px solid ${u.role === "owner" ? theme.gold : u.role === "admin" ? theme.accent : theme.border}`, fontWeight: "600", fontSize: "10px" }}>{u.role}</span>
+                <span>·</span>
+                <span style={{ color: u.employee_name ? theme.accent : theme.textLight, fontWeight: u.employee_name ? "600" : "400" }}>
+                  {u.employee_name ? `Linked: ${u.employee_name}` : "Not linked"}
+                </span>
+              </div>
+            </div>
+            <button onClick={() => { setEditingUser(editingUser === u.user_id ? null : u.user_id); setEditEmpId(u.employee_id ? String(u.employee_id) : ""); }} style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", flexShrink: 0 }}>
+              {editingUser === u.user_id ? "Cancel" : "Edit"}
+            </button>
+          </div>
+          {editingUser === u.user_id && (
+            <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, display: "flex", gap: "8px", alignItems: "center" }}>
+              <select style={{...styles.input, marginTop: 0, flex: 1}} value={editEmpId} onChange={e => setEditEmpId(e.target.value)}>
+                <option value="">No link</option>
+                {activeEmps.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+              </select>
+              <button onClick={() => saveLink(u.user_id)} style={{ padding: "12px 16px", borderRadius: "7px", border: "none", cursor: "pointer", backgroundColor: theme.primary, color: "white", fontWeight: "600", fontFamily: font.body, fontSize: "13px", whiteSpace: "nowrap", minHeight: "44px" }}>Save</button>
+            </div>
+          )}
+        </div>
+      ))}
+    </CollapsibleSection>
+  );
+}
+
 // ─── ADMIN ────────────────────────────────────────────────────
 function AdminScreen({ token }) {
   const headers = { Authorization: `Bearer ${token}` };
@@ -1181,6 +1261,8 @@ function AdminScreen({ token }) {
         </select>
         <button style={{...styles.button, backgroundColor: theme.accent}} onClick={createLogin}>Create Login</button>
       </CollapsibleSection>
+
+      <UserManagement token={token} activeEmps={activeEmps} />
     </div>
   );
 }
