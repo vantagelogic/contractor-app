@@ -196,6 +196,44 @@ def create_user(
 def get_me(current_user: models.User = Depends(get_current_user)):
     return {"user_id": current_user.user_id, "email": current_user.email, "role": current_user.role, "company_id": current_user.company_id, "employee_id": current_user.employee_id}
 
+@app.get("/users")
+def get_users(current_user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
+    users = db.query(models.User).filter(models.User.company_id == current_user.company_id).all()
+    result = []
+    for u in users:
+        emp = None
+        if u.employee_id:
+            emp = db.query(models.Employee).filter(models.Employee.employee_id == u.employee_id).first()
+        result.append({
+            "user_id": u.user_id,
+            "email": u.email,
+            "role": u.role,
+            "employee_id": u.employee_id,
+            "employee_name": f"{emp.first_name} {emp.last_name}" if emp else None,
+            "active": u.active
+        })
+    return result
+
+@app.patch("/users/{user_id}")
+def update_user(
+    user_id: int,
+    employee_id: int = None,
+    role: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(
+        models.User.user_id == user_id,
+        models.User.company_id == current_user.company_id
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if employee_id is not None: user.employee_id = employee_id if employee_id > 0 else None
+    if role is not None: user.role = role
+    db.commit()
+    db.refresh(user)
+    return {"user_id": user.user_id, "email": user.email, "role": user.role, "employee_id": user.employee_id}
+
 # =============================================
 # EMPLOYEES
 # =============================================
