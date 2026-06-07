@@ -765,6 +765,104 @@ def get_my_stats(current_user: models.User = Depends(get_current_user), db: Sess
         "recent_entries": recent_entries
     }
 
+@app.patch("/timesheets/{timesheet_id}")
+def update_timesheet(
+    timesheet_id: int,
+    job_id: int = None,
+    cost_code_id: int = None,
+    shift_date: str = None,
+    hours_worked: float = None,
+    field_notes: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    ts = db.query(models.Timesheet).filter(
+        models.Timesheet.timesheet_id == timesheet_id,
+        models.Timesheet.company_id == current_user.company_id
+    ).first()
+    if not ts:
+        raise HTTPException(status_code=404, detail="Timesheet not found")
+    if job_id is not None: ts.job_id = job_id
+    if cost_code_id is not None: ts.cost_code_id = cost_code_id
+    if shift_date is not None: ts.shift_date = shift_date
+    if hours_worked is not None: ts.hours_worked = hours_worked
+    if field_notes is not None: ts.field_notes = field_notes
+    db.commit()
+    db.refresh(ts)
+    return ts
+
+@app.patch("/materials/{material_id}")
+def update_material(
+    material_id: int,
+    job_id: int = None,
+    description: str = None,
+    supplier: str = None,
+    total_cost: float = None,
+    purchase_date: str = None,
+    notes: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    mat = db.query(models.Material).filter(
+        models.Material.material_id == material_id,
+        models.Material.company_id == current_user.company_id
+    ).first()
+    if not mat:
+        raise HTTPException(status_code=404, detail="Material not found")
+    if job_id is not None: mat.job_id = job_id
+    if description is not None: mat.description = description
+    if supplier is not None: mat.supplier = supplier
+    if total_cost is not None: mat.total_cost = total_cost
+    if purchase_date is not None: mat.purchase_date = purchase_date
+    if notes is not None: mat.notes = notes
+    db.commit()
+    db.refresh(mat)
+    return mat
+
+@app.patch("/mileage/{mileage_id}")
+def update_mileage(
+    mileage_id: int,
+    job_id: int = None,
+    trip_date: str = None,
+    km_driven: float = None,
+    purpose: str = None,
+    notes: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    entry = db.query(models.Mileage).filter(
+        models.Mileage.mileage_id == mileage_id,
+        models.Mileage.company_id == current_user.company_id
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Mileage entry not found")
+    if job_id is not None: entry.job_id = job_id
+    if trip_date is not None: entry.trip_date = trip_date
+    if km_driven is not None: entry.km_driven = km_driven
+    if purpose is not None: entry.purpose = purpose
+    if notes is not None: entry.notes = notes
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+@app.patch("/users/{user_id}/deactivate")
+def deactivate_user(
+    user_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(
+        models.User.user_id == user_id,
+        models.User.company_id == current_user.company_id
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
+    user.active = False
+    db.commit()
+    return {"message": f"{user.email} deactivated"}
+
 # =============================================
 # DASHBOARD
 # =============================================
