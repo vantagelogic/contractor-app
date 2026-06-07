@@ -662,6 +662,71 @@ def get_mileage(current_user: models.User = Depends(get_current_user), db: Sessi
         })
     return result
 
+# ============================================================
+# ADD THESE TO main.py — paste before the DASHBOARD section
+# ============================================================
+
+@app.get("/me/stats")
+def get_my_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from datetime import date, timedelta
+
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+
+    if not current_user.employee_id:
+        return {
+            "linked": False,
+            "employee_name": None,
+            "week": {"hours": 0, "jobs": 0, "km": 0},
+            "month": {"hours": 0, "jobs": 0, "km": 0},
+            "all_time": {"hours": 0, "jobs": 0, "km": 0},
+            "recent_entries": []
+        }
+
+    emp = db.query(models.Employee).filter(models.Employee.employee_id == current_user.employee_id).first()
+    employee_name = f"{emp.first_name} {emp.last_name}" if emp else None
+
+    timesheets = db.query(models.Timesheet).filter(
+        models.Timesheet.employee_id == current_user.employee_id
+    ).all()
+
+    mileage = db.query(models.Mileage).filter(
+        models.Mileage.employee_id == current_user.employee_id
+    ).all()
+
+    def calc(ts, mi):
+        return {
+            "hours": round(sum(float(t.hours_worked or 0) for t in ts), 1),
+            "jobs": len(set(t.job_id for t in ts)),
+            "km": round(sum(float(m.km_driven or 0) for m in mi), 1)
+        }
+
+    week_ts = [t for t in timesheets if t.shift_date and t.shift_date >= week_start]
+    week_mi = [m for m in mileage if m.trip_date and m.trip_date >= week_start]
+    month_ts = [t for t in timesheets if t.shift_date and t.shift_date >= month_start]
+    month_mi = [m for m in mileage if m.trip_date and m.trip_date >= month_start]
+
+    recent = sorted(timesheets, key=lambda t: t.shift_date or date(2000,1,1), reverse=True)[:5]
+    recent_entries = []
+    for t in recent:
+        job = db.query(models.Job).filter(models.Job.job_id == t.job_id).first()
+        recent_entries.append({
+            "shift_date": str(t.shift_date),
+            "hours_worked": float(t.hours_worked or 0),
+            "job_name": job.job_name if job else "Unknown",
+            "field_notes": t.field_notes
+        })
+
+    return {
+        "linked": True,
+        "employee_name": employee_name,
+        "week": calc(week_ts, week_mi),
+        "month": calc(month_ts, month_mi),
+        "all_time": calc(timesheets, mileage),
+        "recent_entries": recent_entries
+    }
+
 # =============================================
 # DASHBOARD
 # =============================================
