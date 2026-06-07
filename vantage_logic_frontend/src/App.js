@@ -1136,6 +1136,12 @@ function UserManagement({ token, activeEmps }) {
     else { const d = await res.json(); showMsg(d.detail || "Error deactivating account."); }
   }
 
+  async function reactivateUser(userId, email) {
+    const res = await apiFetch(`${API}/users/${userId}/reactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg(`${email} reactivated.`); loadUsers(); }
+    else { const d = await res.json(); showMsg(d.detail || "Error reactivating account."); }
+  }
+
   return (
     <CollapsibleSection title="Manage Logins">
       <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px" }}>
@@ -1162,9 +1168,14 @@ function UserManagement({ token, activeEmps }) {
             <button onClick={() => { setEditingUser(editingUser === u.user_id ? null : u.user_id); setEditEmpId(u.employee_id ? String(u.employee_id) : ""); }} style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", flexShrink: 0 }}>
               {editingUser === u.user_id ? "Cancel" : "Edit"}
             </button>
-            {u.role !== "owner" && (
+            {u.active !== false && u.role !== "owner" && (
               <button onClick={() => deactivateUser(u.user_id, u.email)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap" }}>
                 Remove
+              </button>
+            )}
+            {u.active === false && (
+              <button onClick={() => reactivateUser(u.user_id, u.email)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap" }}>
+                Reactivate
               </button>
             )}
           </div>
