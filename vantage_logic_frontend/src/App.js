@@ -101,6 +101,7 @@ function VantageLogo({ size = 40, dark = false, centered = false }) {
   const scale = size / 40;
   const textColor = dark ? "white" : theme.primary;
   const subColor = dark ? "rgba(200,151,58,0.9)" : theme.gold;
+  const dotColor = theme.gold;
 
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: Math.round(10 * scale) + "px", margin: centered ? "0 auto" : "0" }}>
@@ -198,7 +199,7 @@ function NavBar({ view, setView, role, onLogout }) {
           </button>
         ))}
       </div>
-      <div style={{ padding: "16px 12px 28px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+      <div style={{ padding: "8px 12px 16px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
         <button onClick={onLogout} style={{ width: "100%", padding: "10px 14px", borderRadius: "7px", border: "1px solid rgba(255,255,255,0.12)", backgroundColor: "transparent", color: "rgba(255,255,255,0.55)", cursor: "pointer", fontFamily: font.body, fontSize: "12px", fontWeight: "500", textAlign: "center", letterSpacing: "0.3px" }}>
           Sign Out
         </button>
@@ -297,7 +298,7 @@ function Login({ onLogin, onSignUp }) {
       <div style={{ marginBottom: "36px", display: "flex", flexDirection: "column", alignItems: "center" }}>
         <VantageLogo size={64} dark={false} centered={true} />
         <p style={{ fontSize: "14px", color: theme.textSecondary, marginTop: "20px", textAlign: "center", maxWidth: "320px", lineHeight: 1.5 }}>
-          Real-time job costing, crew tracking, and profit visibility — built for trades.
+          Real-time job costing, crew tracking, and profit visibility built for trades.
         </p>
       </div>
 
@@ -505,8 +506,8 @@ function CrewHome({ token, setView }) {
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Quick Log</div>
         <div style={{ display: "flex", gap: "10px" }}>
           <QuickActionBtn label="Hours" Icon={IconHours} color={theme.primary} onClick={() => setView("timesheet")} />
-          <QuickActionBtn label="Mileage" Icon={IconMileage} color={theme.accent} onClick={() => setView("mileage")} />
           <QuickActionBtn label="Materials" Icon={IconMaterials} color={theme.gold} onClick={() => setView("materials")} />
+          <QuickActionBtn label="Mileage" Icon={IconMileage} color={theme.accent} onClick={() => setView("mileage")} />
         </div>
       </div>
 
@@ -549,6 +550,134 @@ function CrewHome({ token, setView }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+// ─── ENTRY HISTORY ────────────────────────────────────────────
+function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCodes, onEditSaved }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const endpoint = type === "timesheet" ? "/timesheets" : type === "material" ? "/materials" : "/mileage";
+
+  function fetchEntries() {
+    return apiFetch(`${API}${endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        let filtered = data;
+        if (linkedEmployeeId) {
+          if (type === "timesheet") filtered = data.filter(e => e.employee_id === linkedEmployeeId);
+          if (type === "material") filtered = data.filter(e => e.purchased_by === linkedEmployeeId);
+          if (type === "mileage") filtered = data.filter(e => e.employee_id === linkedEmployeeId);
+        }
+        filtered.sort((a, b) => {
+          const dateA = a.shift_date || a.purchase_date || a.trip_date || "";
+          const dateB = b.shift_date || b.purchase_date || b.trip_date || "";
+          return dateB.localeCompare(dateA);
+        });
+        setEntries(filtered.slice(0, 10));
+        setLoading(false);
+      });
+  }
+
+  useEffect(() => { fetchEntries(); }, [token, type, linkedEmployeeId]);
+
+  function startEdit(entry) {
+    const id = entry.timesheet_id || entry.material_id || entry.mileage_id;
+    setEditingId(id);
+    if (type === "timesheet") setEditForm({ job_id: entry.job_id, cost_code_id: entry.cost_code_id, shift_date: entry.shift_date, hours_worked: entry.hours_worked, field_notes: entry.field_notes || "" });
+    else if (type === "material") setEditForm({ job_id: entry.job_id, description: entry.description, supplier: entry.supplier || "", total_cost: entry.total_cost, purchase_date: entry.purchase_date, notes: entry.notes || "" });
+    else setEditForm({ job_id: entry.job_id, trip_date: entry.trip_date, km_driven: entry.km_driven, purpose: entry.purpose || "", notes: entry.notes || "" });
+  }
+
+  async function saveEdit(id) {
+    setSaving(true);
+    const path = type === "timesheet" ? "timesheets" : type === "material" ? "materials" : "mileage";
+    const res = await apiFetch(`${API}/${path}/${id}?${new URLSearchParams(editForm)}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    setSaving(false);
+    if (res.ok) {
+      setMessage("Entry updated.");
+      setEditingId(null);
+      setTimeout(() => setMessage(""), 3000);
+      fetchEntries();
+      if (onEditSaved) onEditSaved();
+    } else {
+      setMessage("Failed to update.");
+      setTimeout(() => setMessage(""), 3000);
+    }
+  }
+
+  if (loading) return <div style={{ marginTop: "24px" }}><Skeleton width="100%" height="120px" radius="12px" /></div>;
+  if (entries.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: "28px" }}>
+      <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Recent Entries</div>
+      {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "10px", backgroundColor: theme.accentLight, padding: "9px 12px", borderRadius: "7px", fontSize: "13px" }}>{message}</div>}
+      <div style={{ ...styles.card, padding: "0" }}>
+        {entries.map((entry, i) => {
+          const id = entry.timesheet_id || entry.material_id || entry.mileage_id;
+          const isEditing = editingId === id;
+          const date = entry.shift_date || entry.purchase_date || entry.trip_date;
+          const jobName = (jobs.find(j => j.job_id === entry.job_id) || {}).job_name || "Unknown job";
+          let mainLabel = type === "timesheet" ? jobName : type === "material" ? entry.description : jobName;
+          let valueLabel = type === "timesheet" ? `${entry.hours_worked}h` : type === "material" ? `$${fmt(entry.total_cost)}` : `${entry.km_driven} km`;
+
+          return (
+            <div key={id} style={{ borderBottom: i < entries.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+              <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mainLabel}</div>
+                  <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{date}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                  <span style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{valueLabel}</span>
+                  <button onClick={() => isEditing ? setEditingId(null) : startEdit(entry)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: isEditing ? "#eee" : theme.accentLight, color: isEditing ? theme.textSecondary : theme.accent, fontWeight: "600", fontFamily: font.body }}>
+                    {isEditing ? "Cancel" : "Edit"}
+                  </button>
+                </div>
+              </div>
+              {isEditing && (
+                <div style={{ padding: "14px 16px", backgroundColor: theme.bg, borderTop: `1px solid ${theme.border}` }}>
+                  {type === "timesheet" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                      <div><label style={styles.label}>Job</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
+                      <div><label style={styles.label}>Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.hours_worked} onChange={e => setEditForm({...editForm, hours_worked: e.target.value})} /></div>
+                      <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.shift_date} onChange={e => setEditForm({...editForm, shift_date: e.target.value})} /></div>
+                      <div><label style={styles.label}>Cost Code</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>{costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code}</option>)}</select></div>
+                    </div>
+                  )}
+                  {type === "material" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                      <div><label style={styles.label}>Job</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
+                      <div><label style={styles.label}>Amount ($)</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.total_cost} onChange={e => setEditForm({...editForm, total_cost: e.target.value})} /></div>
+                      <div><label style={styles.label}>Description</label><input style={{...styles.input, marginTop: "4px"}} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /></div>
+                      <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.purchase_date} onChange={e => setEditForm({...editForm, purchase_date: e.target.value})} /></div>
+                    </div>
+                  )}
+                  {type === "mileage" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                      <div><label style={styles.label}>Job</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
+                      <div><label style={styles.label}>KM Driven</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.1" value={editForm.km_driven} onChange={e => setEditForm({...editForm, km_driven: e.target.value})} /></div>
+                      <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.trip_date} onChange={e => setEditForm({...editForm, trip_date: e.target.value})} /></div>
+                      <div><label style={styles.label}>Purpose</label><input style={{...styles.input, marginTop: "4px"}} value={editForm.purpose} onChange={e => setEditForm({...editForm, purpose: e.target.value})} /></div>
+                    </div>
+                  )}
+                  <button onClick={() => saveEdit(id)} style={{ ...styles.button, marginTop: "4px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "12px 20px" }} disabled={saving}>
+                    {saving ? <><Spinner /> Saving...</> : "Save Changes"}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -667,7 +796,7 @@ function TimesheetForm({ token }) {
           <label style={styles.label}>Cost Code</label>
           <select style={errors.cost_code_id ? styles.inputError : styles.input} name="cost_code_id" value={formData.cost_code_id} onChange={handleChange}>
             <option value="">Select cost code</option>
-            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
 
@@ -689,6 +818,7 @@ function TimesheetForm({ token }) {
           </button>
         </form>
       </div>
+      <EntryHistory token={token} type="timesheet" linkedEmployeeId={linkedEmployeeId} jobs={jobs} employees={employees} costCodes={costCodes} />
     </div>
   );
 }
@@ -826,6 +956,7 @@ function MaterialsForm({ token }) {
           </button>
         </form>
       </div>
+      <EntryHistory token={token} type="material" linkedEmployeeId={linkedEmployeeId} jobs={jobs} employees={employees} costCodes={[]} />
     </div>
   );
 }
@@ -964,6 +1095,7 @@ function MileageForm({ token }) {
           </button>
         </form>
       </div>
+      <EntryHistory token={token} type="mileage" linkedEmployeeId={linkedEmployeeId} jobs={jobs} employees={employees} costCodes={[]} />
     </div>
   );
 }
@@ -997,6 +1129,13 @@ function UserManagement({ token, activeEmps }) {
     }
   }
 
+  async function deactivateUser(userId, email) {
+    if (!window.confirm(`Deactivate ${email}? They will no longer be able to log in.`)) return;
+    const res = await apiFetch(`${API}/users/${userId}/deactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg(`${email} deactivated.`); loadUsers(); }
+    else { const d = await res.json(); showMsg(d.detail || "Error deactivating account."); }
+  }
+
   return (
     <CollapsibleSection title="Manage Logins">
       <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px" }}>
@@ -1023,6 +1162,11 @@ function UserManagement({ token, activeEmps }) {
             <button onClick={() => { setEditingUser(editingUser === u.user_id ? null : u.user_id); setEditEmpId(u.employee_id ? String(u.employee_id) : ""); }} style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", flexShrink: 0 }}>
               {editingUser === u.user_id ? "Cancel" : "Edit"}
             </button>
+            {u.role !== "owner" && (
+              <button onClick={() => deactivateUser(u.user_id, u.email)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap" }}>
+                Remove
+              </button>
+            )}
           </div>
           {editingUser === u.user_id && (
             <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, display: "flex", gap: "8px", alignItems: "center" }}>
@@ -1183,7 +1327,7 @@ function AdminScreen({ token }) {
 
         {activeEmps.length > 0 && <div style={{ marginTop: "16px" }}>
           <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
-          {activeEmps.map(emp => <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} sub={`${emp.role || "—"} · $${emp.hourly_rate}/hr · Burden $${emp.burden_rate}/hr`} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditEmp(emp)} />, <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => toggleEmployee(emp)} />]} />)}
+          {activeEmps.map(emp => <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} sub={`${emp.role || " "} · $${emp.hourly_rate}/hr · Burden $${emp.burden_rate}/hr`} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditEmp(emp)} />, <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => toggleEmployee(emp)} />]} />)}
         </div>}
         {inactiveEmps.length > 0 && <div style={{ marginTop: "8px" }}>
           <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{showInactiveEmp ? "Hide" : "Show"} archived ({inactiveEmps.length})</button>
@@ -1239,7 +1383,7 @@ function AdminScreen({ token }) {
         ) : <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>}
         {costCodes.length > 0 && <div style={{ marginTop: "16px" }}>
           <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Current</p>
-          {costCodes.map(cc => <Row key={cc.cost_code_id} main={`${cc.code} — ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />)}
+          {costCodes.map(cc => <Row key={cc.cost_code_id} main={`${cc.code} ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />)}
         </div>}
       </CollapsibleSection>
 
@@ -1484,7 +1628,7 @@ function Dashboard({ token }) {
 
         {!loading && mileage.length > 0 && (
           <div style={{ marginTop: "26px" }}>
-            <CollapsibleSection title={`Mileage Log — ${totalKm.toFixed(1)} km total`}>
+            <CollapsibleSection title={`Mileage Log ${totalKm.toFixed(1)} km total`}>
               {mileage.map((m, i) => (
                 <div key={i} style={{ marginBottom: "6px", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

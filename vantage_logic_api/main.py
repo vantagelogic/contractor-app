@@ -863,6 +863,22 @@ def deactivate_user(
     db.commit()
     return {"message": f"{user.email} deactivated"}
 
+@app.patch("/users/{user_id}/reactivate")
+def reactivate_user(
+    user_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(
+        models.User.user_id == user_id,
+        models.User.company_id == current_user.company_id
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.active = True
+    db.commit()
+    return {"message": f"{user.email} reactivated"}
+
 # =============================================
 # DASHBOARD
 # =============================================
