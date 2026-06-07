@@ -101,7 +101,6 @@ function VantageLogo({ size = 40, dark = false, centered = false }) {
   const scale = size / 40;
   const textColor = dark ? "white" : theme.primary;
   const subColor = dark ? "rgba(200,151,58,0.9)" : theme.gold;
-  const dotColor = theme.gold;
 
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: Math.round(10 * scale) + "px", margin: centered ? "0 auto" : "0" }}>
