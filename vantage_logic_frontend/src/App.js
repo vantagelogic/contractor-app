@@ -419,6 +419,7 @@ function CrewHome({ token, setView }) {
   const [loading, setLoading] = useState(true);
 
   const [schedule, setSchedule] = useState([]);
+  const [schedWeek, setSchedWeek] = useState(0);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -523,6 +524,96 @@ function CrewHome({ token, setView }) {
       </div>
 
       {/* This Month + All Time */}
+      <div style={{ marginBottom: "28px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px" }}>My Schedule</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button onClick={() => setSchedWeek(w => w - 1)} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontFamily: font.body }}>&#8249;</button>
+            <span style={{ fontSize: "12px", color: theme.textSecondary, fontWeight: "500", minWidth: "120px", textAlign: "center" }}>
+              {(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1 + schedWeek * 7); return d.toLocaleDateString("en-CA", { month: "short", day: "numeric" }); })()}
+              {" to "}
+              {(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7 + schedWeek * 7); return d.toLocaleDateString("en-CA", { month: "short", day: "numeric" }); })()}
+            </span>
+            <button onClick={() => setSchedWeek(w => w + 1)} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontFamily: font.body }}>&#8250;</button>
+          </div>
+        </div>
+
+        {/* 7-day strip */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", marginBottom: "16px" }}>
+          {Array.from({ length: 7 }).map((_, i) => {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            const day = d.getDay();
+            d.setDate(d.getDate() - day + 1 + i + schedWeek * 7);
+            const dateStr = d.toISOString().split("T")[0];
+            const isToday = dateStr === new Date().toISOString().split("T")[0];
+            const daySchedules = schedule.filter(s => s.scheduled_date === dateStr);
+            const hasWork = daySchedules.length > 0;
+            return (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+                <div style={{ fontSize: "10px", fontWeight: "600", color: isToday ? theme.gold : theme.textLight, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {d.toLocaleDateString("en-CA", { weekday: "short" }).slice(0, 1)}
+                </div>
+                <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: isToday ? theme.primary : hasWork ? theme.accentLight : "transparent", border: isToday ? `2px solid ${theme.primary}` : hasWork ? `1.5px solid ${theme.accent}` : `1.5px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: "12px", fontWeight: isToday || hasWork ? "700" : "400", color: isToday ? "white" : hasWork ? theme.accent : theme.textLight }}>
+                    {d.getDate()}
+                  </span>
+                </div>
+                {hasWork && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Assignment cards for the week */}
+        {(() => {
+          const weekSchedules = schedule.filter(s => {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            const day = d.getDay();
+            const monday = new Date(d);
+            monday.setDate(d.getDate() - day + 1 + schedWeek * 7);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            const sd = new Date(s.scheduled_date + "T00:00:00");
+            return sd >= monday && sd <= sunday;
+          });
+          if (weekSchedules.length === 0) return (
+            <div style={{ ...styles.card, textAlign: "center", padding: "20px", backgroundColor: theme.bg }}>
+              <p style={{ fontSize: "13px", color: theme.textLight, margin: 0 }}>No assignments this week</p>
+            </div>
+          );
+          return (
+            <div style={{ ...styles.card, padding: "0" }}>
+              {weekSchedules.map((s, i) => {
+                const date = new Date(s.scheduled_date + "T00:00:00");
+                const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
+                const isTomorrow = s.scheduled_date === new Date(Date.now() + 86400000).toISOString().split("T")[0];
+                const dayLabel = isToday ? "Today" : isTomorrow ? "Tomorrow" : date.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+                return (
+                  <div key={s.schedule_id} style={{ padding: "13px 16px", borderBottom: i < weekSchedules.length - 1 ? `1px solid ${theme.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.job_name}</div>
+                      <div style={{ fontSize: "12px", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ color: isToday ? theme.gold : theme.textSecondary, fontWeight: isToday ? "600" : "400" }}>{dayLabel}</span>
+                        {isToday && <span style={{ backgroundColor: theme.gold, color: "white", padding: "1px 6px", borderRadius: "8px", fontSize: "10px", fontWeight: "700" }}>TODAY</span>}
+                      </div>
+                      {s.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{s.notes}</div>}
+                    </div>
+                    {s.scheduled_hours && (
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: "17px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.scheduled_hours}h</div>
+                        <div style={{ fontSize: "10px", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px" }}>scheduled</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+
       <div style={{ marginBottom: "24px" }}>
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Lifetime Stats</div>
         <div style={{ ...styles.card, padding: "0" }}>
@@ -541,63 +632,6 @@ function CrewHome({ token, setView }) {
         </div>
       </div>
 
-      {/* Recent Entries */}
-      <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>My Schedule</div>
-        {schedule.length === 0 ? (
-          <div style={{ ...styles.card, textAlign: "center", padding: "28px 22px" }}>
-            <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No upcoming assignments. Check with your admin.</p>
-          </div>
-        ) : (
-          <div style={{ ...styles.card, padding: "0" }}>
-            {schedule.map((s, i) => {
-              const date = new Date(s.scheduled_date + "T00:00:00");
-              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
-              const isTomorrow = s.scheduled_date === new Date(Date.now() + 86400000).toISOString().split("T")[0];
-              const dayLabel = isToday ? "Today" : isTomorrow ? "Tomorrow" : date.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
-              return (
-                <div key={s.schedule_id} style={{ padding: "14px 18px", borderBottom: i < schedule.length - 1 ? `1px solid ${theme.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.job_name}</div>
-                    <div style={{ fontSize: "12px", color: isToday ? theme.gold : theme.textSecondary, marginTop: "2px", fontWeight: isToday ? "600" : "400", display: "flex", alignItems: "center", gap: "6px" }}>
-                      {dayLabel}
-                      {isToday && <span style={{ backgroundColor: theme.gold, color: "white", padding: "1px 7px", borderRadius: "10px", fontSize: "10px", fontWeight: "700" }}>TODAY</span>}
-                    </div>
-                    {s.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{s.notes}</div>}
-                  </div>
-                  {s.scheduled_hours && (
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "17px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.scheduled_hours}h</div>
-                      <div style={{ fontSize: "10px", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px" }}>scheduled</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Recent Entries</div>
-        {stats.recent_entries.length === 0 ? (
-          <div style={{ ...styles.card, textAlign: "center", padding: "28px 22px" }}>
-            <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0, lineHeight: 1.5 }}>{hasAnyData ? "No recent timesheets." : "No entries yet. Start by logging some hours."}</p>
-          </div>
-        ) : (
-          <div style={{ ...styles.card, padding: "0" }}>
-            {stats.recent_entries.map((e, i) => (
-              <div key={i} style={{ padding: "14px 18px", borderBottom: i < stats.recent_entries.length - 1 ? `1px solid ${theme.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.job_name}</div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{e.shift_date}</div>
-                </div>
-                <div style={{ fontSize: "17px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{e.hours_worked}h</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
