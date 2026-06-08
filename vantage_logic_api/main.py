@@ -16,6 +16,8 @@ limiter = Limiter(key_func=get_remote_address)
 models.Base.metadata.create_all(bind=engine)
 
 import os
+import resend
+resend.api_key = os.environ.get("RESEND_API_KEY", "")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
@@ -33,6 +35,62 @@ app.add_middleware(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+def send_welcome_email(to_email: str, company_name: str):
+    try:
+        resend.Emails.send({
+            "from": "Vantage Logic <onboarding@resend.dev>",
+            "to": to_email,
+            "subject": "Welcome to Vantage Logic",
+            "html": f"""
+            <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
+                <div style="margin-bottom: 32px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #1a3d2b; margin: 0;">Vantage Logic</h1>
+                    <div style="height: 2px; background: #c8973a; margin-top: 6px; width: 60px;"></div>
+                </div>
+                <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 12px;">Welcome, {company_name}</h2>
+                <p style="font-size: 15px; color: #5c5c5c; line-height: 1.6; margin: 0 0 24px;">
+                    Your account is ready. Start by adding your jobs, employees, and cost codes from the Admin panel.
+                </p>
+                <a href="https://contractor-app-rose.vercel.app" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                    Open Vantage Logic
+                </a>
+                <p style="font-size: 13px; color: #9a9a9a; margin-top: 32px;">
+                    30-day free trial. No credit card required.
+                </p>
+            </div>
+            """
+        })
+    except Exception:
+        pass
+
+def send_crew_welcome_email(to_email: str, company_name: str):
+    try:
+        resend.Emails.send({
+            "from": "Vantage Logic <onboarding@resend.dev>",
+            "to": to_email,
+            "subject": f"You have been added to {company_name} on Vantage Logic",
+            "html": f"""
+            <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
+                <div style="margin-bottom: 32px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #1a3d2b; margin: 0;">Vantage Logic</h1>
+                    <div style="height: 2px; background: #c8973a; margin-top: 6px; width: 60px;"></div>
+                </div>
+                <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 12px;">Your account is ready</h2>
+                <p style="font-size: 15px; color: #5c5c5c; line-height: 1.6; margin: 0 0 24px;">
+                    {company_name} has added you to Vantage Logic. Log in to track your hours, mileage, and materials.
+                </p>
+                <a href="https://contractor-app-rose.vercel.app" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                    Log In Now
+                </a>
+                <p style="font-size: 13px; color: #9a9a9a; margin-top: 32px;">
+                    Your login email is {to_email}. Contact your administrator if you need help with your password.
+                </p>
+            </div>
+            """
+        })
+    except Exception:
+        pass
 
 # =============================================
 # AUTH HELPERS
@@ -155,6 +213,7 @@ def signup(
         "role": user.role
     })
     
+    send_welcome_email(email, company_name)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -187,9 +246,11 @@ def create_user(
         role=role,
         employee_id=employee_id
     )
-    db.add(user)
     db.commit()
     db.refresh(user)
+    company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
+    company_name = company.company_name if company else "Your company"
+    send_crew_welcome_email(email, company_name)
     return {"user_id": user.user_id, "email": user.email, "role": user.role}
 
 @app.get("/me")
