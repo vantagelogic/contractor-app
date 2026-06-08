@@ -418,9 +418,18 @@ function CrewHome({ token, setView }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [schedule, setSchedule] = useState([]);
+
   useEffect(() => {
-    apiFetch(`${API}/me/stats`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(data => { setStats(data); setLoading(false); });
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      apiFetch(`${API}/me/stats`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/my-schedule`, { headers: h }).then(r => r.json()),
+    ]).then(([statsData, schedData]) => {
+      setStats(statsData);
+      setSchedule(Array.isArray(schedData) ? schedData : []);
+      setLoading(false);
+    });
   }, [token]);
 
   const greeting = (() => {
@@ -533,6 +542,42 @@ function CrewHome({ token, setView }) {
       </div>
 
       {/* Recent Entries */}
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>My Schedule</div>
+        {schedule.length === 0 ? (
+          <div style={{ ...styles.card, textAlign: "center", padding: "28px 22px" }}>
+            <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No upcoming assignments. Check with your admin.</p>
+          </div>
+        ) : (
+          <div style={{ ...styles.card, padding: "0" }}>
+            {schedule.map((s, i) => {
+              const date = new Date(s.scheduled_date + "T00:00:00");
+              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
+              const isTomorrow = s.scheduled_date === new Date(Date.now() + 86400000).toISOString().split("T")[0];
+              const dayLabel = isToday ? "Today" : isTomorrow ? "Tomorrow" : date.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+              return (
+                <div key={s.schedule_id} style={{ padding: "14px 18px", borderBottom: i < schedule.length - 1 ? `1px solid ${theme.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.job_name}</div>
+                    <div style={{ fontSize: "12px", color: isToday ? theme.gold : theme.textSecondary, marginTop: "2px", fontWeight: isToday ? "600" : "400", display: "flex", alignItems: "center", gap: "6px" }}>
+                      {dayLabel}
+                      {isToday && <span style={{ backgroundColor: theme.gold, color: "white", padding: "1px 7px", borderRadius: "10px", fontSize: "10px", fontWeight: "700" }}>TODAY</span>}
+                    </div>
+                    {s.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{s.notes}</div>}
+                  </div>
+                  {s.scheduled_hours && (
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: "17px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.scheduled_hours}h</div>
+                      <div style={{ fontSize: "10px", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px" }}>scheduled</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div>
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Recent Entries</div>
         {stats.recent_entries.length === 0 ? (
