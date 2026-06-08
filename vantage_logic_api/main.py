@@ -247,7 +247,6 @@ def create_user(
         employee_id=employee_id
     )
     db.commit()
-    db.refresh(user)
     company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
     company_name = company.company_name if company else "Your company"
     send_crew_welcome_email(email, company_name)
