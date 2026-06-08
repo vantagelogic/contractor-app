@@ -122,7 +122,7 @@ class Mileage(Base):
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
 
-    class Schedule(Base):
+class Schedule(Base):
     __tablename__ = "schedules"
 
     schedule_id = Column(Integer, primary_key=True, index=True)
