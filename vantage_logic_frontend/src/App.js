@@ -586,7 +586,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
       });
   }
 
-  useEffect(() => { fetchEntries(); }, [token, type, linkedEmployeeId]);
+  useEffect(() => { fetchEntries(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startEdit(entry) {
     const id = entry.timesheet_id || entry.material_id || entry.mileage_id;
