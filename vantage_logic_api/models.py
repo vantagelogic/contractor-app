@@ -40,6 +40,7 @@ class Employee(Base):
     burden_rate = Column(Numeric(10, 2))
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
+    worker_type = Column(String(20), default="employee", nullable=False)
 
 class CostCode(Base):
     __tablename__ = "cost_codes"
@@ -118,5 +119,17 @@ class Mileage(Base):
     trip_date = Column(Date, nullable=False)
     km_driven = Column(Numeric(8, 2), nullable=False)
     purpose = Column(String(255))
+    notes = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+    class Schedule(Base):
+    __tablename__ = "schedules"
+
+    schedule_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    scheduled_date = Column(Date, nullable=False)
+    scheduled_hours = Column(Numeric(5, 2))
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())

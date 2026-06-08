@@ -259,6 +259,7 @@ def create_employee(
     trade_level: str = None,
     hourly_rate: float = None,
     burden_rate: float = None,
+    worker_type: str = "employee",
     phone: str = None,
     email: str = None,
     current_user: models.User = Depends(require_owner),
@@ -272,6 +273,7 @@ def create_employee(
         trade_level=trade_level,
         hourly_rate=hourly_rate,
         burden_rate=burden_rate,
+        worker_type=worker_type,
         phone=phone,
         email=email
     )
@@ -321,6 +323,7 @@ def update_employee(
     trade_level: str = None,
     hourly_rate: float = None,
     burden_rate: float = None,
+    worker_type: str = "None",
     phone: str = None,
     email: str = None,
     current_user: models.User = Depends(require_owner),
@@ -338,6 +341,7 @@ def update_employee(
     if trade_level is not None: emp.trade_level = trade_level
     if hourly_rate is not None: emp.hourly_rate = hourly_rate
     if burden_rate is not None: emp.burden_rate = burden_rate
+    if worker_type is not None: emp.worker_type = worker_type
     if phone is not None: emp.phone = phone
     if email is not None: emp.email = email
     db.commit()
@@ -907,10 +911,13 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
             emp = db.query(models.Employee).filter(
                 models.Employee.employee_id == t.employee_id
             ).first()
-            if emp and emp.burden_rate:
-                labour_cost += float(t.hours_worked or 0) * float(emp.burden_rate)
-            elif emp and emp.hourly_rate:
-                labour_cost += float(t.hours_worked or 0) * float(emp.hourly_rate)
+            if emp:
+                if emp.worker_type == "contractor" and emp.hourly_rate:
+                    labour_cost += float(t.hours_worked or 0) * float(emp.hourly_rate)
+                elif emp.burden_rate:
+                    labour_cost += float(t.hours_worked or 0) * float(emp.burden_rate)
+                elif emp.hourly_rate:
+                    labour_cost += float(t.hours_worked or 0) * float(emp.hourly_rate)
 
         total_cost = labour_cost + total_materials_cost
         contract_value = float(job.contract_value or 0)
@@ -933,3 +940,99 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
         })
 
     return result
+
+# =============================================
+# SCHEDULES
+# =============================================
+
+@app.post("/schedules")
+def create_schedule(
+    employee_id: int,
+    job_id: int,
+    scheduled_date: str,
+    scheduled_hours: float = None,
+    notes: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    schedule = models.Schedule(
+        company_id=current_user.company_id,
+        employee_id=employee_id,
+        job_id=job_id,
+        scheduled_date=scheduled_date,
+        scheduled_hours=scheduled_hours,
+        notes=notes
+    )
+    db.add(schedule)
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+@app.get("/schedules")
+def get_schedules(
+    start_date: str = None,
+    end_date: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Schedule).filter(models.Schedule.company_id == current_user.company_id)
+    if start_date:
+        query = query.filter(models.Schedule.scheduled_date >= start_date)
+    if end_date:
+        query = query.filter(models.Schedule.scheduled_date <= end_date)
+    schedules = query.order_by(models.Schedule.scheduled_date).all()
+    result = []
+    for s in schedules:
+        emp = db.query(models.Employee).filter(models.Employee.employee_id == s.employee_id).first()
+        job = db.query(models.Job).filter(models.Job.job_id == s.job_id).first()
+        result.append({
+            "schedule_id": s.schedule_id,
+            "employee_id": s.employee_id,
+            "job_id": s.job_id,
+            "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "job_name": job.job_name if job else "Unknown",
+            "scheduled_date": str(s.scheduled_date),
+            "scheduled_hours": float(s.scheduled_hours) if s.scheduled_hours else None,
+            "notes": s.notes
+        })
+    return result
+
+@app.delete("/schedules/{schedule_id}")
+def delete_schedule(
+    schedule_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    s = db.query(models.Schedule).filter(
+        models.Schedule.schedule_id == schedule_id,
+        models.Schedule.company_id == current_user.company_id
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    db.delete(s)
+    db.commit()
+    return {"message": "Schedule deleted"}
+
+@app.get("/my-jobs")
+def get_my_jobs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from datetime import date, timedelta
+    if not current_user.employee_id:
+        return db.query(models.Job).filter(
+            models.Job.company_id == current_user.company_id,
+            models.Job.status == "active"
+        ).all()
+    today = date.today()
+    week_end = today + timedelta(days=14)
+    schedules = db.query(models.Schedule).filter(
+        models.Schedule.company_id == current_user.company_id,
+        models.Schedule.employee_id == current_user.employee_id,
+        models.Schedule.scheduled_date >= today - timedelta(days=7),
+        models.Schedule.scheduled_date <= week_end
+    ).all()
+    job_ids = list(set(s.job_id for s in schedules))
+    if not job_ids:
+        return []
+    return db.query(models.Job).filter(
+        models.Job.job_id.in_(job_ids),
+        models.Job.status == "active"
+    ).all()
