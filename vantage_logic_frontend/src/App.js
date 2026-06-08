@@ -1267,28 +1267,31 @@ function UserManagement({ token, activeEmps }) {
 
 // ─── SCHEDULE SCREEN ──────────────────────────────────────────
 function ScheduleScreen({ token }) {
-  const [mode, setMode] = useState("employee");
+  const [tab, setTab] = useState("view");
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [costCodes, setCostCodes] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedEmp, setSelectedEmp] = useState(null);
-  const [selectedDay, setSelectedDay] = useState(null);
-  const [pending, setPending] = useState({});
-  const [editingHours, setEditingHours] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [form, setForm] = useState({
+    employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: ""
+  });
+  const [errors, setErrors] = useState({});
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
   function getWeekDays(offset) {
-    const days = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dow = today.getDay();
     const monday = new Date(today);
     monday.setDate(today.getDate() - dow + (dow === 0 ? -6 : 1) + offset * 7);
+    const days = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
@@ -1309,236 +1312,255 @@ function ScheduleScreen({ token }) {
     Promise.all([
       apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/schedules?start_date=${start}&end_date=${end}`, { headers: h }).then(r => r.json()),
-    ]).then(([emps, jobList, sched]) => {
-      setEmployees(emps.filter(e => e.active));
-      setJobs(jobList.filter(j => j.status === "active"));
+    ]).then(([emps, jobList, ccs, sched]) => {
+      const activeEmps = emps.filter(e => e.active);
+      const activeJobs = jobList.filter(j => j.status === "active");
+      setEmployees(activeEmps);
+      setJobs(activeJobs);
+      setCostCodes(ccs);
       setSchedules(Array.isArray(sched) ? sched : []);
-      if (!selectedEmp && emps.length > 0) setSelectedEmp(emps[0].employee_id);
-      if (!selectedDay) setSelectedDay(days[0].toISOString().split("T")[0]);
-      setPending({});
       setLoading(false);
     });
   }
 
   useEffect(() => { loadData(); }, [weekOffset, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function getKey(empId, jobId, dateStr) { return `${empId}_${jobId}_${dateStr}`; }
-
-  function getCellState(empId, jobId, dateStr) {
-    const key = getKey(empId, jobId, dateStr);
-    if (key in pending) return pending[key];
-    const existing = schedules.find(s => s.employee_id === empId && s.job_id === jobId && s.scheduled_date === dateStr);
-    if (existing) return { assigned: true, hours: existing.scheduled_hours || 8, schedule_id: existing.schedule_id };
-    return { assigned: false, hours: 8 };
+  function validate() {
+    const e = {};
+    if (!form.employee_id) e.employee_id = "Select an employee";
+    if (!form.job_id) e.job_id = "Select a job";
+    if (!form.cost_code_id) e.cost_code_id = "Select a cost code";
+    if (!form.scheduled_date) e.scheduled_date = "Date is required";
+    if (!form.scheduled_hours || parseFloat(form.scheduled_hours) <= 0) e.scheduled_hours = "Enter hours";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
-  function toggleCell(empId, jobId, dateStr) {
-    const key = getKey(empId, jobId, dateStr);
-    const current = getCellState(empId, jobId, dateStr);
-    if (current.assigned) {
-      setPending(p => ({ ...p, [key]: { assigned: false, hours: current.hours, schedule_id: current.schedule_id } }));
-      setEditingHours(null);
+  async function handleAdd() {
+    if (!validate()) return;
+    setSubmitting(true);
+    const params = new URLSearchParams({
+      employee_id: form.employee_id,
+      job_id: form.job_id,
+      cost_code_id: form.cost_code_id,
+      scheduled_date: form.scheduled_date,
+      scheduled_hours: form.scheduled_hours,
+    });
+    if (form.notes) params.append("notes", form.notes);
+    const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setSubmitting(false);
+    if (res.ok) {
+      showMsg("Assignment added.");
+      setForm(f => ({ ...f, employee_id: "", job_id: "", cost_code_id: "", notes: "" }));
+      setErrors({});
+      loadData();
     } else {
-      setPending(p => ({ ...p, [key]: { assigned: true, hours: current.hours, schedule_id: current.schedule_id } }));
-      setEditingHours(key);
+      showMsg("Failed to add. Please try again.");
     }
   }
 
-  function setHours(empId, jobId, dateStr, hours) {
-    const key = getKey(empId, jobId, dateStr);
-    const current = getCellState(empId, jobId, dateStr);
-    setPending(p => ({ ...p, [key]: { ...current, assigned: true, hours: parseFloat(hours) || 8 } }));
+  async function handleDelete(scheduleId) {
+    if (!window.confirm("Remove this assignment?")) return;
+    const res = await apiFetch(`${API}/schedules/${scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg("Removed."); loadData(); }
   }
 
-  async function saveAll() {
-    setSaving(true);
-    const ops = [];
-    for (const [key, state] of Object.entries(pending)) {
-      const [empId, jobId, dateStr] = key.split("_");
-      const original = schedules.find(s => s.employee_id === parseInt(empId) && s.job_id === parseInt(jobId) && s.scheduled_date === dateStr);
-      if (!state.assigned && original) {
-        ops.push(apiFetch(`${API}/schedules/${original.schedule_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }));
-      } else if (state.assigned && !original) {
-        const params = new URLSearchParams({ employee_id: empId, job_id: jobId, scheduled_date: dateStr, scheduled_hours: state.hours });
-        ops.push(apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }));
-      } else if (state.assigned && original && state.hours !== original.scheduled_hours) {
-        ops.push(apiFetch(`${API}/schedules/${original.schedule_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).then(() => {
-          const params = new URLSearchParams({ employee_id: empId, job_id: jobId, scheduled_date: dateStr, scheduled_hours: state.hours });
-          return apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-        }));
-      }
-    }
-    await Promise.all(ops);
-    setSaving(false);
-    showMsg("Schedule saved.");
+  async function handleEditSave(scheduleId) {
+    const params = new URLSearchParams({
+      employee_id: editForm.employee_id,
+      job_id: editForm.job_id,
+      cost_code_id: editForm.cost_code_id || "",
+      scheduled_date: editForm.scheduled_date,
+      scheduled_hours: editForm.scheduled_hours,
+    });
+    if (editForm.notes) params.append("notes", editForm.notes);
+    await apiFetch(`${API}/schedules/${scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    showMsg("Assignment updated.");
+    setEditingId(null);
     loadData();
   }
 
-  const hasPendingChanges = Object.keys(pending).length > 0;
+  const byDate = {};
+  schedules.forEach(s => {
+    if (!byDate[s.scheduled_date]) byDate[s.scheduled_date] = [];
+    byDate[s.scheduled_date].push(s);
+  });
 
-  const NavRow = () => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", gap: "8px" }}>
-      <button onClick={() => { setWeekOffset(w => w - 1); setPending({}); }} style={{ padding: "8px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "40px" }}>&#8249;</button>
-      <div style={{ flex: 1, textAlign: "center" }}>
-        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
-        {weekOffset !== 0 && <button onClick={() => { setWeekOffset(0); setPending({}); }} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>This week</button>}
-      </div>
-      <button onClick={() => { setWeekOffset(w => w + 1); setPending({}); }} style={{ padding: "8px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "40px" }}>&#8250;</button>
-    </div>
+  const TabBtn = ({ id, label }) => (
+    <button onClick={() => setTab(id)} style={{ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "14px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" }}>
+      {label}
+    </button>
   );
 
-  const Cell = ({ empId, jobId, dateStr }) => {
-    const state = getCellState(empId, jobId, dateStr);
-    const isEditing = editingHours === getKey(empId, jobId, dateStr);
-    const isToday = dateStr === todayStr;
-    const isPending = getKey(empId, jobId, dateStr) in pending;
-
-    return (
-      <div style={{ position: "relative" }}>
-        <div
-          onClick={(e) => { e.stopPropagation(); if (!state.assigned) toggleCell(empId, jobId, dateStr); else if (!isEditing) setEditingHours(getKey(empId, jobId, dateStr)); else setEditingHours(null); }}
-          style={{ border: `1.5px solid ${state.assigned ? (isToday ? theme.gold : theme.accent) : theme.border}`, borderRadius: "7px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "46px", cursor: "pointer", backgroundColor: state.assigned ? (isToday ? theme.goldLight : theme.accentLight) : "white", opacity: isPending ? 0.85 : 1, transition: "all 0.12s" }}>
-          {state.assigned ? (
-            <>
-              <span style={{ fontSize: "13px", fontWeight: "700", color: isToday ? "#854F0B" : theme.primary }}>{state.hours}h</span>
-              <span style={{ fontSize: "9px", color: isToday ? "#854F0B" : theme.accent, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.4px" }}>tap</span>
-            </>
-          ) : (
-            <span style={{ fontSize: "18px", color: theme.border, fontWeight: "300" }}>+</span>
-          )}
-        </div>
-        {isEditing && (
-          <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "50px", left: "50%", transform: "translateX(-50%)", zIndex: 10, backgroundColor: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "8px", padding: "10px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", gap: "6px", minWidth: "110px" }}>
-            <div style={{ fontSize: "10px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>Hours</div>
-            <input type="number" step="0.5" min="0.5" max="24" defaultValue={state.hours} style={{ ...styles.input, padding: "6px 8px", fontSize: "15px", textAlign: "center", marginTop: 0, fontWeight: "700" }} onChange={e => setHours(empId, jobId, dateStr, e.target.value)} autoFocus />
-            <button onClick={(e) => { e.stopPropagation(); setEditingHours(null); }} style={{ fontSize: "12px", padding: "7px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Done</button>
-            {state.assigned && <button onClick={(e) => { e.stopPropagation(); const key = getKey(empId, jobId, dateStr); const cur = getCellState(empId, jobId, dateStr); setPending(p => ({ ...p, [key]: { assigned: false, hours: cur.hours, schedule_id: cur.schedule_id } })); setEditingHours(null); }} style={{ fontSize: "11px", padding: "5px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>}
-          </div>
-        )}
+  const WeekNav = () => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", gap: "8px" }}>
+      <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8249;</button>
+      <div style={{ flex: 1, textAlign: "center" }}>
+        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
+        {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>This week</button>}
       </div>
-    );
-  };
-
-  if (loading) return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Schedule</h1>
-      <p style={styles.subtitle}>Assign employees to jobs</p>
-      {[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="60px" radius="10px" /></div>)}
+      <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8250;</button>
     </div>
   );
 
   return (
-    <div style={styles.container} onClick={() => setEditingHours(null)}>
+    <div style={styles.container}>
       <h1 style={styles.title}>Schedule</h1>
-      <p style={styles.subtitle}>Assign employees to jobs by week</p>
+      <p style={styles.subtitle}>Plan and view your crew assignments</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
-      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "14px", border: `1px solid ${theme.border}` }}>
-        {[["employee", "By Employee"], ["day", "By Day"]].map(([m, label]) => (
-          <button key={m} onClick={() => { setMode(m); setPending({}); setEditingHours(null); }} style={{ flex: 1, padding: "9px", borderRadius: "7px", border: mode === m ? `1px solid ${theme.border}` : "none", backgroundColor: mode === m ? "white" : "transparent", color: mode === m ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", transition: "all 0.15s" }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}` }}>
+        <TabBtn id="view" label="View Schedule" />
+        <TabBtn id="add" label="Add Assignment" />
       </div>
 
-      <NavRow />
-
-      {mode === "employee" ? (
+      {tab === "view" && (
         <>
-          <div style={{ marginBottom: "14px" }}>
-            <label style={styles.label}>Employee</label>
-            <select style={styles.input} value={selectedEmp || ""} onChange={e => { setSelectedEmp(parseInt(e.target.value)); setPending({}); setEditingHours(null); }}>
-              {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
-            </select>
-          </div>
-
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: "500px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "140px repeat(7, minmax(44px, 1fr))", gap: "5px", marginBottom: "6px" }}>
-                <div />
-                {days.map(d => {
-                  const ds = d.toISOString().split("T")[0];
-                  const isToday = ds === todayStr;
-                  return (
-                    <div key={ds} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: "10px", fontWeight: "600", color: isToday ? theme.gold : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.4px" }}>{d.toLocaleDateString("en-CA", { weekday: "short" })}</div>
-                      <div style={{ fontSize: "13px", fontWeight: isToday ? "700" : "500", color: isToday ? theme.gold : theme.textPrimary }}>{d.getDate()}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {jobs.map(job => (
-                <div key={job.job_id} style={{ display: "grid", gridTemplateColumns: "100px repeat(7, 1fr)", gap: "5px", marginBottom: "5px", alignItems: "center" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, paddingRight: "6px", lineHeight: 1.3 }}>{job.job_name}</div>
-                  {days.map(d => {
-                    const ds = d.toISOString().split("T")[0];
-                    return <Cell key={ds} empId={selectedEmp} jobId={job.job_id} dateStr={ds} />;
-                  })}
-                </div>
-              ))}
+          <WeekNav />
+          {loading ? (
+            <div>{[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
+          ) : schedules.length === 0 ? (
+            <div style={{ ...styles.card, textAlign: "center", padding: "32px 22px" }}>
+              <p style={{ fontSize: "14px", color: theme.textSecondary, margin: "0 0 16px" }}>No assignments this week.</p>
+              <button onClick={() => setTab("add")} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, display: "inline-block", width: "auto", padding: "11px 24px" }}>Add Assignment</button>
             </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ display: "flex", gap: "6px", marginBottom: "14px", overflowX: "auto", paddingBottom: "4px" }}>
-            {days.map(d => {
-              const ds = d.toISOString().split("T")[0];
-              const isToday = ds === todayStr;
-              const isSelected = selectedDay === ds;
-              return (
-                <button key={ds} onClick={() => { setSelectedDay(ds); setPending({}); setEditingHours(null); }} style={{ padding: "7px 12px", borderRadius: "20px", border: `1.5px solid ${isSelected ? theme.primary : isToday ? theme.gold : theme.border}`, backgroundColor: isSelected ? theme.primary : "white", color: isSelected ? "white" : isToday ? theme.gold : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: "600", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  {d.toLocaleDateString("en-CA", { weekday: "short" })} {d.getDate()}
-                  {isToday && !isSelected && <span style={{ marginLeft: "4px", fontSize: "9px" }}>TODAY</span>}
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedDay && (
-            <div style={{ overflowX: "auto" }}>
-              <div style={{ minWidth: "400px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "120px repeat(" + jobs.length + ", minmax(54px, 1fr))", gap: "5px", marginBottom: "6px" }}>
-                  <div />
-                  {jobs.map(job => (
-                    <div key={job.job_id} style={{ textAlign: "center", fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1.3 }}>
-                      {job.job_name}
+          ) : (
+            <div>
+              {days.map(day => {
+                const dateStr = day.toISOString().split("T")[0];
+                const daySchedules = byDate[dateStr] || [];
+                if (daySchedules.length === 0) return null;
+                const isToday = dateStr === todayStr;
+                const dayLabel = day.toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric" });
+                return (
+                  <div key={dateStr} style={{ marginBottom: "20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: "700", color: isToday ? theme.gold : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px" }}>{dayLabel}</div>
+                      {isToday && <span style={{ backgroundColor: theme.gold, color: "white", padding: "2px 8px", borderRadius: "10px", fontSize: "10px", fontWeight: "700" }}>TODAY</span>}
                     </div>
-                  ))}
-                </div>
-
-                {employees.map(emp => (
-                  <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "90px repeat(" + jobs.length + ", 1fr)", gap: "5px", marginBottom: "5px", alignItems: "center" }}>
-                    <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, lineHeight: 1.3 }}>{emp.first_name} {emp.last_name}</div>
-                    {jobs.map(job => (
-                      <Cell key={job.job_id} empId={emp.employee_id} jobId={job.job_id} dateStr={selectedDay} />
-                    ))}
+                    <div style={{ ...styles.card, padding: "0" }}>
+                      {daySchedules.map((s, i) => {
+                        const isEditing = editingId === s.schedule_id;
+                        return (
+                          <div key={s.schedule_id} style={{ borderBottom: i < daySchedules.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+                            {!isEditing ? (
+                              <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>{s.employee_name}</div>
+                                  <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px" }}>{s.job_name}</div>
+                                  {s.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{s.notes}</div>}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                                  <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: "16px", fontWeight: "700", color: theme.primary }}>{s.scheduled_hours}h</div>
+                                  </div>
+                                  <div style={{ display: "flex", gap: "4px" }}>
+                                    <button onClick={() => { setEditingId(s.schedule_id); setEditForm({ employee_id: s.employee_id, job_id: s.job_id, cost_code_id: s.cost_code_id || "", scheduled_date: s.scheduled_date, scheduled_hours: s.scheduled_hours || 8, notes: s.notes || "" }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
+                                    <button onClick={() => handleDelete(s.schedule_id)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ padding: "14px 16px", backgroundColor: theme.bg }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                                  <div>
+                                    <label style={styles.label}>Employee</label>
+                                    <select style={{...styles.input, marginTop: "4px"}} value={editForm.employee_id} onChange={e => setEditForm({...editForm, employee_id: e.target.value})}>
+                                      {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label style={styles.label}>Hours</label>
+                                    <input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.scheduled_hours} onChange={e => setEditForm({...editForm, scheduled_hours: e.target.value})} />
+                                  </div>
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                                  <div>
+                                    <label style={styles.label}>Job</label>
+                                    <select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>
+                                      {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label style={styles.label}>Date</label>
+                                    <input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.scheduled_date} onChange={e => setEditForm({...editForm, scheduled_date: e.target.value})} />
+                                  </div>
+                                </div>
+                                <div style={{ marginBottom: "8px" }}>
+                                  <label style={styles.label}>Notes</label>
+                                  <input style={{...styles.input, marginTop: "4px"}} placeholder="Optional" value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
+                                </div>
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                  <button onClick={() => handleEditSave(s.schedule_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px" }}>Save</button>
+                                  <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
-
-                <div style={{ marginTop: "10px", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "8px", fontSize: "12px", color: theme.textSecondary }}>
-                  {(() => {
-                    const assigned = employees.filter(emp => jobs.some(job => getCellState(emp.employee_id, job.job_id, selectedDay).assigned));
-                    return assigned.length === 0 ? "No assignments on this day" : `${assigned.length} employee${assigned.length > 1 ? "s" : ""} scheduled`;
-                  })()}
-                </div>
-              </div>
+                );
+              })}
             </div>
           )}
         </>
       )}
 
-      {hasPendingChanges && (
-        <button onClick={saveAll} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%" }} disabled={saving}>
-          {saving ? <><Spinner /> Saving...</> : `Save Changes (${Object.keys(pending).length} update${Object.keys(pending).length > 1 ? "s" : ""})`}
-        </button>
-      )}
+      {tab === "add" && (
+        <div style={styles.card}>
+          <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary, marginBottom: "14px", fontFamily: font.display }}>New Assignment</div>
 
-      {!hasPendingChanges && (
-        <p style={{ textAlign: "center", fontSize: "12px", color: theme.textLight, marginTop: "16px" }}>Tap any cell to assign. Tap an assigned cell to edit hours or remove.</p>
+          <label style={styles.label}>Employee</label>
+          <select style={errors.employee_id ? styles.inputError : styles.input} value={form.employee_id} onChange={e => { setForm({...form, employee_id: e.target.value}); setErrors({...errors, employee_id: ""}); }}>
+            <option value="">Select employee</option>
+            {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+          </select>
+          {errors.employee_id && <p style={styles.errorMsg}>{errors.employee_id}</p>}
+
+          <label style={styles.label}>Job</label>
+          <select style={errors.job_id ? styles.inputError : styles.input} value={form.job_id} onChange={e => { setForm({...form, job_id: e.target.value}); setErrors({...errors, job_id: ""}); }}>
+            <option value="">Select job</option>
+            {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
+          </select>
+          {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
+
+          <label style={styles.label}>Cost Code</label>
+          <select style={errors.cost_code_id ? styles.inputError : styles.input} value={form.cost_code_id} onChange={e => { setForm({...form, cost_code_id: e.target.value}); setErrors({...errors, cost_code_id: ""}); }}>
+            <option value="">Select cost code</option>
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+          </select>
+          {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={styles.label}>Date</label>
+              <input style={errors.scheduled_date ? styles.inputError : styles.input} type="date" value={form.scheduled_date} onChange={e => { setForm({...form, scheduled_date: e.target.value}); setErrors({...errors, scheduled_date: ""}); }} />
+              {errors.scheduled_date && <p style={styles.errorMsg}>{errors.scheduled_date}</p>}
+            </div>
+            <div>
+              <label style={styles.label}>Hours</label>
+              <input style={errors.scheduled_hours ? styles.inputError : styles.input} type="number" step="0.5" placeholder="8" value={form.scheduled_hours} onChange={e => { setForm({...form, scheduled_hours: e.target.value}); setErrors({...errors, scheduled_hours: ""}); }} />
+              {errors.scheduled_hours && <p style={styles.errorMsg}>{errors.scheduled_hours}</p>}
+            </div>
+          </div>
+
+          <label style={styles.label}>Notes (optional)</label>
+          <textarea style={styles.textarea} placeholder="Any details for the crew member" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+
+          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting}>
+            {submitting ? <><Spinner /> Adding...</> : "Add Assignment"}
+          </button>
+
+          <button onClick={() => setTab("view")} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "500" }}>
+            View Schedule
+          </button>
+        </div>
       )}
     </div>
   );
