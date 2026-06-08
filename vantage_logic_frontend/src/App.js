@@ -1336,8 +1336,13 @@ function ScheduleScreen({ token }) {
   function toggleCell(empId, jobId, dateStr) {
     const key = getKey(empId, jobId, dateStr);
     const current = getCellState(empId, jobId, dateStr);
-    setPending(p => ({ ...p, [key]: { assigned: !current.assigned, hours: current.hours, schedule_id: current.schedule_id } }));
-    setEditingHours(null);
+    if (current.assigned) {
+      setPending(p => ({ ...p, [key]: { assigned: false, hours: current.hours, schedule_id: current.schedule_id } }));
+      setEditingHours(null);
+    } else {
+      setPending(p => ({ ...p, [key]: { assigned: true, hours: current.hours, schedule_id: current.schedule_id } }));
+      setEditingHours(key);
+    }
   }
 
   function setHours(empId, jobId, dateStr, hours) {
@@ -1392,7 +1397,7 @@ function ScheduleScreen({ token }) {
     return (
       <div style={{ position: "relative" }}>
         <div
-          onClick={() => { if (!state.assigned) toggleCell(empId, jobId, dateStr); else if (!isEditing) setEditingHours(getKey(empId, jobId, dateStr)); else setEditingHours(null); }}
+          onClick={(e) => { e.stopPropagation(); if (!state.assigned) toggleCell(empId, jobId, dateStr); else if (!isEditing) setEditingHours(getKey(empId, jobId, dateStr)); else setEditingHours(null); }}
           style={{ border: `1.5px solid ${state.assigned ? (isToday ? theme.gold : theme.accent) : theme.border}`, borderRadius: "7px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "46px", cursor: "pointer", backgroundColor: state.assigned ? (isToday ? theme.goldLight : theme.accentLight) : "white", opacity: isPending ? 0.85 : 1, transition: "all 0.12s" }}>
           {state.assigned ? (
             <>
@@ -1403,10 +1408,12 @@ function ScheduleScreen({ token }) {
             <span style={{ fontSize: "18px", color: theme.border, fontWeight: "300" }}>+</span>
           )}
         </div>
-        {state.assigned && isEditing && (
-          <div style={{ position: "absolute", top: "50px", left: "50%", transform: "translateX(-50%)", zIndex: 10, backgroundColor: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "8px", padding: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column", gap: "6px", minWidth: "100px" }}>
-            <input type="number" step="0.5" min="0.5" max="24" defaultValue={state.hours} style={{ ...styles.input, padding: "6px 8px", fontSize: "14px", textAlign: "center", marginTop: 0 }} onChange={e => setHours(empId, jobId, dateStr, e.target.value)} autoFocus />
-            <button onClick={(e) => { e.stopPropagation(); toggleCell(empId, jobId, dateStr); setEditingHours(null); }} style={{ fontSize: "11px", padding: "5px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
+        {isEditing && (
+          <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "50px", left: "50%", transform: "translateX(-50%)", zIndex: 10, backgroundColor: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "8px", padding: "10px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", gap: "6px", minWidth: "110px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>Hours</div>
+            <input type="number" step="0.5" min="0.5" max="24" defaultValue={state.hours} style={{ ...styles.input, padding: "6px 8px", fontSize: "15px", textAlign: "center", marginTop: 0, fontWeight: "700" }} onChange={e => setHours(empId, jobId, dateStr, e.target.value)} autoFocus />
+            <button onClick={(e) => { e.stopPropagation(); setEditingHours(null); }} style={{ fontSize: "12px", padding: "7px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Done</button>
+            {state.assigned && <button onClick={(e) => { e.stopPropagation(); const key = getKey(empId, jobId, dateStr); const cur = getCellState(empId, jobId, dateStr); setPending(p => ({ ...p, [key]: { assigned: false, hours: cur.hours, schedule_id: cur.schedule_id } })); setEditingHours(null); }} style={{ fontSize: "11px", padding: "5px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>}
           </div>
         )}
       </div>
@@ -1449,7 +1456,7 @@ function ScheduleScreen({ token }) {
 
           <div style={{ overflowX: "auto" }}>
             <div style={{ minWidth: "500px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "100px repeat(7, 1fr)", gap: "5px", marginBottom: "6px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "140px repeat(7, minmax(44px, 1fr))", gap: "5px", marginBottom: "6px" }}>
                 <div />
                 {days.map(d => {
                   const ds = d.toISOString().split("T")[0];
@@ -1465,7 +1472,7 @@ function ScheduleScreen({ token }) {
 
               {jobs.map(job => (
                 <div key={job.job_id} style={{ display: "grid", gridTemplateColumns: "100px repeat(7, 1fr)", gap: "5px", marginBottom: "5px", alignItems: "center" }}>
-                  <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, paddingRight: "6px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{job.job_name}</div>
+                  <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, paddingRight: "6px", lineHeight: 1.3 }}>{job.job_name}</div>
                   {days.map(d => {
                     const ds = d.toISOString().split("T")[0];
                     return <Cell key={ds} empId={selectedEmp} jobId={job.job_id} dateStr={ds} />;
@@ -1494,18 +1501,18 @@ function ScheduleScreen({ token }) {
           {selectedDay && (
             <div style={{ overflowX: "auto" }}>
               <div style={{ minWidth: "400px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "90px repeat(" + jobs.length + ", 1fr)", gap: "5px", marginBottom: "6px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "120px repeat(" + jobs.length + ", minmax(54px, 1fr))", gap: "5px", marginBottom: "6px" }}>
                   <div />
                   {jobs.map(job => (
                     <div key={job.job_id} style={{ textAlign: "center", fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1.3 }}>
-                      {job.job_name.split(" ").slice(0, 2).join(" ")}
+                      {job.job_name}
                     </div>
                   ))}
                 </div>
 
                 {employees.map(emp => (
                   <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "90px repeat(" + jobs.length + ", 1fr)", gap: "5px", marginBottom: "5px", alignItems: "center" }}>
-                    <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.first_name} {emp.last_name.charAt(0)}.</div>
+                    <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, lineHeight: 1.3 }}>{emp.first_name} {emp.last_name}</div>
                     {jobs.map(job => (
                       <Cell key={job.job_id} empId={emp.employee_id} jobId={job.job_id} dateStr={selectedDay} />
                     ))}
