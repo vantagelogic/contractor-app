@@ -1036,3 +1036,28 @@ def get_my_jobs(current_user: models.User = Depends(get_current_user), db: Sessi
         models.Job.job_id.in_(job_ids),
         models.Job.status == "active"
     ).all()
+
+@app.get("/my-schedule")
+def get_my_schedule(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from datetime import date, timedelta
+    if not current_user.employee_id:
+        return []
+    today = date.today()
+    end = today + timedelta(days=14)
+    schedules = db.query(models.Schedule).filter(
+        models.Schedule.company_id == current_user.company_id,
+        models.Schedule.employee_id == current_user.employee_id,
+        models.Schedule.scheduled_date >= today,
+        models.Schedule.scheduled_date <= end
+    ).order_by(models.Schedule.scheduled_date).all()
+    result = []
+    for s in schedules:
+        job = db.query(models.Job).filter(models.Job.job_id == s.job_id).first()
+        result.append({
+            "schedule_id": s.schedule_id,
+            "job_name": job.job_name if job else "Unknown",
+            "scheduled_date": str(s.scheduled_date),
+            "scheduled_hours": float(s.scheduled_hours) if s.scheduled_hours else None,
+            "notes": s.notes
+        })
+    return result
