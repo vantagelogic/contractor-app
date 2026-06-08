@@ -61,8 +61,8 @@ def send_welcome_email(to_email: str, company_name: str):
             </div>
             """
         })
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Email error: {e}")
 
 def send_crew_welcome_email(to_email: str, company_name: str):
     try:
