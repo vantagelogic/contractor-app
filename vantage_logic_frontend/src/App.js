@@ -420,6 +420,7 @@ function CrewHome({ token, setView }) {
 
   const [schedule, setSchedule] = useState([]);
   const [schedWeek, setSchedWeek] = useState(0);
+  const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split("T")[0]);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -493,6 +494,7 @@ function CrewHome({ token, setView }) {
     );
   }
 
+  const hasAnyData = stats.all_time.hours > 0 || stats.all_time.km > 0;
 
   return (
     <div style={styles.container}>
@@ -527,13 +529,13 @@ function CrewHome({ token, setView }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px" }}>My Schedule</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button onClick={() => setSchedWeek(w => w - 1)} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontFamily: font.body }}>&#8249;</button>
+            <button onClick={() => { setSchedWeek(w => w - 1); setSelectedDay(null); }} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontFamily: font.body }}>&#8249;</button>
             <span style={{ fontSize: "12px", color: theme.textSecondary, fontWeight: "500", minWidth: "120px", textAlign: "center" }}>
               {(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1 + schedWeek * 7); return d.toLocaleDateString("en-CA", { month: "short", day: "numeric" }); })()}
               {" to "}
               {(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7 + schedWeek * 7); return d.toLocaleDateString("en-CA", { month: "short", day: "numeric" }); })()}
             </span>
-            <button onClick={() => setSchedWeek(w => w + 1)} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontFamily: font.body }}>&#8250;</button>
+            <button onClick={() => { setSchedWeek(w => w + 1); setSelectedDay(null); }} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontFamily: font.body }}>&#8250;</button>
           </div>
         </div>
 
@@ -553,8 +555,8 @@ function CrewHome({ token, setView }) {
                 <div style={{ fontSize: "10px", fontWeight: "600", color: isToday ? theme.gold : theme.textLight, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                   {d.toLocaleDateString("en-CA", { weekday: "short" }).slice(0, 1)}
                 </div>
-                <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: isToday ? theme.primary : hasWork ? theme.accentLight : "transparent", border: isToday ? `2px solid ${theme.primary}` : hasWork ? `1.5px solid ${theme.accent}` : `1.5px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: "12px", fontWeight: isToday || hasWork ? "700" : "400", color: isToday ? "white" : hasWork ? theme.accent : theme.textLight }}>
+                <div onClick={() => setSelectedDay(selectedDay === dateStr ? null : dateStr)} style={{ width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", backgroundColor: selectedDay === dateStr ? theme.primary : isToday && selectedDay !== dateStr ? "transparent" : hasWork ? theme.accentLight : "transparent", border: selectedDay === dateStr ? `2px solid ${theme.primary}` : isToday ? `2px solid ${theme.primary}` : hasWork ? `1.5px solid ${theme.accent}` : `1.5px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}>
+                  <span style={{ fontSize: "12px", fontWeight: isToday || hasWork || selectedDay === dateStr ? "700" : "400", color: selectedDay === dateStr ? "white" : isToday ? theme.primary : hasWork ? theme.accent : theme.textLight }}>
                     {d.getDate()}
                   </span>
                 </div>
@@ -566,20 +568,21 @@ function CrewHome({ token, setView }) {
 
         {/* Assignment cards for the week */}
         {(() => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          const day = d.getDay();
+          const monday = new Date(d);
+          monday.setDate(d.getDate() - day + 1 + schedWeek * 7);
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
           const weekSchedules = schedule.filter(s => {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            const day = d.getDay();
-            const monday = new Date(d);
-            monday.setDate(d.getDate() - day + 1 + schedWeek * 7);
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
             const sd = new Date(s.scheduled_date + "T00:00:00");
+            if (selectedDay) return s.scheduled_date === selectedDay;
             return sd >= monday && sd <= sunday;
           });
           if (weekSchedules.length === 0) return (
             <div style={{ ...styles.card, textAlign: "center", padding: "20px", backgroundColor: theme.bg }}>
-              <p style={{ fontSize: "13px", color: theme.textLight, margin: 0 }}>No assignments this week</p>
+              <p style={{ fontSize: "13px", color: theme.textLight, margin: 0 }}>{selectedDay ? "No assignments on this day" : "No assignments this week"}</p>
             </div>
           );
           return (
