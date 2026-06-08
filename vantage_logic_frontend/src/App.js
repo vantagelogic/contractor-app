@@ -493,7 +493,6 @@ function CrewHome({ token, setView }) {
     );
   }
 
-  const hasAnyData = stats.all_time.hours > 0 || stats.all_time.km > 0;
 
   return (
     <div style={styles.container}>
