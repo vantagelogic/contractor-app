@@ -236,8 +236,9 @@ function OnboardingChecklist({ token, onDismiss }) {
   }, [token]);
 
   const steps = [
-    { label: "Add your first job", done: hasJob, hint: "Go to Admin → Jobs" },
-    { label: "Add your first employee", done: hasEmployee, hint: "Go to Admin → Employees" },
+  { label: "Add your first job", done: hasJob, hint: "Admin panel, then Jobs section" },
+    { label: "Add your first employee", done: hasEmployee, hint: "Admin panel, then Employees section" },
+    { label: "Create logins for your crew", done: false, hint: "Admin panel, then Create Crew Login" },
     { label: "Share the app link with your crew", done: false, hint: window.location.origin, copyable: true },
   ];
 
