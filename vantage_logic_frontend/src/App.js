@@ -236,9 +236,8 @@ function OnboardingChecklist({ token, onDismiss }) {
   }, [token]);
 
   const steps = [
-  { label: "Add your first job", done: hasJob, hint: "Admin panel, then Jobs section" },
-    { label: "Add your first employee", done: hasEmployee, hint: "Admin panel, then Employees section" },
-    { label: "Create logins for your crew", done: false, hint: "Admin panel, then Create Crew Login" },
+    { label: "Add your first job", done: hasJob, hint: "Go to Admin → Jobs" },
+    { label: "Add your first employee", done: hasEmployee, hint: "Go to Admin → Employees" },
     { label: "Share the app link with your crew", done: false, hint: window.location.origin, copyable: true },
   ];
 
@@ -495,6 +494,7 @@ function CrewHome({ token, setView }) {
     );
   }
 
+  const hasAnyData = stats.all_time.hours > 0 || stats.all_time.km > 0;
 
   return (
     <div style={styles.container}>
@@ -1268,214 +1268,271 @@ function UserManagement({ token, activeEmps }) {
 
 // ─── SCHEDULE SCREEN ──────────────────────────────────────────
 function ScheduleScreen({ token }) {
-  const [schedules, setSchedules] = useState([]);
+  const [mode, setMode] = useState("employee");
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ employee_id: "", job_ids: [], scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: "" });
-  const [errors, setErrors] = useState({});
   const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedEmp, setSelectedEmp] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [pending, setPending] = useState({});
+  const [editingHours, setEditingHours] = useState(null);
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
-  function getWeekRange(offset) {
+  function getWeekDays(offset) {
+    const days = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const day = today.getDay();
+    const dow = today.getDay();
     const monday = new Date(today);
-    monday.setDate(today.getDate() - day + (day === 0 ? -6 : 1) + offset * 7);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    return { start: monday, end: sunday };
+    monday.setDate(today.getDate() - dow + (dow === 0 ? -6 : 1) + offset * 7);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      days.push(d);
+    }
+    return days;
   }
 
-  const week = getWeekRange(weekOffset);
-  const weekStr = `${week.start.toISOString().split("T")[0]}`;
-  const weekEndStr = `${week.end.toISOString().split("T")[0]}`;
+  const days = getWeekDays(weekOffset);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const weekLabel = `${days[0].toLocaleDateString("en-CA", { month: "short", day: "numeric" })} to ${days[6].toLocaleDateString("en-CA", { month: "short", day: "numeric" })}`;
 
   function loadData() {
     setLoading(true);
     const h = { Authorization: `Bearer ${token}` };
+    const start = days[0].toISOString().split("T")[0];
+    const end = days[6].toISOString().split("T")[0];
     Promise.all([
-      apiFetch(`${API}/schedules?start_date=${weekStr}&end_date=${weekEndStr}`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()),
-    ]).then(([sched, emps, jobList]) => {
-      setSchedules(sched);
-      setEmployees(emps);
+      apiFetch(`${API}/schedules?start_date=${start}&end_date=${end}`, { headers: h }).then(r => r.json()),
+    ]).then(([emps, jobList, sched]) => {
+      setEmployees(emps.filter(e => e.active));
       setJobs(jobList.filter(j => j.status === "active"));
+      setSchedules(Array.isArray(sched) ? sched : []);
+      if (!selectedEmp && emps.length > 0) setSelectedEmp(emps[0].employee_id);
+      if (!selectedDay) setSelectedDay(days[0].toISOString().split("T")[0]);
+      setPending({});
       setLoading(false);
     });
   }
 
   useEffect(() => { loadData(); }, [weekOffset, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function validate() {
-    const e = {};
-    if (!form.employee_id) e.employee_id = "Select an employee";
-    if (!form.job_ids.length) e.job_ids = "Select at least one job";
-    if (!form.scheduled_date) e.scheduled_date = "Date is required";
-    if (form.scheduled_hours && (parseFloat(form.scheduled_hours) <= 0 || parseFloat(form.scheduled_hours) > 24)) e.scheduled_hours = "Hours must be between 0 and 24";
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  function getKey(empId, jobId, dateStr) { return `${empId}_${jobId}_${dateStr}`; }
+
+  function getCellState(empId, jobId, dateStr) {
+    const key = getKey(empId, jobId, dateStr);
+    if (key in pending) return pending[key];
+    const existing = schedules.find(s => s.employee_id === empId && s.job_id === jobId && s.scheduled_date === dateStr);
+    if (existing) return { assigned: true, hours: existing.scheduled_hours || 8, schedule_id: existing.schedule_id };
+    return { assigned: false, hours: 8 };
   }
 
-  async function handleSubmit() {
-    if (!validate()) return;
-    setSubmitting(true);
-    const promises = form.job_ids.map(jobId => {
-      const params = { employee_id: parseInt(form.employee_id), job_id: parseInt(jobId), scheduled_date: form.scheduled_date };
-      if (form.scheduled_hours) params.scheduled_hours = parseFloat(form.scheduled_hours);
-      if (form.notes) params.notes = form.notes;
-      return apiFetch(`${API}/schedules?${new URLSearchParams(params)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-    });
-    const results = await Promise.all(promises);
-    setSubmitting(false);
-    const allOk = results.every(r => r.ok);
-    if (allOk) {
-      showMsg(`Scheduled ${form.job_ids.length} assignment${form.job_ids.length > 1 ? "s" : ""}.`);
-      setForm({ employee_id: "", job_ids: [], scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: "" });
-      setShowForm(false);
-      loadData();
-    } else {
-      showMsg("Some assignments failed.");
+  function toggleCell(empId, jobId, dateStr) {
+    const key = getKey(empId, jobId, dateStr);
+    const current = getCellState(empId, jobId, dateStr);
+    setPending(p => ({ ...p, [key]: { assigned: !current.assigned, hours: current.hours, schedule_id: current.schedule_id } }));
+    setEditingHours(null);
+  }
+
+  function setHours(empId, jobId, dateStr, hours) {
+    const key = getKey(empId, jobId, dateStr);
+    const current = getCellState(empId, jobId, dateStr);
+    setPending(p => ({ ...p, [key]: { ...current, assigned: true, hours: parseFloat(hours) || 8 } }));
+  }
+
+  async function saveAll() {
+    setSaving(true);
+    const ops = [];
+    for (const [key, state] of Object.entries(pending)) {
+      const [empId, jobId, dateStr] = key.split("_");
+      const original = schedules.find(s => s.employee_id === parseInt(empId) && s.job_id === parseInt(jobId) && s.scheduled_date === dateStr);
+      if (!state.assigned && original) {
+        ops.push(apiFetch(`${API}/schedules/${original.schedule_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }));
+      } else if (state.assigned && !original) {
+        const params = new URLSearchParams({ employee_id: empId, job_id: jobId, scheduled_date: dateStr, scheduled_hours: state.hours });
+        ops.push(apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }));
+      } else if (state.assigned && original && state.hours !== original.scheduled_hours) {
+        ops.push(apiFetch(`${API}/schedules/${original.schedule_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }).then(() => {
+          const params = new URLSearchParams({ employee_id: empId, job_id: jobId, scheduled_date: dateStr, scheduled_hours: state.hours });
+          return apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+        }));
+      }
     }
+    await Promise.all(ops);
+    setSaving(false);
+    showMsg("Schedule saved.");
+    loadData();
   }
 
-  async function deleteSchedule(id) {
-    if (!window.confirm("Remove this assignment?")) return;
-    const res = await apiFetch(`${API}/schedules/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { showMsg("Assignment removed."); loadData(); }
-    else showMsg("Failed to remove.");
-  }
+  const hasPendingChanges = Object.keys(pending).length > 0;
 
-  function toggleJob(jobId) {
-    const newIds = form.job_ids.includes(jobId)
-      ? form.job_ids.filter(id => id !== jobId)
-      : [...form.job_ids, jobId];
-    setForm({ ...form, job_ids: newIds });
-    setErrors({ ...errors, job_ids: "" });
-  }
+  const NavRow = () => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", gap: "8px" }}>
+      <button onClick={() => { setWeekOffset(w => w - 1); setPending({}); }} style={{ padding: "8px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "40px" }}>&#8249;</button>
+      <div style={{ flex: 1, textAlign: "center" }}>
+        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
+        {weekOffset !== 0 && <button onClick={() => { setWeekOffset(0); setPending({}); }} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>This week</button>}
+      </div>
+      <button onClick={() => { setWeekOffset(w => w + 1); setPending({}); }} style={{ padding: "8px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "40px" }}>&#8250;</button>
+    </div>
+  );
 
-  const activeEmps = employees.filter(e => e.active);
+  const Cell = ({ empId, jobId, dateStr }) => {
+    const state = getCellState(empId, jobId, dateStr);
+    const isEditing = editingHours === getKey(empId, jobId, dateStr);
+    const isToday = dateStr === todayStr;
+    const isPending = getKey(empId, jobId, dateStr) in pending;
 
-  // Group schedules by date
-  const byDate = {};
-  schedules.forEach(s => {
-    if (!byDate[s.scheduled_date]) byDate[s.scheduled_date] = [];
-    byDate[s.scheduled_date].push(s);
-  });
+    return (
+      <div style={{ position: "relative" }}>
+        <div
+          onClick={() => { if (!state.assigned) toggleCell(empId, jobId, dateStr); else if (!isEditing) setEditingHours(getKey(empId, jobId, dateStr)); else setEditingHours(null); }}
+          style={{ border: `1.5px solid ${state.assigned ? (isToday ? theme.gold : theme.accent) : theme.border}`, borderRadius: "7px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "46px", cursor: "pointer", backgroundColor: state.assigned ? (isToday ? theme.goldLight : theme.accentLight) : "white", opacity: isPending ? 0.85 : 1, transition: "all 0.12s" }}>
+          {state.assigned ? (
+            <>
+              <span style={{ fontSize: "13px", fontWeight: "700", color: isToday ? "#854F0B" : theme.primary }}>{state.hours}h</span>
+              <span style={{ fontSize: "9px", color: isToday ? "#854F0B" : theme.accent, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.4px" }}>tap</span>
+            </>
+          ) : (
+            <span style={{ fontSize: "18px", color: theme.border, fontWeight: "300" }}>+</span>
+          )}
+        </div>
+        {state.assigned && isEditing && (
+          <div style={{ position: "absolute", top: "50px", left: "50%", transform: "translateX(-50%)", zIndex: 10, backgroundColor: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "8px", padding: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column", gap: "6px", minWidth: "100px" }}>
+            <input type="number" step="0.5" min="0.5" max="24" defaultValue={state.hours} style={{ ...styles.input, padding: "6px 8px", fontSize: "14px", textAlign: "center", marginTop: 0 }} onChange={e => setHours(empId, jobId, dateStr, e.target.value)} autoFocus />
+            <button onClick={(e) => { e.stopPropagation(); toggleCell(empId, jobId, dateStr); setEditingHours(null); }} style={{ fontSize: "11px", padding: "5px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(week.start);
-    d.setDate(week.start.getDate() + i);
-    days.push(d);
-  }
-
-  const weekLabel = `${week.start.toLocaleDateString("en-CA", { month: "short", day: "numeric" })} to ${week.end.toLocaleDateString("en-CA", { month: "short", day: "numeric" })}`;
-
-  return (
+  if (loading) return (
     <div style={styles.container}>
       <h1 style={styles.title}>Schedule</h1>
-      <p style={styles.subtitle}>Assign employees to jobs by date</p>
+      <p style={styles.subtitle}>Assign employees to jobs</p>
+      {[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="60px" radius="10px" /></div>)}
+    </div>
+  );
+
+  return (
+    <div style={styles.container} onClick={() => setEditingHours(null)}>
+      <h1 style={styles.title}>Schedule</h1>
+      <p style={styles.subtitle}>Assign employees to jobs by week</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", gap: "8px" }}>
-        <button onClick={() => setWeekOffset(weekOffset - 1)} style={{ padding: "10px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "44px" }}>Previous</button>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{weekLabel}</div>
-          {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>Back to this week</button>}
-        </div>
-        <button onClick={() => setWeekOffset(weekOffset + 1)} style={{ padding: "10px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "44px" }}>Next</button>
+      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "14px", border: `1px solid ${theme.border}` }}>
+        {[["employee", "By Employee"], ["day", "By Day"]].map(([m, label]) => (
+          <button key={m} onClick={() => { setMode(m); setPending({}); setEditingHours(null); }} style={{ flex: 1, padding: "9px", borderRadius: "7px", border: mode === m ? `1px solid ${theme.border}` : "none", backgroundColor: mode === m ? "white" : "transparent", color: mode === m ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: mode === m ? "600" : "400", cursor: "pointer", transition: "all 0.15s" }}>
+            {label}
+          </button>
+        ))}
       </div>
 
-      <button onClick={() => setShowForm(!showForm)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: showForm ? "#888" : theme.accent, width: "100%" }}>
-        {showForm ? "Cancel" : "+ New Assignment"}
-      </button>
+      <NavRow />
 
-      {showForm && (
-        <div style={{ ...styles.card, marginBottom: "20px" }}>
-          <label style={styles.label}>Employee</label>
-          <select style={errors.employee_id ? styles.inputError : styles.input} value={form.employee_id} onChange={e => { setForm({...form, employee_id: e.target.value}); setErrors({...errors, employee_id: ""}); }}>
-            <option value="">Select employee</option>
-            {activeEmps.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
-          </select>
-          {errors.employee_id && <p style={styles.errorMsg}>{errors.employee_id}</p>}
-
-          <label style={styles.label}>Jobs (pick one or more)</label>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
-            {jobs.map(job => (
-              <button type="button" key={job.job_id} onClick={() => toggleJob(job.job_id)} style={{ padding: "10px 14px", borderRadius: "8px", border: `1.5px solid ${form.job_ids.includes(job.job_id) ? theme.primary : theme.border}`, backgroundColor: form.job_ids.includes(job.job_id) ? theme.accentLight : "white", color: form.job_ids.includes(job.job_id) ? theme.primary : theme.textPrimary, fontWeight: form.job_ids.includes(job.job_id) ? "600" : "400", fontSize: "13px", cursor: "pointer", fontFamily: font.body, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>{job.job_name}</span>
-                {form.job_ids.includes(job.job_id) && <span style={{ color: theme.accent }}>✓</span>}
-              </button>
-            ))}
+      {mode === "employee" ? (
+        <>
+          <div style={{ marginBottom: "14px" }}>
+            <label style={styles.label}>Employee</label>
+            <select style={styles.input} value={selectedEmp || ""} onChange={e => { setSelectedEmp(parseInt(e.target.value)); setPending({}); setEditingHours(null); }}>
+              {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+            </select>
           </div>
-          {errors.job_ids && <p style={styles.errorMsg}>{errors.job_ids}</p>}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-            <div>
-              <label style={styles.label}>Date</label>
-              <input style={errors.scheduled_date ? styles.inputError : styles.input} type="date" value={form.scheduled_date} onChange={e => { setForm({...form, scheduled_date: e.target.value}); setErrors({...errors, scheduled_date: ""}); }} />
-            </div>
-            <div>
-              <label style={styles.label}>Hours</label>
-              <input style={errors.scheduled_hours ? styles.inputError : styles.input} type="number" step="0.5" placeholder="8" value={form.scheduled_hours} onChange={e => { setForm({...form, scheduled_hours: e.target.value}); setErrors({...errors, scheduled_hours: ""}); }} />
-            </div>
-          </div>
-          {errors.scheduled_date && <p style={styles.errorMsg}>{errors.scheduled_date}</p>}
-          {errors.scheduled_hours && <p style={styles.errorMsg}>{errors.scheduled_hours}</p>}
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: "500px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "100px repeat(7, 1fr)", gap: "5px", marginBottom: "6px" }}>
+                <div />
+                {days.map(d => {
+                  const ds = d.toISOString().split("T")[0];
+                  const isToday = ds === todayStr;
+                  return (
+                    <div key={ds} style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: "10px", fontWeight: "600", color: isToday ? theme.gold : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.4px" }}>{d.toLocaleDateString("en-CA", { weekday: "short" })}</div>
+                      <div style={{ fontSize: "13px", fontWeight: isToday ? "700" : "500", color: isToday ? theme.gold : theme.textPrimary }}>{d.getDate()}</div>
+                    </div>
+                  );
+                })}
+              </div>
 
-          <label style={styles.label}>Notes (optional)</label>
-          <textarea style={styles.textarea} placeholder="Any details for the crew" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-
-          <button style={{...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} onClick={handleSubmit} disabled={submitting}>
-            {submitting ? <><Spinner /> Scheduling...</> : `Schedule${form.job_ids.length > 1 ? ` ${form.job_ids.length} jobs` : ""}`}
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div>{[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
-      ) : schedules.length === 0 ? (
-        <div style={{ ...styles.card, textAlign: "center", padding: "32px 22px" }}>
-          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No assignments this week.</p>
-        </div>
-      ) : (
-        <div>
-          {days.map(day => {
-            const dayStr = day.toISOString().split("T")[0];
-            const daySchedules = byDate[dayStr] || [];
-            if (daySchedules.length === 0) return null;
-            const dayLabel = day.toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric" });
-            const isToday = dayStr === new Date().toISOString().split("T")[0];
-            return (
-              <div key={dayStr} style={{ marginBottom: "16px" }}>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: isToday ? theme.gold : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  {dayLabel}
-                  {isToday && <span style={{ backgroundColor: theme.gold, color: "white", padding: "2px 8px", borderRadius: "10px", fontSize: "10px" }}>TODAY</span>}
+              {jobs.map(job => (
+                <div key={job.job_id} style={{ display: "grid", gridTemplateColumns: "100px repeat(7, 1fr)", gap: "5px", marginBottom: "5px", alignItems: "center" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, paddingRight: "6px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{job.job_name}</div>
+                  {days.map(d => {
+                    const ds = d.toISOString().split("T")[0];
+                    return <Cell key={ds} empId={selectedEmp} jobId={job.job_id} dateStr={ds} />;
+                  })}
                 </div>
-                <div style={{ ...styles.card, padding: "0" }}>
-                  {daySchedules.map((s, i) => (
-                    <div key={s.schedule_id} style={{ padding: "13px 16px", borderBottom: i < daySchedules.length - 1 ? `1px solid ${theme.border}` : "none", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{s.employee_name}</div>
-                        <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{s.job_name}{s.scheduled_hours ? ` · ${s.scheduled_hours}h` : ""}</div>
-                        {s.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{s.notes}</div>}
-                      </div>
-                      <button onClick={() => deleteSchedule(s.schedule_id)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body, flexShrink: 0 }}>Remove</button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "14px", overflowX: "auto", paddingBottom: "4px" }}>
+            {days.map(d => {
+              const ds = d.toISOString().split("T")[0];
+              const isToday = ds === todayStr;
+              const isSelected = selectedDay === ds;
+              return (
+                <button key={ds} onClick={() => { setSelectedDay(ds); setPending({}); setEditingHours(null); }} style={{ padding: "7px 12px", borderRadius: "20px", border: `1.5px solid ${isSelected ? theme.primary : isToday ? theme.gold : theme.border}`, backgroundColor: isSelected ? theme.primary : "white", color: isSelected ? "white" : isToday ? theme.gold : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: "600", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  {d.toLocaleDateString("en-CA", { weekday: "short" })} {d.getDate()}
+                  {isToday && !isSelected && <span style={{ marginLeft: "4px", fontSize: "9px" }}>TODAY</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedDay && (
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ minWidth: "400px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "90px repeat(" + jobs.length + ", 1fr)", gap: "5px", marginBottom: "6px" }}>
+                  <div />
+                  {jobs.map(job => (
+                    <div key={job.job_id} style={{ textAlign: "center", fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.3px", lineHeight: 1.3 }}>
+                      {job.job_name.split(" ").slice(0, 2).join(" ")}
                     </div>
                   ))}
                 </div>
+
+                {employees.map(emp => (
+                  <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "90px repeat(" + jobs.length + ", 1fr)", gap: "5px", marginBottom: "5px", alignItems: "center" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.first_name} {emp.last_name.charAt(0)}.</div>
+                    {jobs.map(job => (
+                      <Cell key={job.job_id} empId={emp.employee_id} jobId={job.job_id} dateStr={selectedDay} />
+                    ))}
+                  </div>
+                ))}
+
+                <div style={{ marginTop: "10px", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: "8px", fontSize: "12px", color: theme.textSecondary }}>
+                  {(() => {
+                    const assigned = employees.filter(emp => jobs.some(job => getCellState(emp.employee_id, job.job_id, selectedDay).assigned));
+                    return assigned.length === 0 ? "No assignments on this day" : `${assigned.length} employee${assigned.length > 1 ? "s" : ""} scheduled`;
+                  })()}
+                </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {hasPendingChanges && (
+        <button onClick={saveAll} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%" }} disabled={saving}>
+          {saving ? <><Spinner /> Saving...</> : `Save Changes (${Object.keys(pending).length} update${Object.keys(pending).length > 1 ? "s" : ""})`}
+        </button>
+      )}
+
+      {!hasPendingChanges && (
+        <p style={{ textAlign: "center", fontSize: "12px", color: theme.textLight, marginTop: "16px" }}>Tap any cell to assign. Tap an assigned cell to edit hours or remove.</p>
       )}
     </div>
   );
