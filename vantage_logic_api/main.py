@@ -18,6 +18,7 @@ models.Base.metadata.create_all(bind=engine)
 import os
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
+print(f"Resend key loaded: {bool(resend.api_key)} length: {len(resend.api_key)}")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
