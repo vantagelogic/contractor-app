@@ -945,12 +945,12 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
 # SCHEDULES
 # =============================================
 
-@app.post("/schedules")
 def create_schedule(
     employee_id: int,
     job_id: int,
     scheduled_date: str,
     scheduled_hours: float = None,
+    cost_code_id: int = None,
     notes: str = None,
     current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
@@ -961,6 +961,7 @@ def create_schedule(
         job_id=job_id,
         scheduled_date=scheduled_date,
         scheduled_hours=scheduled_hours,
+        cost_code_id=cost_code_id,
         notes=notes
     )
     db.add(schedule)

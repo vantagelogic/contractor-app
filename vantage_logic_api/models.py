@@ -131,5 +131,6 @@ class Schedule(Base):
     job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
     scheduled_date = Column(Date, nullable=False)
     scheduled_hours = Column(Numeric(5, 2))
+    cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"), nullable=True)
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
