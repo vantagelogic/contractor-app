@@ -2065,10 +2065,21 @@ export default function App() {
   const stored = getStoredAuth();
   const [token, setToken] = useState(stored.token);
   const [role, setRole] = useState(stored.role);
-  const [view, setView] = useState("home");
+  const [view, setView] = useState(stored.role === "crew" ? "home" : "schedule");
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobile, setMobile] = useState(isMobile());
+
+  // Keep the view valid for the current role (prevents owners landing on crew pages after refresh)
+  useEffect(() => {
+    const crewViews = ["home", "timesheet", "materials", "mileage"];
+    const ownerViews = ["schedule", "dashboard", "admin"];
+    if (role === "crew" && !crewViews.includes(view)) {
+      setView("home");
+    } else if ((role === "owner" || role === "admin") && !ownerViews.includes(view)) {
+      setView("schedule");
+    }
+  }, [role, view]);
 
   useEffect(() => {
     const handler = () => setMobile(isMobile());
@@ -2115,13 +2126,13 @@ export default function App() {
               <OnboardingChecklist token={token} onDismiss={() => setShowOnboarding(false)} />
             </div>
           )}
-          {view === "home" && <CrewHome token={token} setView={setView} />}
-          {view === "timesheet" && <TimesheetForm token={token} />}
-          {view === "materials" && <MaterialsForm token={token} />}
-          {view === "mileage" && <MileageForm token={token} />}
-          {view === "schedule" && <ScheduleScreen token={token} />}
-          {view === "dashboard" && <Dashboard token={token} />}
-          {view === "admin" && <AdminScreen token={token} />}
+          {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} />}
+          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} />}
+          {role === "crew" && view === "materials" && <MaterialsForm token={token} />}
+          {role === "crew" && view === "mileage" && <MileageForm token={token} />}
+          {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} />}
+          {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} />}
+          {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} />}
           {mobile && (
             <div style={{ padding: "8px 18px 100px", textAlign: "center" }}>
               <button onClick={handleLogout} style={{ fontSize: "13px", color: "white", background: theme.danger, border: "none", borderRadius: "7px", padding: "10px 26px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "40px" }}>
