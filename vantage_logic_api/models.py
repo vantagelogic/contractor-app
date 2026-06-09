@@ -134,3 +134,35 @@ class Schedule(Base):
     cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"), nullable=True)
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+class Inventory(Base):
+    __tablename__ = "inventory"
+
+    inventory_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(50), nullable=False)
+    quantity = Column(Numeric(10, 2), default=0)
+    purchase_price = Column(Numeric(10, 2))
+    charge_out_price = Column(Numeric(10, 2))
+    notes = Column(Text)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Request(Base):
+    __tablename__ = "requests"
+
+    request_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    request_type = Column(String(50), nullable=False)
+    description = Column(Text)
+    inventory_id = Column(Integer, ForeignKey("inventory.inventory_id"))
+    quantity_requested = Column(Numeric(10, 2))
+    status = Column(String(20), default="pending")
+    denial_reason = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    reviewed_at = Column(DateTime)
+    reviewed_by = Column(Integer, ForeignKey("users.user_id"))

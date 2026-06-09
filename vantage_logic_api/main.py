@@ -1159,3 +1159,210 @@ def get_my_schedule(current_user: models.User = Depends(get_current_user), db: S
             "notes": s.notes
         })
     return result
+
+# =============================================
+# INVENTORY
+# =============================================
+
+@app.get("/inventory")
+def get_inventory(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    items = db.query(models.Inventory).filter(
+        models.Inventory.company_id == current_user.company_id,
+        models.Inventory.active == True
+    ).all()
+    return items
+
+@app.post("/inventory")
+def create_inventory_item(
+    name: str,
+    unit: str,
+    quantity: float = 0,
+    purchase_price: float = None,
+    charge_out_price: float = None,
+    notes: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    item = models.Inventory(
+        company_id=current_user.company_id,
+        name=name,
+        unit=unit,
+        quantity=quantity,
+        purchase_price=purchase_price,
+        charge_out_price=charge_out_price,
+        notes=notes
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.patch("/inventory/{inventory_id}")
+def update_inventory_item(
+    inventory_id: int,
+    name: str = None,
+    unit: str = None,
+    quantity: float = None,
+    purchase_price: float = None,
+    charge_out_price: float = None,
+    notes: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    item = db.query(models.Inventory).filter(
+        models.Inventory.inventory_id == inventory_id,
+        models.Inventory.company_id == current_user.company_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if name is not None: item.name = name
+    if unit is not None: item.unit = unit
+    if quantity is not None: item.quantity = quantity
+    if purchase_price is not None: item.purchase_price = purchase_price
+    if charge_out_price is not None: item.charge_out_price = charge_out_price
+    if notes is not None: item.notes = notes
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.delete("/inventory/{inventory_id}")
+def deactivate_inventory_item(
+    inventory_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    item = db.query(models.Inventory).filter(
+        models.Inventory.inventory_id == inventory_id,
+        models.Inventory.company_id == current_user.company_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    item.active = False
+    db.commit()
+    return {"message": f"{item.name} removed"}
+
+# =============================================
+# REQUESTS
+# =============================================
+
+@app.get("/requests")
+def get_requests(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role in ["owner", "admin"]:
+        reqs = db.query(models.Request).filter(
+            models.Request.company_id == current_user.company_id
+        ).order_by(models.Request.created_at.desc()).all()
+    else:
+        if not current_user.employee_id:
+            return []
+        reqs = db.query(models.Request).filter(
+            models.Request.company_id == current_user.company_id,
+            models.Request.employee_id == current_user.employee_id
+        ).order_by(models.Request.created_at.desc()).all()
+    result = []
+    for r in reqs:
+        emp = db.query(models.Employee).filter(models.Employee.employee_id == r.employee_id).first()
+        job = db.query(models.Job).filter(models.Job.job_id == r.job_id).first()
+        inv = db.query(models.Inventory).filter(models.Inventory.inventory_id == r.inventory_id).first() if r.inventory_id else None
+        result.append({
+            "request_id": r.request_id,
+            "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "job_name": job.job_name if job else "Unknown",
+            "job_id": r.job_id,
+            "request_type": r.request_type,
+            "description": r.description,
+            "inventory_item": inv.name if inv else None,
+            "inventory_unit": inv.unit if inv else None,
+            "quantity_requested": float(r.quantity_requested) if r.quantity_requested else None,
+            "status": r.status,
+            "denial_reason": r.denial_reason,
+            "created_at": str(r.created_at),
+            "reviewed_at": str(r.reviewed_at) if r.reviewed_at else None,
+        })
+    return result
+
+@app.post("/requests")
+def create_request(
+    job_id: int,
+    request_type: str,
+    description: str = None,
+    inventory_id: int = None,
+    quantity_requested: float = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.employee_id:
+        raise HTTPException(status_code=400, detail="Account not linked to an employee")
+    req = models.Request(
+        company_id=current_user.company_id,
+        employee_id=current_user.employee_id,
+        job_id=job_id,
+        request_type=request_type,
+        description=description,
+        inventory_id=inventory_id,
+        quantity_requested=quantity_requested,
+        status="pending"
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return req
+
+@app.patch("/requests/{request_id}/approve")
+def approve_request(
+    request_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    from datetime import datetime
+    req = db.query(models.Request).filter(
+        models.Request.request_id == request_id,
+        models.Request.company_id == current_user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    req.status = "approved"
+    req.reviewed_at = datetime.utcnow()
+    req.reviewed_by = current_user.user_id
+
+    if req.request_type == "Inventory Pull" and req.inventory_id and req.quantity_requested:
+        inv = db.query(models.Inventory).filter(
+            models.Inventory.inventory_id == req.inventory_id
+        ).first()
+        if inv:
+            if float(inv.quantity) < float(req.quantity_requested):
+                raise HTTPException(status_code=400, detail=f"Insufficient stock. Only {inv.quantity} {inv.unit} available.")
+            inv.quantity = float(inv.quantity) - float(req.quantity_requested)
+            material = models.Material(
+                company_id=current_user.company_id,
+                job_id=req.job_id,
+                description=f"{inv.name} (from inventory)",
+                total_cost=float(inv.charge_out_price or 0) * float(req.quantity_requested),
+                purchase_date=datetime.utcnow().date()
+            )
+            db.add(material)
+    db.commit()
+    return {"message": "Request approved"}
+
+@app.patch("/requests/{request_id}/deny")
+def deny_request(
+    request_id: int,
+    denial_reason: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    from datetime import datetime
+    req = db.query(models.Request).filter(
+        models.Request.request_id == request_id,
+        models.Request.company_id == current_user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    req.status = "denied"
+    req.denial_reason = denial_reason
+    req.reviewed_at = datetime.utcnow()
+    req.reviewed_by = current_user.user_id
+    db.commit()
+    return {"message": "Request denied"}
