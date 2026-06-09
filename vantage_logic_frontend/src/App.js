@@ -1040,47 +1040,6 @@ function MaterialsForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Materials</h1>
       <p style={styles.subtitle}>Record a material purchase</p>
-      {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
-        <div style={{ marginBottom: "18px" }}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            Scheduled Work to Log
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).map(s => {
-              const d = new Date(s.scheduled_date + "T00:00:00");
-              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
-              const dayLabel = isToday ? "Today" : d.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
-              return (
-                <div key={s.schedule_id} style={{ backgroundColor: "white", border: `1.5px solid ${theme.gold}`, borderRadius: "12px", padding: "14px 16px", boxShadow: "0 1px 4px rgba(200,151,58,0.12)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.job_name}</div>
-                      <div style={{ fontSize: "12px", marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ color: isToday ? theme.gold : theme.textSecondary, fontWeight: isToday ? "600" : "400" }}>{dayLabel}</span>
-                        <span style={{ color: theme.textLight }}>·</span>
-                        <span style={{ color: theme.textSecondary }}>{s.scheduled_hours}h scheduled</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button type="button" onClick={() => {
-                      setFormData(prev => ({ ...prev, job_id: String(s.job_id), cost_code_id: s.cost_code_id ? String(s.cost_code_id) : prev.cost_code_id, shift_date: s.scheduled_date, hours_worked: String(s.scheduled_hours) }));
-                      setDismissedSchedule(prev => [...prev, s.schedule_id]);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.primary, color: "white", fontWeight: "600", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
-                      Fill This In
-                    </button>
-                    <button type="button" onClick={() => setDismissedSchedule(prev => [...prev, s.schedule_id])} style={{ padding: "11px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: "white", color: theme.textSecondary, fontWeight: "500", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
-                      Ignore
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -1223,47 +1182,6 @@ function MileageForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Mileage</h1>
       <p style={styles.subtitle}>Record a trip for a job</p>
-      {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
-        <div style={{ marginBottom: "18px" }}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            Scheduled Work to Log
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).map(s => {
-              const d = new Date(s.scheduled_date + "T00:00:00");
-              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
-              const dayLabel = isToday ? "Today" : d.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
-              return (
-                <div key={s.schedule_id} style={{ backgroundColor: "white", border: `1.5px solid ${theme.gold}`, borderRadius: "12px", padding: "14px 16px", boxShadow: "0 1px 4px rgba(200,151,58,0.12)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.job_name}</div>
-                      <div style={{ fontSize: "12px", marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ color: isToday ? theme.gold : theme.textSecondary, fontWeight: isToday ? "600" : "400" }}>{dayLabel}</span>
-                        <span style={{ color: theme.textLight }}>·</span>
-                        <span style={{ color: theme.textSecondary }}>{s.scheduled_hours}h scheduled</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button type="button" onClick={() => {
-                      setFormData(prev => ({ ...prev, job_id: String(s.job_id), cost_code_id: s.cost_code_id ? String(s.cost_code_id) : prev.cost_code_id, shift_date: s.scheduled_date, hours_worked: String(s.scheduled_hours) }));
-                      setDismissedSchedule(prev => [...prev, s.schedule_id]);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.primary, color: "white", fontWeight: "600", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
-                      Fill This In
-                    </button>
-                    <button type="button" onClick={() => setDismissedSchedule(prev => [...prev, s.schedule_id])} style={{ padding: "11px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: "white", color: theme.textSecondary, fontWeight: "500", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
-                      Ignore
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
