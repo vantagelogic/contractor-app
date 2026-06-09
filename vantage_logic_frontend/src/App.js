@@ -1469,9 +1469,15 @@ function InventoryScreen({ token }) {
         </div>
       )}
 
-      <button onClick={() => setShowForm(!showForm)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: showForm ? "#888" : theme.accent, width: "100%" }}>
-        {showForm ? "Cancel" : "+ Add Item"}
-      </button>
+      {!showForm ? (
+        <button onClick={() => setShowForm(true)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: theme.accent, width: "100%" }}>
+          + Add Item
+        </button>
+      ) : (
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          <button onClick={() => setShowForm(false)} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: "#888" }}>Cancel</button>
+        </div>
+      )}
 
       {showForm && (
         <div style={{ ...styles.card, marginBottom: "20px" }}>
@@ -1501,9 +1507,12 @@ function InventoryScreen({ token }) {
           </div>
           <label style={styles.label}>Notes (optional)</label>
           <textarea style={styles.textarea} placeholder="Location, specs, supplier..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting}>
-            {submitting ? <><Spinner /> Adding...</> : "Add to Inventory"}
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting}>
+              {submitting ? <><Spinner /> Adding...</> : "Add to Inventory"}
+            </button>
+            <button style={{ ...styles.button, flex: 1, backgroundColor: "#888" }} onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
         </div>
       )}
 
@@ -1744,9 +1753,15 @@ function CrewRequestsScreen({ token }) {
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
-      <button onClick={() => setShowForm(!showForm)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: showForm ? "#888" : theme.accent, width: "100%" }}>
-        {showForm ? "Cancel" : "+ New Request"}
-      </button>
+      {!showForm ? (
+        <button onClick={() => setShowForm(true)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: theme.accent, width: "100%" }}>
+          + New Request
+        </button>
+      ) : (
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          <button onClick={() => setShowForm(false)} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: "#888" }}>Cancel</button>
+        </div>
+      )}
 
       {showForm && (
         <div style={{ ...styles.card, marginBottom: "20px" }}>
@@ -1781,9 +1796,12 @@ function CrewRequestsScreen({ token }) {
           <label style={styles.label}>Description</label>
           <textarea style={styles.textarea} placeholder="Describe what you need or what happened..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
 
-          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleSubmit} disabled={submitting}>
-            {submitting ? <><Spinner /> Submitting...</> : "Submit Request"}
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleSubmit} disabled={submitting}>
+              {submitting ? <><Spinner /> Submitting...</> : "Submit Request"}
+            </button>
+            <button style={{ ...styles.button, flex: 1, backgroundColor: "#888" }} onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
         </div>
       )}
 
