@@ -979,6 +979,131 @@ def get_my_schedule_to_log(current_user: models.User = Depends(get_current_user)
     return result
 
 # =============================================
+# CHANGE ORDERS
+# =============================================
+
+@app.get("/jobs/{job_id}/change-orders")
+def get_change_orders(
+    job_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    orders = db.query(models.ChangeOrder).filter(
+        models.ChangeOrder.job_id == job_id,
+        models.ChangeOrder.company_id == current_user.company_id
+    ).order_by(models.ChangeOrder.created_at).all()
+    result = []
+    for o in orders:
+        user = db.query(models.User).filter(models.User.user_id == o.created_by).first()
+        result.append({
+            "change_order_id": o.change_order_id,
+            "description": o.description,
+            "amount": float(o.amount),
+            "order_type": o.order_type,
+            "created_by": user.email if user else "Unknown",
+            "created_at": str(o.created_at)
+        })
+    return result
+
+@app.post("/jobs/{job_id}/change-orders")
+def create_change_order(
+    job_id: int,
+    description: str,
+    amount: float,
+    order_type: str = "addition",
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    job = db.query(models.Job).filter(
+        models.Job.job_id == job_id,
+        models.Job.company_id == current_user.company_id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    order = models.ChangeOrder(
+        company_id=current_user.company_id,
+        job_id=job_id,
+        description=description,
+        amount=amount,
+        order_type=order_type,
+        created_by=current_user.user_id
+    )
+    db.add(order)
+    # Adjust contract value
+    current_value = float(job.contract_value or 0)
+    if order_type == "addition":
+        job.contract_value = current_value + amount
+    else:
+        job.contract_value = current_value - amount
+    db.commit()
+    db.refresh(order)
+    # Send notifications to all company owners
+    owners = db.query(models.User).filter(
+        models.User.company_id == current_user.company_id,
+        models.User.role.in_(["owner", "admin"])
+    ).all()
+    for owner in owners:
+        if owner.user_id != current_user.user_id:
+            notif = models.Notification(
+                company_id=current_user.company_id,
+                user_id=owner.user_id,
+                type="change_order",
+                title="Change Order Added",
+                message=f"{description} — {'+'if order_type == 'addition' else '-'}${amount:.2f}",
+                related_id=job_id,
+                related_type="job"
+            )
+            db.add(notif)
+    db.commit()
+    return order
+
+# =============================================
+# NOTIFICATIONS
+# =============================================
+
+@app.get("/notifications")
+def get_notifications(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    notifs = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id
+    ).order_by(models.Notification.created_at.desc()).limit(50).all()
+    return [{
+        "notification_id": n.notification_id,
+        "type": n.type,
+        "title": n.title,
+        "message": n.message,
+        "related_id": n.related_id,
+        "related_type": n.related_type,
+        "read": n.read,
+        "created_at": str(n.created_at)
+    } for n in notifs]
+
+@app.get("/notifications/unread-count")
+def get_unread_count(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    count = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id,
+        models.Notification.read == False
+    ).count()
+    return {"count": count}
+
+@app.patch("/notifications/mark-read")
+def mark_all_read(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id,
+        models.Notification.read == False
+    ).update({"read": True})
+    db.commit()
+    return {"message": "All notifications marked as read"}
+
+# =============================================
 # DASHBOARD
 # =============================================
 
@@ -1308,6 +1433,27 @@ def create_request(
     db.add(req)
     db.commit()
     db.refresh(req)
+
+    # Notify all owners
+    owners = db.query(models.User).filter(
+        models.User.company_id == current_user.company_id,
+        models.User.role.in_(["owner", "admin"])
+    ).all()
+    emp = db.query(models.Employee).filter(models.Employee.employee_id == current_user.employee_id).first()
+    emp_name = f"{emp.first_name} {emp.last_name}" if emp else "A crew member"
+    job = db.query(models.Job).filter(models.Job.job_id == job_id).first()
+    for owner in owners:
+        notif = models.Notification(
+            company_id=current_user.company_id,
+            user_id=owner.user_id,
+            type="new_request",
+            title=f"New {request_type} Request",
+            message=f"{emp_name} on {job.job_name if job else 'a job'}",
+            related_id=req.request_id,
+            related_type="request"
+        )
+        db.add(notif)
+    db.commit()
     return req
 
 @app.patch("/requests/{request_id}/approve")
@@ -1419,4 +1565,32 @@ def add_comment(
     db.add(comment)
     db.commit()
     db.refresh(comment)
+
+    # Notify the other party
+    req = db.query(models.Request).filter(models.Request.request_id == request_id).first()
+    if req:
+        if current_user.role == "crew":
+            targets = db.query(models.User).filter(
+                models.User.company_id == current_user.company_id,
+                models.User.role.in_(["owner", "admin"])
+            ).all()
+        else:
+            crew_user = db.query(models.User).filter(
+                models.User.employee_id == req.employee_id,
+                models.User.company_id == current_user.company_id
+            ).first()
+            targets = [crew_user] if crew_user else []
+        for target in targets:
+            if target and target.user_id != current_user.user_id:
+                notif = models.Notification(
+                    company_id=current_user.company_id,
+                    user_id=target.user_id,
+                    type="new_comment",
+                    title="New comment on request",
+                    message=message[:100],
+                    related_id=request_id,
+                    related_type="request"
+                )
+                db.add(notif)
+        db.commit()
     return {"comment_id": comment.comment_id, "message": comment.message}

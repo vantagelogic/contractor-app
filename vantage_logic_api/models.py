@@ -176,3 +176,30 @@ class RequestComment(Base):
     company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+
+class ChangeOrder(Base):
+    __tablename__ = "change_orders"
+
+    change_order_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    description = Column(Text, nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    order_type = Column(String(20), default="addition")
+    created_by = Column(Integer, ForeignKey("users.user_id"))
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    notification_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text)
+    related_id = Column(Integer)
+    related_type = Column(String(50))
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
