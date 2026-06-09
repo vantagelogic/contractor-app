@@ -969,6 +969,11 @@ function MaterialsForm({ token }) {
   const [linkedEmployeeId, setLinkedEmployeeId] = useState(null);
   const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
   const [employees, setEmployees] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [matTab, setMatTab] = useState("store");
+  const [invForm, setInvForm] = useState({ job_id: "", inventory_id: "", quantity_requested: "", description: "" });
+  const [invErrors, setInvErrors] = useState({});
+  const [invSubmitting, setInvSubmitting] = useState(false);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -976,13 +981,15 @@ function MaterialsForm({ token }) {
       apiFetch(`${API}/me`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/my-jobs`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()),
-    ]).then(([me, jobs, emps]) => {
+      apiFetch(`${API}/inventory`, { headers: h }).then(r => r.json()).catch(() => []),
+    ]).then(([me, jobList, emps, inv]) => {
       if (me.employee_id) {
         setLinkedEmployeeId(me.employee_id);
         setFormData(prev => ({ ...prev, employee_id: me.employee_id }));
       }
-      setJobs(jobs.filter(j => j.status === "active"));
+      setJobs(jobList.filter(j => j.status === "active"));
       setEmployees(emps);
+      setInventory(Array.isArray(inv) ? inv : []);
       setLoading(false);
     });
   }, [token]);
