@@ -137,6 +137,8 @@ function IconSchedule() { return <svg width="18" height="18" viewBox="0 0 24 24"
 function IconAdmin() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>; }
 
 // ─── SPINNER ──────────────────────────────────────────────────
+function IconInventory() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>; }
+function IconRequests() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>; }
 function Spinner({ size = 16, color = "white" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ animation: "vlspin 0.8s linear infinite" }}>
@@ -169,10 +171,13 @@ function NavBar({ view, setView, role, onLogout }) {
         { id: "timesheet", label: "Hours", Icon: IconHours },
         { id: "materials", label: "Materials", Icon: IconMaterials },
         { id: "mileage", label: "Mileage", Icon: IconMileage },
+        { id: "crew_requests", label: "Requests", Icon: IconRequests },
       ]
     : [
         { id: "schedule", label: "Schedule", Icon: IconSchedule },
         { id: "dashboard", label: "Dashboard", Icon: IconDashboard },
+        { id: "inventory", label: "Inventory", Icon: IconInventory },
+        { id: "requests", label: "Requests", Icon: IconRequests },
         { id: "admin", label: "Admin", Icon: IconAdmin },
       ];
 
@@ -1039,7 +1044,56 @@ function MaterialsForm({ token }) {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Log Materials</h1>
-      <p style={styles.subtitle}>Record a material purchase</p>
+      <p style={styles.subtitle}>Record a material purchase or inventory pull</p>
+
+      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "16px", border: `1px solid ${theme.border}` }}>
+        {[["store", "Store Bought"], ["inventory", "From Inventory"]].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setMatTab(id)} style={{ flex: 1, padding: "10px", borderRadius: "7px", border: matTab === id ? `1px solid ${theme.border}` : "none", backgroundColor: matTab === id ? "white" : "transparent", color: matTab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: matTab === id ? "600" : "400", cursor: "pointer" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {matTab === "inventory" ? (
+        <div style={styles.card}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>Pull from Inventory</div>
+          {linkedEmployeeId && <IdentityBadge name={linkedEmployeeName} />}
+          <label style={styles.label}>Job</label>
+          <select style={invErrors.job_id ? styles.inputError : styles.input} value={invForm.job_id} onChange={e => { setInvForm({...invForm, job_id: e.target.value}); setInvErrors({...invErrors, job_id: ""}); }}>
+            <option value="">Select job</option>
+            {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+          </select>
+          {invErrors.job_id && <p style={styles.errorMsg}>{invErrors.job_id}</p>}
+          <label style={styles.label}>Item</label>
+          <select style={invErrors.inventory_id ? styles.inputError : styles.input} value={invForm.inventory_id} onChange={e => { setInvForm({...invForm, inventory_id: e.target.value}); setInvErrors({...invErrors, inventory_id: ""}); }}>
+            <option value="">Select item</option>
+            {inventory.map(i => <option key={i.inventory_id} value={i.inventory_id}>{i.name} ({parseFloat(i.quantity || 0)} {i.unit} available)</option>)}
+          </select>
+          {invErrors.inventory_id && <p style={styles.errorMsg}>{invErrors.inventory_id}</p>}
+          <label style={styles.label}>Quantity Needed</label>
+          <input style={invErrors.quantity_requested ? styles.inputError : styles.input} type="number" step="0.01" placeholder="0" value={invForm.quantity_requested} onChange={e => { setInvForm({...invForm, quantity_requested: e.target.value}); setInvErrors({...invErrors, quantity_requested: ""}); }} />
+          {invErrors.quantity_requested && <p style={styles.errorMsg}>{invErrors.quantity_requested}</p>}
+          <label style={styles.label}>Notes (optional)</label>
+          <textarea style={styles.textarea} placeholder="What is this for?" value={invForm.description} onChange={e => setInvForm({...invForm, description: e.target.value})} />
+          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} type="button" onClick={async () => {
+            const e = {};
+            if (!invForm.job_id) e.job_id = "Select a job";
+            if (!invForm.inventory_id) e.inventory_id = "Select an item";
+            if (!invForm.quantity_requested || parseFloat(invForm.quantity_requested) <= 0) e.quantity_requested = "Enter quantity";
+            setInvErrors(e);
+            if (Object.keys(e).length > 0) return;
+            setInvSubmitting(true);
+            const params = new URLSearchParams({ job_id: invForm.job_id, request_type: "Inventory Pull", inventory_id: invForm.inventory_id, quantity_requested: invForm.quantity_requested });
+            if (invForm.description) params.append("description", invForm.description);
+            const res = await apiFetch(`${API}/requests?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+            setInvSubmitting(false);
+            if (res.ok) { setInvForm({ job_id: "", inventory_id: "", quantity_requested: "", description: "" }); setMatTab("store"); }
+          }} disabled={invSubmitting}>
+            {invSubmitting ? <><Spinner /> Submitting...</> : "Request from Inventory"}
+          </button>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "10px", textAlign: "center" }}>Your request will be sent to the admin for approval.</p>
+        </div>
+      ) : (
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -1086,6 +1140,7 @@ function MaterialsForm({ token }) {
           </button>
         </form>
       </div>
+      )}
       <EntryHistory token={token} type="material" linkedEmployeeId={linkedEmployeeId} jobs={jobs} employees={employees} costCodes={[]} />
     </div>
   );
@@ -1315,6 +1370,443 @@ function UserManagement({ token, activeEmps, refreshSignal }) {
         </div>
       ))}
     </CollapsibleSection>
+  );
+}
+
+// ─── INVENTORY SCREEN ─────────────────────────────────────────
+function InventoryScreen({ token }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "" });
+  const [editForm, setEditForm] = useState({});
+  const [errors, setErrors] = useState({});
+
+  const UNITS = ["each", "box", "roll", "litre", "kg", "metre", "sheet", "bag", "pail", "tube"];
+
+  function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
+
+  function loadItems() {
+    apiFetch(`${API}/inventory`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(data => { setItems(Array.isArray(data) ? data : []); setLoading(false); });
+  }
+
+  useEffect(() => { loadItems(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function validate() {
+    const e = {};
+    if (!form.name.trim()) e.name = "Name is required";
+    if (!form.unit) e.unit = "Unit is required";
+    if (form.quantity !== "" && parseFloat(form.quantity) < 0) e.quantity = "Cannot be negative";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleAdd() {
+    if (!validate()) return;
+    setSubmitting(true);
+    const params = new URLSearchParams({ name: form.name, unit: form.unit });
+    if (form.quantity) params.append("quantity", form.quantity);
+    if (form.purchase_price) params.append("purchase_price", form.purchase_price);
+    if (form.charge_out_price) params.append("charge_out_price", form.charge_out_price);
+    if (form.notes) params.append("notes", form.notes);
+    const res = await apiFetch(`${API}/inventory?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setSubmitting(false);
+    if (res.ok) { showMsg("Item added."); setForm({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "" }); setShowForm(false); loadItems(); }
+    else showMsg("Failed to add item.");
+  }
+
+  async function handleUpdate(id) {
+    const params = new URLSearchParams();
+    if (editForm.name) params.append("name", editForm.name);
+    if (editForm.unit) params.append("unit", editForm.unit);
+    if (editForm.quantity !== "") params.append("quantity", editForm.quantity);
+    if (editForm.purchase_price !== "") params.append("purchase_price", editForm.purchase_price);
+    if (editForm.charge_out_price !== "") params.append("charge_out_price", editForm.charge_out_price);
+    const res = await apiFetch(`${API}/inventory/${id}?${params}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg("Item updated."); setEditingId(null); loadItems(); }
+    else showMsg("Failed to update.");
+  }
+
+  async function handleRemove(id, name) {
+    if (!window.confirm(`Remove ${name} from inventory?`)) return;
+    const res = await apiFetch(`${API}/inventory/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg("Item removed."); loadItems(); }
+  }
+
+  const totalValue = items.reduce((s, i) => s + (parseFloat(i.quantity || 0) * parseFloat(i.purchase_price || 0)), 0);
+  const totalChargeOut = items.reduce((s, i) => s + (parseFloat(i.quantity || 0) * parseFloat(i.charge_out_price || 0)), 0);
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Inventory</h1>
+      <p style={styles.subtitle}>Track materials and supplies on hand</p>
+
+      {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
+
+      {items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+          <div style={{ ...styles.card, padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>Stock Value</div>
+            <div style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>${fmt(totalValue)}</div>
+            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>at purchase price</div>
+          </div>
+          <div style={{ ...styles.card, padding: "16px 18px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "6px" }}>Charge-Out Value</div>
+            <div style={{ fontSize: "22px", fontWeight: "700", color: theme.accent, fontFamily: font.display }}>${fmt(totalChargeOut)}</div>
+            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>billable to clients</div>
+          </div>
+        </div>
+      )}
+
+      <button onClick={() => setShowForm(!showForm)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: showForm ? "#888" : theme.accent, width: "100%" }}>
+        {showForm ? "Cancel" : "+ Add Item"}
+      </button>
+
+      {showForm && (
+        <div style={{ ...styles.card, marginBottom: "20px" }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>New Inventory Item</div>
+          <label style={styles.label}>Item Name</label>
+          <input style={errors.name ? styles.inputError : styles.input} placeholder="e.g. 2x4 Lumber, Drywall Screws" value={form.name} onChange={e => { setForm({...form, name: e.target.value}); setErrors({...errors, name: ""}); }} />
+          {errors.name && <p style={styles.errorMsg}>{errors.name}</p>}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={styles.label}>Unit</label>
+              <select style={styles.input} value={form.unit} onChange={e => setForm({...form, unit: e.target.value})}>
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Qty on Hand</label>
+              <input style={styles.input} type="number" step="0.01" placeholder="0" value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} />
+            </div>
+            <div>
+              <label style={styles.label}>Purchase Price</label>
+              <input style={styles.input} type="number" step="0.01" placeholder="$0.00" value={form.purchase_price} onChange={e => setForm({...form, purchase_price: e.target.value})} />
+            </div>
+            <div>
+              <label style={styles.label}>Charge-Out Price</label>
+              <input style={styles.input} type="number" step="0.01" placeholder="$0.00" value={form.charge_out_price} onChange={e => setForm({...form, charge_out_price: e.target.value})} />
+            </div>
+          </div>
+          <label style={styles.label}>Notes (optional)</label>
+          <textarea style={styles.textarea} placeholder="Location, specs, supplier..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting}>
+            {submitting ? <><Spinner /> Adding...</> : "Add to Inventory"}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div>{[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
+      ) : items.length === 0 ? (
+        <div style={{ ...styles.card, textAlign: "center", padding: "32px 22px" }}>
+          <p style={{ fontSize: "14px", color: theme.textSecondary, margin: "0 0 16px" }}>No inventory items yet.</p>
+          <button onClick={() => setShowForm(true)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, padding: "11px 24px", display: "inline-block", width: "auto" }}>Add First Item</button>
+        </div>
+      ) : (
+        <div style={{ ...styles.card, padding: "0" }}>
+          {items.map((item, i) => {
+            const isEditing = editingId === item.inventory_id;
+            const margin = item.charge_out_price && item.purchase_price ? ((parseFloat(item.charge_out_price) - parseFloat(item.purchase_price)) / parseFloat(item.charge_out_price) * 100).toFixed(0) : null;
+            const lowStock = parseFloat(item.quantity || 0) <= 2;
+            return (
+              <div key={item.inventory_id} style={{ borderBottom: i < items.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+                {!isEditing ? (
+                  <div style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+                        <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>{item.name}</div>
+                        {lowStock && <span style={{ fontSize: "10px", backgroundColor: theme.dangerLight, color: theme.danger, padding: "2px 7px", borderRadius: "10px", fontWeight: "600" }}>Low Stock</span>}
+                      </div>
+                      <div style={{ fontSize: "12px", color: theme.textSecondary, display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: "700", color: parseFloat(item.quantity || 0) === 0 ? theme.danger : theme.primary }}>{parseFloat(item.quantity || 0)} {item.unit}</span>
+                        {item.purchase_price && <span>Cost: ${fmt(item.purchase_price)}</span>}
+                        {item.charge_out_price && <span style={{ color: theme.accent }}>Bill: ${fmt(item.charge_out_price)}</span>}
+                        {margin && <span style={{ color: theme.gold }}>Margin: {margin}%</span>}
+                      </div>
+                      {item.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{item.notes}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+                      <button onClick={() => { setEditingId(item.inventory_id); setEditForm({ name: item.name, unit: item.unit, quantity: String(item.quantity || 0), purchase_price: String(item.purchase_price || ""), charge_out_price: String(item.charge_out_price || "") }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
+                      <button onClick={() => handleRemove(item.inventory_id, item.name)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: "14px 16px", backgroundColor: theme.bg }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                      <div><label style={styles.label}>Name</label><input style={{...styles.input, marginTop: "4px"}} value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} /></div>
+                      <div><label style={styles.label}>Unit</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.unit} onChange={e => setEditForm({...editForm, unit: e.target.value})}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
+                      <div><label style={styles.label}>Qty on Hand</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: e.target.value})} /></div>
+                      <div><label style={styles.label}>Purchase Price</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.purchase_price} onChange={e => setEditForm({...editForm, purchase_price: e.target.value})} /></div>
+                      <div><label style={styles.label}>Charge-Out Price</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.charge_out_price} onChange={e => setEditForm({...editForm, charge_out_price: e.target.value})} /></div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => handleUpdate(item.inventory_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px" }}>Save</button>
+                      <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── REQUESTS SCREEN (OWNER) ───────────────────────────────────
+function RequestsScreen({ token }) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending");
+  const [message, setMessage] = useState("");
+  const [denyingId, setDenyingId] = useState(null);
+  const [denialReason, setDenialReason] = useState("");
+
+  function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
+
+  function loadRequests() {
+    apiFetch(`${API}/requests`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(data => { setRequests(Array.isArray(data) ? data : []); setLoading(false); });
+  }
+
+  useEffect(() => { loadRequests(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function approve(id) {
+    const res = await apiFetch(`${API}/requests/${id}/approve`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg("Request approved."); loadRequests(); }
+    else { const d = await res.json(); showMsg(d.detail || "Failed to approve."); }
+  }
+
+  async function deny(id) {
+    const params = new URLSearchParams();
+    if (denialReason) params.append("denial_reason", denialReason);
+    const res = await apiFetch(`${API}/requests/${id}/deny?${params}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg("Request denied."); setDenyingId(null); setDenialReason(""); loadRequests(); }
+    else showMsg("Failed to deny.");
+  }
+
+  const filtered = requests.filter(r => filter === "all" ? true : r.status === filter);
+  const pendingCount = requests.filter(r => r.status === "pending").length;
+
+  const statusColor = (s) => s === "approved" ? theme.accent : s === "denied" ? theme.danger : theme.gold;
+  const statusBg = (s) => s === "approved" ? theme.accentLight : s === "denied" ? theme.dangerLight : theme.goldLight;
+
+  return (
+    <div style={styles.container}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "4px" }}>
+        <h1 style={styles.title}>Requests</h1>
+        {pendingCount > 0 && <span style={{ backgroundColor: theme.gold, color: "white", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "12px", marginTop: "4px" }}>{pendingCount} pending</span>}
+      </div>
+      <p style={styles.subtitle}>Review and respond to crew requests</p>
+
+      {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
+
+      <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+        {[["pending", "Pending"], ["approved", "Approved"], ["denied", "Denied"], ["all", "All"]].map(([val, label]) => (
+          <button key={val} onClick={() => setFilter(val)} style={{ padding: "7px 14px", borderRadius: "20px", border: `1.5px solid ${filter === val ? theme.primary : theme.border}`, backgroundColor: filter === val ? theme.primary : "white", color: filter === val ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+            {label}{val === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div>{[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="100px" radius="10px" /></div>)}</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ ...styles.card, textAlign: "center", padding: "32px" }}>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No {filter === "all" ? "" : filter} requests.</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {filtered.map(req => (
+            <div key={req.request_id} style={{ ...styles.card, padding: "16px", borderLeft: `4px solid ${statusColor(req.status)}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
+                    <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{req.status}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.employee_name} · {req.job_name}</div>
+                  <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px" }}>{new Date(req.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+              </div>
+              {req.description && <div style={{ fontSize: "13px", color: theme.textPrimary, backgroundColor: theme.bg, padding: "10px 12px", borderRadius: "8px", marginBottom: "10px", lineHeight: 1.5 }}>{req.description}</div>}
+              {req.inventory_item && (
+                <div style={{ fontSize: "12px", color: theme.accent, backgroundColor: theme.accentLight, padding: "8px 12px", borderRadius: "8px", marginBottom: "10px", fontWeight: "600" }}>
+                  Inventory: {req.quantity_requested} {req.inventory_unit} of {req.inventory_item}
+                </div>
+              )}
+              {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, backgroundColor: theme.dangerLight, padding: "8px 12px", borderRadius: "8px", marginBottom: "10px" }}>Denied: {req.denial_reason}</div>}
+              {req.status === "pending" && (
+                denyingId === req.request_id ? (
+                  <div>
+                    <textarea style={{ ...styles.textarea, minHeight: "60px", marginBottom: "8px" }} placeholder="Reason for denial (optional)" value={denialReason} onChange={e => setDenialReason(e.target.value)} />
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => deny(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.danger }}>Confirm Deny</button>
+                      <button onClick={() => { setDenyingId(null); setDenialReason(""); }} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={() => approve(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.accent }}>Approve</button>
+                    <button onClick={() => setDenyingId(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.danger }}>Deny</button>
+                  </div>
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CREW REQUESTS SCREEN ──────────────────────────────────────
+function CrewRequestsScreen({ token }) {
+  const [requests, setRequests] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ job_id: "", request_type: "Additional Materials", description: "", inventory_id: "", quantity_requested: "" });
+  const [errors, setErrors] = useState({});
+
+  const REQUEST_TYPES = ["Additional Materials", "Inventory Pull", "Scope Change", "Equipment Issue", "Safety Concern", "Other"];
+
+  function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
+
+  useEffect(() => {
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      apiFetch(`${API}/requests`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/inventory`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/my-jobs`, { headers: h }).then(r => r.json()),
+    ]).then(([reqs, inv, jobList]) => {
+      setRequests(Array.isArray(reqs) ? reqs : []);
+      setInventory(Array.isArray(inv) ? inv : []);
+      setJobs(Array.isArray(jobList) ? jobList : []);
+      setLoading(false);
+    });
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function validate() {
+    const e = {};
+    if (!form.job_id) e.job_id = "Select a job";
+    if (!form.request_type) e.request_type = "Select a type";
+    if (form.request_type === "Inventory Pull" && !form.inventory_id) e.inventory_id = "Select an item";
+    if (form.request_type === "Inventory Pull" && (!form.quantity_requested || parseFloat(form.quantity_requested) <= 0)) e.quantity_requested = "Enter quantity";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleSubmit() {
+    if (!validate()) return;
+    setSubmitting(true);
+    const params = new URLSearchParams({ job_id: form.job_id, request_type: form.request_type });
+    if (form.description) params.append("description", form.description);
+    if (form.request_type === "Inventory Pull" && form.inventory_id) {
+      params.append("inventory_id", form.inventory_id);
+      params.append("quantity_requested", form.quantity_requested);
+    }
+    const res = await apiFetch(`${API}/requests?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setSubmitting(false);
+    if (res.ok) {
+      showMsg("Request submitted.");
+      setForm({ job_id: "", request_type: "Additional Materials", description: "", inventory_id: "", quantity_requested: "" });
+      setShowForm(false);
+      apiFetch(`${API}/requests`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(data => setRequests(Array.isArray(data) ? data : []));
+    } else {
+      showMsg("Failed to submit request.");
+    }
+  }
+
+  const statusColor = (s) => s === "approved" ? theme.accent : s === "denied" ? theme.danger : theme.gold;
+  const statusBg = (s) => s === "approved" ? theme.accentLight : s === "denied" ? theme.dangerLight : theme.goldLight;
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>My Requests</h1>
+      <p style={styles.subtitle}>Submit and track job requests</p>
+
+      {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
+
+      <button onClick={() => setShowForm(!showForm)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: showForm ? "#888" : theme.accent, width: "100%" }}>
+        {showForm ? "Cancel" : "+ New Request"}
+      </button>
+
+      {showForm && (
+        <div style={{ ...styles.card, marginBottom: "20px" }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>Submit a Request</div>
+
+          <label style={styles.label}>Job</label>
+          <select style={errors.job_id ? styles.inputError : styles.input} value={form.job_id} onChange={e => { setForm({...form, job_id: e.target.value}); setErrors({...errors, job_id: ""}); }}>
+            <option value="">Select job</option>
+            {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+          </select>
+          {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
+
+          <label style={styles.label}>Request Type</label>
+          <select style={styles.input} value={form.request_type} onChange={e => setForm({...form, request_type: e.target.value, inventory_id: "", quantity_requested: ""})}>
+            {REQUEST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+
+          {form.request_type === "Inventory Pull" && (
+            <>
+              <label style={styles.label}>Item</label>
+              <select style={errors.inventory_id ? styles.inputError : styles.input} value={form.inventory_id} onChange={e => { setForm({...form, inventory_id: e.target.value}); setErrors({...errors, inventory_id: ""}); }}>
+                <option value="">Select item</option>
+                {inventory.map(i => <option key={i.inventory_id} value={i.inventory_id}>{i.name} ({parseFloat(i.quantity || 0)} {i.unit} available)</option>)}
+              </select>
+              {errors.inventory_id && <p style={styles.errorMsg}>{errors.inventory_id}</p>}
+              <label style={styles.label}>Quantity Needed</label>
+              <input style={errors.quantity_requested ? styles.inputError : styles.input} type="number" step="0.01" placeholder="0" value={form.quantity_requested} onChange={e => { setForm({...form, quantity_requested: e.target.value}); setErrors({...errors, quantity_requested: ""}); }} />
+              {errors.quantity_requested && <p style={styles.errorMsg}>{errors.quantity_requested}</p>}
+            </>
+          )}
+
+          <label style={styles.label}>Description</label>
+          <textarea style={styles.textarea} placeholder="Describe what you need or what happened..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+
+          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleSubmit} disabled={submitting}>
+            {submitting ? <><Spinner /> Submitting...</> : "Submit Request"}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div>{[1,2].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
+      ) : requests.length === 0 ? (
+        <div style={{ ...styles.card, textAlign: "center", padding: "32px" }}>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No requests yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {requests.map(req => (
+            <div key={req.request_id} style={{ ...styles.card, padding: "14px 16px", borderLeft: `4px solid ${statusColor(req.status)}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "6px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
+                    <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase" }}>{req.status}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.job_name} · {new Date(req.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}</div>
+                </div>
+              </div>
+              {req.description && <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "4px" }}>{req.description}</div>}
+              {req.inventory_item && <div style={{ fontSize: "12px", color: theme.accent, marginTop: "4px", fontWeight: "600" }}>{req.quantity_requested} {req.inventory_unit} of {req.inventory_item}</div>}
+              {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, marginTop: "6px", backgroundColor: theme.dangerLight, padding: "6px 10px", borderRadius: "6px" }}>Reason: {req.denial_reason}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2131,8 +2623,8 @@ export default function App() {
 
   // Keep the view valid for the current role (prevents owners landing on crew pages after refresh)
   useEffect(() => {
-    const crewViews = ["home", "timesheet", "materials", "mileage"];
-    const ownerViews = ["schedule", "dashboard", "admin"];
+    const crewViews = ["home", "timesheet", "materials", "mileage", "crew_requests"];
+    const ownerViews = ["schedule", "dashboard", "inventory", "requests", "admin"];
     if (role === "crew" && !crewViews.includes(view)) {
       setView("home");
     } else if ((role === "owner" || role === "admin") && !ownerViews.includes(view)) {
@@ -2189,8 +2681,11 @@ export default function App() {
           {role === "crew" && view === "timesheet" && <TimesheetForm token={token} />}
           {role === "crew" && view === "materials" && <MaterialsForm token={token} />}
           {role === "crew" && view === "mileage" && <MileageForm token={token} />}
+          {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} />}
           {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} />}
+          {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} />}
+          {(role === "owner" || role === "admin") && view === "requests" && <RequestsScreen token={token} />}
           {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} />}
           {mobile && (
             <div style={{ padding: "8px 18px 100px", textAlign: "center" }}>
