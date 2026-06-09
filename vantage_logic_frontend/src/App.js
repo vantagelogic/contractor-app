@@ -26,14 +26,17 @@ const theme = {
   dangerLight: "#fdf0ee",
   warning: "#c47d1a",
   warningLight: "#fdf4e3",
-  bg: "#f7f6f3",
+  bg: "#f6f5f1",
   card: "#ffffff",
-  border: "#e6e3dd",
+  border: "#e7e4dd",
   borderStrong: "#d4cfc6",
-  textPrimary: "#1a1a1a",
-  textSecondary: "#5c5c5c",
-  textLight: "#9a9a9a",
-  sidebarWidth: "240px",
+  textPrimary: "#16110d",
+  textSecondary: "#5c5853",
+  textLight: "#9a958d",
+  sidebarWidth: "248px",
+  shadowSm: "0 1px 3px rgba(26,61,43,0.05), 0 1px 2px rgba(26,61,43,0.04)",
+  shadowMd: "0 4px 14px rgba(26,61,43,0.08), 0 2px 6px rgba(26,61,43,0.04)",
+  shadowLg: "0 10px 32px rgba(26,61,43,0.12), 0 4px 12px rgba(26,61,43,0.06)",
 };
 
 const font = {
@@ -45,15 +48,15 @@ const isMobile = () => window.innerWidth < 768;
 
 const styles = {
   container: { maxWidth: "640px", margin: "0 auto", padding: "24px 18px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
-  title: { fontSize: "26px", fontWeight: "700", color: theme.primary, marginBottom: "4px", fontFamily: font.display, letterSpacing: "-0.5px", lineHeight: 1.2 },
+  title: { fontSize: "27px", fontWeight: "800", color: theme.primary, marginBottom: "5px", fontFamily: font.display, letterSpacing: "-0.7px", lineHeight: 1.15 },
   subtitle: { fontSize: "14px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.4 },
   form: { display: "flex", flexDirection: "column", gap: "4px" },
   label: { fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginTop: "14px", textTransform: "uppercase", letterSpacing: "0.7px" },
-  input: { padding: "13px 14px", fontSize: "15px", borderRadius: "8px", border: `1.5px solid ${theme.border}`, width: "100%", boxSizing: "border-box", backgroundColor: "white", outline: "none", fontFamily: font.body, transition: "border-color 0.15s, box-shadow 0.15s" },
+  input: { padding: "13px 14px", fontSize: "15px", borderRadius: "10px", border: `1.5px solid ${theme.border}`, width: "100%", boxSizing: "border-box", backgroundColor: "#fdfdfc", outline: "none", fontFamily: font.body, transition: "border-color 0.15s, box-shadow 0.15s" },
   inputError: { padding: "13px 14px", fontSize: "15px", borderRadius: "8px", border: `1.5px solid ${theme.danger}`, width: "100%", boxSizing: "border-box", backgroundColor: theme.dangerLight, outline: "none", fontFamily: font.body },
   textarea: { padding: "13px 14px", fontSize: "15px", borderRadius: "8px", border: `1.5px solid ${theme.border}`, width: "100%", boxSizing: "border-box", minHeight: "84px", backgroundColor: "white", fontFamily: font.body, resize: "vertical" },
-  button: { marginTop: "18px", padding: "14px 22px", fontSize: "15px", backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, transition: "all 0.15s", minHeight: "48px" },
-  card: { backgroundColor: "white", borderRadius: "12px", padding: "22px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 3px rgba(26,61,43,0.04)" },
+  button: { marginTop: "18px", padding: "14px 22px", fontSize: "15px", backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)", minHeight: "48px", boxShadow: "0 2px 8px rgba(26,61,43,0.18)", letterSpacing: "0.1px" },
+  card: { backgroundColor: "white", borderRadius: "14px", padding: "22px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 3px rgba(26,61,43,0.05), 0 1px 2px rgba(26,61,43,0.04)" },
   errorMsg: { color: theme.danger, fontSize: "12px", marginTop: "4px", fontWeight: "500" },
 };
 
@@ -175,7 +178,7 @@ function NavBar({ view, setView, role, onLogout }) {
 
   if (mobile) {
     return (
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "10px 0 14px", boxShadow: "0 -1px 0 rgba(255,255,255,0.06), 0 -4px 20px rgba(0,0,0,0.25)", paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "12px 0 14px", boxShadow: "0 -1px 0 rgba(255,255,255,0.08), 0 -8px 28px rgba(0,0,0,0.28)", paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "6px 10px", borderRadius: "8px", minWidth: "48px", minHeight: "48px" }}>
             <span style={{ color: view === tab.id ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
@@ -194,7 +197,7 @@ function NavBar({ view, setView, role, onLogout }) {
       </div>
       <div style={{ flex: 1, padding: "18px 12px" }}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.1)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.5)", fontFamily: font.body, fontSize: "13px", fontWeight: view === tab.id ? "600" : "400", textAlign: "left", transition: "all 0.15s" }}>
+          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.12)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: view === tab.id ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
             <span style={{ display: "flex", flexShrink: 0 }}><tab.Icon /></span>
             <span>{tab.label}</span>
             {view === tab.id && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
@@ -777,6 +780,8 @@ function TimesheetForm({ token }) {
   const [loading, setLoading] = useState(true);
   const [linkedEmployeeId, setLinkedEmployeeId] = useState(null);
   const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
+  const [scheduleToLog, setScheduleToLog] = useState([]);
+  const [dismissedSchedule, setDismissedSchedule] = useState([]);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -785,10 +790,12 @@ function TimesheetForm({ token }) {
       apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/my-jobs`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()),
-    ]).then(([me, emps, jobs, ccs]) => {
+      apiFetch(`${API}/my-schedule-to-log`, { headers: h }).then(r => r.json()).catch(() => []),
+    ]).then(([me, emps, jobs, ccs, schedToLog]) => {
       if (me.employee_id) {
         setLinkedEmployeeId(me.employee_id);
         setFormData(prev => ({ ...prev, employee_id: me.employee_id }));
+        setScheduleToLog(Array.isArray(schedToLog) ? schedToLog.filter(s => !s.already_logged) : []);
       }
       setEmployees(emps);
       setJobs(jobs.filter(j => j.status === "active"));
@@ -853,6 +860,47 @@ function TimesheetForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Hours</h1>
       <p style={styles.subtitle}>Record your time on a job</p>
+      {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
+        <div style={{ marginBottom: "18px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Scheduled Work to Log
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).map(s => {
+              const d = new Date(s.scheduled_date + "T00:00:00");
+              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
+              const dayLabel = isToday ? "Today" : d.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+              return (
+                <div key={s.schedule_id} style={{ backgroundColor: "white", border: `1.5px solid ${theme.gold}`, borderRadius: "12px", padding: "14px 16px", boxShadow: "0 1px 4px rgba(200,151,58,0.12)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.job_name}</div>
+                      <div style={{ fontSize: "12px", marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ color: isToday ? theme.gold : theme.textSecondary, fontWeight: isToday ? "600" : "400" }}>{dayLabel}</span>
+                        <span style={{ color: theme.textLight }}>·</span>
+                        <span style={{ color: theme.textSecondary }}>{s.scheduled_hours}h scheduled</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button type="button" onClick={() => {
+                      setFormData(prev => ({ ...prev, job_id: String(s.job_id), cost_code_id: s.cost_code_id ? String(s.cost_code_id) : prev.cost_code_id, shift_date: s.scheduled_date, hours_worked: String(s.scheduled_hours) }));
+                      setDismissedSchedule(prev => [...prev, s.schedule_id]);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.primary, color: "white", fontWeight: "600", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
+                      Fill This In
+                    </button>
+                    <button type="button" onClick={() => setDismissedSchedule(prev => [...prev, s.schedule_id])} style={{ padding: "11px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: "white", color: theme.textSecondary, fontWeight: "500", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
+                      Ignore
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -992,6 +1040,47 @@ function MaterialsForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Materials</h1>
       <p style={styles.subtitle}>Record a material purchase</p>
+      {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
+        <div style={{ marginBottom: "18px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Scheduled Work to Log
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).map(s => {
+              const d = new Date(s.scheduled_date + "T00:00:00");
+              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
+              const dayLabel = isToday ? "Today" : d.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+              return (
+                <div key={s.schedule_id} style={{ backgroundColor: "white", border: `1.5px solid ${theme.gold}`, borderRadius: "12px", padding: "14px 16px", boxShadow: "0 1px 4px rgba(200,151,58,0.12)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.job_name}</div>
+                      <div style={{ fontSize: "12px", marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ color: isToday ? theme.gold : theme.textSecondary, fontWeight: isToday ? "600" : "400" }}>{dayLabel}</span>
+                        <span style={{ color: theme.textLight }}>·</span>
+                        <span style={{ color: theme.textSecondary }}>{s.scheduled_hours}h scheduled</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button type="button" onClick={() => {
+                      setFormData(prev => ({ ...prev, job_id: String(s.job_id), cost_code_id: s.cost_code_id ? String(s.cost_code_id) : prev.cost_code_id, shift_date: s.scheduled_date, hours_worked: String(s.scheduled_hours) }));
+                      setDismissedSchedule(prev => [...prev, s.schedule_id]);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.primary, color: "white", fontWeight: "600", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
+                      Fill This In
+                    </button>
+                    <button type="button" onClick={() => setDismissedSchedule(prev => [...prev, s.schedule_id])} style={{ padding: "11px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: "white", color: theme.textSecondary, fontWeight: "500", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
+                      Ignore
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -1134,6 +1223,47 @@ function MileageForm({ token }) {
     <div style={styles.container}>
       <h1 style={styles.title}>Log Mileage</h1>
       <p style={styles.subtitle}>Record a trip for a job</p>
+      {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
+        <div style={{ marginBottom: "18px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Scheduled Work to Log
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).map(s => {
+              const d = new Date(s.scheduled_date + "T00:00:00");
+              const isToday = s.scheduled_date === new Date().toISOString().split("T")[0];
+              const dayLabel = isToday ? "Today" : d.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+              return (
+                <div key={s.schedule_id} style={{ backgroundColor: "white", border: `1.5px solid ${theme.gold}`, borderRadius: "12px", padding: "14px 16px", boxShadow: "0 1px 4px rgba(200,151,58,0.12)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{s.job_name}</div>
+                      <div style={{ fontSize: "12px", marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ color: isToday ? theme.gold : theme.textSecondary, fontWeight: isToday ? "600" : "400" }}>{dayLabel}</span>
+                        <span style={{ color: theme.textLight }}>·</span>
+                        <span style={{ color: theme.textSecondary }}>{s.scheduled_hours}h scheduled</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button type="button" onClick={() => {
+                      setFormData(prev => ({ ...prev, job_id: String(s.job_id), cost_code_id: s.cost_code_id ? String(s.cost_code_id) : prev.cost_code_id, shift_date: s.scheduled_date, hours_worked: String(s.scheduled_hours) }));
+                      setDismissedSchedule(prev => [...prev, s.schedule_id]);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.primary, color: "white", fontWeight: "600", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
+                      Fill This In
+                    </button>
+                    <button type="button" onClick={() => setDismissedSchedule(prev => [...prev, s.schedule_id])} style={{ padding: "11px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: "white", color: theme.textSecondary, fontWeight: "500", fontFamily: font.body, fontSize: "13px", minHeight: "44px" }}>
+                      Ignore
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -1862,7 +1992,7 @@ function Dashboard({ token }) {
   return (
     <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "90px" }}>
       {/* Header */}
-      <div style={{ background: `linear-gradient(135deg, ${theme.primaryDark} 0%, ${theme.primary} 60%, ${theme.accent} 100%)`, padding: "30px 22px 36px", color: "white" }}>
+      <div style={{ background: `linear-gradient(150deg, ${theme.primaryDark} 0%, ${theme.primary} 55%, ${theme.accent} 115%)`, padding: "32px 22px 38px", color: "white", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.06)" }}>
         <div style={{ maxWidth: "940px", margin: "0 auto" }}>
           <div style={{ marginBottom: "22px" }}>
             <VantageLogo size={32} dark={true} />
@@ -2055,8 +2185,13 @@ function GlobalStyles() {
       * { -webkit-tap-highlight-color: transparent; }
       input, select, textarea, button { font-family: inherit; }
       input:focus, select:focus, textarea:focus { border-color: ${theme.accent} !important; box-shadow: 0 0 0 3px ${theme.accentLight} !important; }
-      button:hover:not(:disabled) { opacity: 0.92; }
-      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      button:hover:not(:disabled) { opacity: 0.93; transform: translateY(-1px); }
+      button:active:not(:disabled) { transform: translateY(0); }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      ::selection { background: rgba(45,106,79,0.15); }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: #d4cfc6; border-radius: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
       @keyframes vlspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       @keyframes vlskeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     `;
