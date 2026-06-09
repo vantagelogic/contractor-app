@@ -1183,9 +1183,10 @@ function MileageForm({ token }) {
 }
 
 // ─── USER MANAGEMENT ─────────────────────────────────────────
-function UserManagement({ token, activeEmps }) {
+function UserManagement({ token, activeEmps, refreshSignal }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editEmpId, setEditEmpId] = useState("");
   const [message, setMessage] = useState("");
@@ -1193,8 +1194,10 @@ function UserManagement({ token, activeEmps }) {
   function loadUsers() {
     setLoading(true);
     apiFetch(`${API}/users`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(data => { setUsers(data); setLoading(false); });
+      .then(r => r.json()).then(data => { setUsers(data); setLoading(false); setLoaded(true); });
   }
+
+  useEffect(() => { if (refreshSignal > 0) loadUsers(); }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
@@ -1223,9 +1226,11 @@ function UserManagement({ token, activeEmps }) {
       <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px" }}>
         See which employee is linked to each login and edit the link.
       </p>
-      {users.length === 0 && !loading && (
-        <button onClick={loadUsers} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent }}>Load Accounts</button>
-      )}
+      <div style={{ display: "flex", gap: "8px", marginBottom: users.length > 0 ? "12px" : "0" }}>
+        <button onClick={loadUsers} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, flex: 1 }}>
+          {loaded ? "Refresh List" : "Load Accounts"}
+        </button>
+      </div>
       {loading && <p style={{ fontSize: "13px", color: theme.textSecondary }}>Loading...</p>}
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "10px", backgroundColor: theme.accentLight, padding: "9px 12px", borderRadius: "7px", fontSize: "13px" }}>{message}</div>}
       {users.map(u => (
@@ -1584,6 +1589,7 @@ function AdminScreen({ token }) {
   const [ccForm, setCcForm] = useState({ code: "", description: "", category: "" });
   const [loginForm, setLoginForm] = useState({ email: "", password: "", confirm_password: "", employee_role: "crew", employee_id: "" });
   const [loginError, setLoginError] = useState("");
+  const [userRefresh, setUserRefresh] = useState(0);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -1644,7 +1650,7 @@ function AdminScreen({ token }) {
     const params = { company_id: companyId, email: loginForm.email, password: loginForm.password, role: loginForm.employee_role };
     if (loginForm.employee_id) params.employee_id = parseInt(loginForm.employee_id);
     const res = await apiFetch(`${API}/users?${new URLSearchParams(params)}`, { method: "POST" });
-    if (res.ok) { showMsg(`Login created for ${loginForm.email}`); setLoginForm({ email: "", password: "", confirm_password: "", employee_role: "crew", employee_id: "" }); }
+    if (res.ok) { showMsg(`Login created for ${loginForm.email}`); setLoginForm({ email: "", password: "", confirm_password: "", employee_role: "crew", employee_id: "" }); setUserRefresh(n => n + 1); }
     else { const d = await res.json(); showMsg(`Error: ${d.detail}`); }
   }
 
@@ -1792,7 +1798,7 @@ function AdminScreen({ token }) {
         <button style={{...styles.button, backgroundColor: theme.accent}} onClick={createLogin}>Create Login</button>
       </CollapsibleSection>
 
-      <UserManagement token={token} activeEmps={activeEmps} />
+      <UserManagement token={token} activeEmps={activeEmps} refreshSignal={userRefresh} />
     </div>
   );
 }
