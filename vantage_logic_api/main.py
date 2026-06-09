@@ -944,6 +944,40 @@ def reactivate_user(
     db.commit()
     return {"message": f"{user.email} reactivated"}
 
+@app.get("/my-schedule-to-log")
+def get_my_schedule_to_log(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from datetime import date, timedelta
+    if not current_user.employee_id:
+        return []
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    # schedules from start of this week through today
+    schedules = db.query(models.Schedule).filter(
+        models.Schedule.company_id == current_user.company_id,
+        models.Schedule.employee_id == current_user.employee_id,
+        models.Schedule.scheduled_date >= week_start,
+        models.Schedule.scheduled_date <= today
+    ).order_by(models.Schedule.scheduled_date).all()
+    result = []
+    for s in schedules:
+        # check if a timesheet already exists for this employee, job, and date
+        existing = db.query(models.Timesheet).filter(
+            models.Timesheet.employee_id == current_user.employee_id,
+            models.Timesheet.job_id == s.job_id,
+            models.Timesheet.shift_date == s.scheduled_date
+        ).first()
+        job = db.query(models.Job).filter(models.Job.job_id == s.job_id).first()
+        result.append({
+            "schedule_id": s.schedule_id,
+            "job_id": s.job_id,
+            "job_name": job.job_name if job else "Unknown",
+            "cost_code_id": s.cost_code_id,
+            "scheduled_date": str(s.scheduled_date),
+            "scheduled_hours": float(s.scheduled_hours) if s.scheduled_hours else 8,
+            "already_logged": existing is not None
+        })
+    return result
+
 # =============================================
 # DASHBOARD
 # =============================================
