@@ -166,3 +166,13 @@ class Request(Base):
     created_at = Column(DateTime, server_default=func.now())
     reviewed_at = Column(DateTime)
     reviewed_by = Column(Integer, ForeignKey("users.user_id"))
+
+class RequestComment(Base):
+    __tablename__ = "request_comments"
+
+    comment_id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("requests.request_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())

@@ -149,7 +149,7 @@ def root():
 @app.post("/login")
 @limiter.limit("10/minute")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    user = db.query(models.User).filter(models.User.email == form_data.username.lower().strip()).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     token = create_access_token({"user_id": user.user_id, "company_id": user.company_id, "role": user.role})
@@ -184,7 +184,7 @@ def signup(
     password: str,
     db: Session = Depends(get_db)
 ):
-    existing = db.query(models.User).filter(models.User.email == email).first()
+    existing = db.query(models.User).filter(models.User.email == email.lower().strip()).first()
     if existing:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
 
@@ -198,7 +198,7 @@ def signup(
 
     user = models.User(
         company_id=company.company_id,
-        email=email,
+        email=email.lower().strip(),
         hashed_password=hash_password(password),
         role="owner"
     )
@@ -235,12 +235,12 @@ def create_user(
     employee_id: int = None,
     db: Session = Depends(get_db)
 ):
-    existing = db.query(models.User).filter(models.User.email == email).first()
+    existing = db.query(models.User).filter(models.User.email == email.lower().strip()).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     user = models.User(
         company_id=company_id,
-        email=email,
+        email=email.lower().strip(),
         hashed_password=hash_password(password),
         role=role,
         employee_id=employee_id
@@ -1366,3 +1366,57 @@ def deny_request(
     req.reviewed_by = current_user.user_id
     db.commit()
     return {"message": "Request denied"}
+
+@app.get("/requests/{request_id}/comments")
+def get_comments(
+    request_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    req = db.query(models.Request).filter(
+        models.Request.request_id == request_id,
+        models.Request.company_id == current_user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    comments = db.query(models.RequestComment).filter(
+        models.RequestComment.request_id == request_id
+    ).order_by(models.RequestComment.created_at).all()
+    result = []
+    for c in comments:
+        user = db.query(models.User).filter(models.User.user_id == c.user_id).first()
+        emp = db.query(models.Employee).filter(models.Employee.employee_id == user.employee_id).first() if user and user.employee_id else None
+        name = f"{emp.first_name} {emp.last_name}" if emp else (user.email if user else "Unknown")
+        result.append({
+            "comment_id": c.comment_id,
+            "message": c.message,
+            "author": name,
+            "role": user.role if user else "unknown",
+            "created_at": str(c.created_at),
+            "is_mine": c.user_id == current_user.user_id
+        })
+    return result
+
+@app.post("/requests/{request_id}/comments")
+def add_comment(
+    request_id: int,
+    message: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    req = db.query(models.Request).filter(
+        models.Request.request_id == request_id,
+        models.Request.company_id == current_user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    comment = models.RequestComment(
+        request_id=request_id,
+        user_id=current_user.user_id,
+        company_id=current_user.company_id,
+        message=message
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return {"comment_id": comment.comment_id, "message": comment.message}
