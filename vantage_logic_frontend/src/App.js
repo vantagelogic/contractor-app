@@ -304,41 +304,46 @@ function Login({ onLogin, onSignUp }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "32px 20px" }}>
-      <div style={{ marginBottom: "36px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <VantageLogo size={64} dark={false} centered={true} />
-        <p style={{ fontSize: "14px", color: theme.textSecondary, marginTop: "20px", textAlign: "center", maxWidth: "320px", lineHeight: 1.5 }}>
+    <div style={{ minHeight: "100vh", background: `radial-gradient(120% 80% at 50% 0%, ${theme.primary} 0%, ${theme.primaryDark} 55%, #0a1c11 100%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "32px 20px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "600px", background: "radial-gradient(circle, rgba(200,151,58,0.10) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      <div style={{ marginBottom: "34px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", animation: "vlFadeUp 0.5s ease both" }}>
+        <VantageLogo size={66} dark={true} centered={true} />
+        <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.62)", marginTop: "20px", textAlign: "center", maxWidth: "330px", lineHeight: 1.55 }}>
           Real-time job costing, crew tracking, and profit visibility built for trades.
         </p>
       </div>
 
-      <div style={{ backgroundColor: "white", borderRadius: "14px", padding: "36px 32px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.08)", border: `1px solid ${theme.border}` }}>
-        <h1 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.3px" }}>Sign in</h1>
-        <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 24px" }}>Welcome back to Vantage Logic</p>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", width: "100%", maxWidth: "404px", boxShadow: "0 24px 60px rgba(0,0,0,0.32), 0 8px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden", position: "relative", animation: "vlFadeUp 0.5s ease 0.08s both" }}>
+        <div style={{ height: "3px", background: `linear-gradient(90deg, ${theme.gold} 0%, #e0b75e 50%, ${theme.gold} 100%)` }} />
+        <div style={{ padding: "34px 32px" }}>
+          <h1 style={{ fontSize: "23px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.5px" }}>Sign in</h1>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 26px" }}>Welcome back to Vantage Logic</p>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>Email</label>
-          <input style={error && !email ? styles.inputError : styles.input} type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@yourcompany.com" />
-          <label style={styles.label}>Password</label>
-          <PasswordInput value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} error={error && !password} />
-          {error && <p style={{...styles.errorMsg, marginTop: "10px"}}>{error}</p>}
-          <button style={{...styles.button, marginTop: "24px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
-            {loading ? <><Spinner /> Signing in...</> : "Sign In"}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} style={styles.form}>
+            <label style={styles.label}>Email</label>
+            <input style={error && !email ? styles.inputError : styles.input} type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@yourcompany.com" />
+            <label style={styles.label}>Password</label>
+            <PasswordInput value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} error={error && !password} />
+            {error && <p style={{...styles.errorMsg, marginTop: "10px"}}>{error}</p>}
+            <button style={{...styles.button, marginTop: "24px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
+              {loading ? <><Spinner /> Signing in...</> : "Sign In"}
+            </button>
+          </form>
 
-        <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${theme.border}` }}>
-          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 12px", textAlign: "center" }}>
-            New to Vantage Logic?
-          </p>
-          <button onClick={onSignUp} type="button" style={{ width: "100%", fontSize: "14px", color: theme.accent, background: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "8px", padding: "12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "44px" }}>
-            Create an Account
-          </button>
+          <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: `1px solid ${theme.border}` }}>
+            <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 12px", textAlign: "center" }}>
+              New to Vantage Logic?
+            </p>
+            <button onClick={onSignUp} type="button" style={{ width: "100%", fontSize: "14px", color: theme.accent, background: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "10px", padding: "12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "44px", transition: "all 0.15s" }}>
+              Create an Account
+            </button>
+          </div>
+          <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "18px" }}>Forgot your password? Contact your administrator.</p>
         </div>
-        <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "18px" }}>Forgot your password? Contact your administrator.</p>
       </div>
 
-      <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "28px", textAlign: "center" }}>
+      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "28px", textAlign: "center", position: "relative" }}>
         © 2026 Vantage Logic
       </p>
     </div>
@@ -380,13 +385,16 @@ function SignUp({ onLogin, onBack }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "32px 20px" }}>
-      <div style={{ marginBottom: "32px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <VantageLogo size={56} dark={false} centered={true} />
+    <div style={{ minHeight: "100vh", background: `radial-gradient(120% 80% at 50% 0%, ${theme.primary} 0%, ${theme.primaryDark} 55%, #0a1c11 100%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "32px 20px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "600px", background: "radial-gradient(circle, rgba(200,151,58,0.10) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ marginBottom: "30px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", animation: "vlFadeUp 0.5s ease both" }}>
+        <VantageLogo size={58} dark={true} centered={true} />
       </div>
 
-      <div style={{ backgroundColor: "white", borderRadius: "14px", padding: "36px 32px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 24px rgba(26,61,43,0.08)", border: `1px solid ${theme.border}` }}>
-        <h1 style={{ fontSize: "22px", fontWeight: "700", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.3px" }}>Start your free trial</h1>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", width: "100%", maxWidth: "404px", boxShadow: "0 24px 60px rgba(0,0,0,0.32), 0 8px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden", position: "relative", animation: "vlFadeUp 0.5s ease 0.08s both" }}>
+        <div style={{ height: "3px", background: `linear-gradient(90deg, ${theme.gold} 0%, #e0b75e 50%, ${theme.gold} 100%)` }} />
+        <div style={{ padding: "34px 32px" }}>
+        <h1 style={{ fontSize: "23px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.5px" }}>Start your free trial</h1>
         <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 24px" }}>30 days free. No credit card required.</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -415,6 +423,7 @@ function SignUp({ onLogin, onBack }) {
 
         <div style={{ textAlign: "center", marginTop: "20px" }}>
           <button onClick={onBack} type="button" style={{ fontSize: "13px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", fontWeight: "500" }}>Already have an account? Sign in</button>
+        </div>
         </div>
       </div>
     </div>
@@ -1575,6 +1584,89 @@ function InventoryScreen({ token }) {
   );
 }
 
+// ─── TIME AGO HELPER ──────────────────────────────────────────
+function timeAgo(dateStr) {
+  const then = new Date(dateStr.replace(" ", "T"));
+  if (isNaN(then.getTime())) return "";
+  const secs = Math.floor((Date.now() - then.getTime()) / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return then.toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+}
+
+// ─── REQUEST THREAD (shared chat) ─────────────────────────────
+function RequestThread({ token, requestId, onActivity }) {
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+
+  function load() {
+    apiFetch(`${API}/requests/${requestId}/comments`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(data => { setComments(Array.isArray(data) ? data : []); setLoading(false); });
+  }
+
+  useEffect(() => { load(); }, [requestId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function send() {
+    const msg = draft.trim();
+    if (!msg) return;
+    setSending(true);
+    const params = new URLSearchParams({ message: msg });
+    const res = await apiFetch(`${API}/requests/${requestId}/comments?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setSending(false);
+    if (res.ok) { setDraft(""); load(); if (onActivity) onActivity(); }
+  }
+
+  return (
+    <div style={{ marginTop: "12px", paddingTop: "14px", borderTop: `1px solid ${theme.border}` }}>
+      <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "7px" }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Discussion{comments.length > 0 ? ` (${comments.length})` : ""}
+      </div>
+      {loading ? (
+        <div style={{ fontSize: "12px", color: theme.textLight, padding: "4px 0" }}>Loading...</div>
+      ) : comments.length === 0 ? (
+        <div style={{ fontSize: "12px", color: theme.textLight, padding: "4px 0 10px", fontStyle: "italic" }}>No messages yet. Start the conversation below.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px", maxHeight: "320px", overflowY: "auto", paddingRight: "2px" }}>
+          {comments.map(c => (
+            <div key={c.comment_id} style={{ display: "flex", flexDirection: "column", alignItems: c.is_mine ? "flex-end" : "flex-start" }}>
+              <div style={{ maxWidth: "82%", backgroundColor: c.is_mine ? theme.primary : "white", color: c.is_mine ? "white" : theme.textPrimary, padding: "9px 13px", borderRadius: c.is_mine ? "13px 13px 4px 13px" : "13px 13px 13px 4px", border: c.is_mine ? "none" : `1px solid ${theme.border}`, boxShadow: theme.shadowSm }}>
+                {!c.is_mine && (
+                  <div style={{ fontSize: "10px", fontWeight: "700", color: c.role === "crew" ? theme.gold : theme.accent, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                    {c.author}{c.role === "owner" || c.role === "admin" ? " · Admin" : ""}
+                  </div>
+                )}
+                <div style={{ fontSize: "13.5px", lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{c.message}</div>
+              </div>
+              <div style={{ fontSize: "10px", color: theme.textLight, marginTop: "3px", padding: "0 4px" }}>{timeAgo(c.created_at)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Write a message..."
+          rows={1}
+          style={{ flex: 1, padding: "10px 13px", fontSize: "14px", borderRadius: "10px", border: `1.5px solid ${theme.border}`, fontFamily: font.body, resize: "none", outline: "none", backgroundColor: "#fdfdfc", minHeight: "42px", maxHeight: "120px", boxSizing: "border-box" }}
+        />
+        <button onClick={send} disabled={sending || !draft.trim()} style={{ flexShrink: 0, width: "42px", height: "42px", borderRadius: "10px", border: "none", cursor: draft.trim() ? "pointer" : "not-allowed", backgroundColor: draft.trim() ? theme.primary : theme.border, color: "white", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: draft.trim() ? "0 2px 8px rgba(26,61,43,0.18)" : "none", transition: "all 0.15s" }}>
+          {sending ? <Spinner size={15} /> : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── REQUESTS SCREEN (OWNER) ───────────────────────────────────
 function RequestsScreen({ token }) {
   const [requests, setRequests] = useState([]);
@@ -1583,6 +1675,7 @@ function RequestsScreen({ token }) {
   const [message, setMessage] = useState("");
   const [denyingId, setDenyingId] = useState(null);
   const [denialReason, setDenialReason] = useState("");
+  const [openThread, setOpenThread] = useState(null);
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
@@ -1674,6 +1767,11 @@ function RequestsScreen({ token }) {
                   </div>
                 )
               )}
+              <button onClick={() => setOpenThread(openThread === req.request_id ? null : req.request_id)} style={{ marginTop: "10px", width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: openThread === req.request_id ? theme.bg : "white", color: theme.accent, fontWeight: "600", fontFamily: font.body, fontSize: "12.5px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                {openThread === req.request_id ? "Hide Discussion" : "Discuss"}
+              </button>
+              {openThread === req.request_id && <RequestThread token={token} requestId={req.request_id} />}
             </div>
           ))}
         </div>
@@ -1693,6 +1791,10 @@ function CrewRequestsScreen({ token }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ job_id: "", request_type: "Additional Materials", description: "", inventory_id: "", quantity_requested: "" });
   const [errors, setErrors] = useState({});
+  const [openThread, setOpenThread] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({ description: "", quantity_requested: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const REQUEST_TYPES = ["Additional Materials", "Inventory Pull", "Scope Change", "Equipment Issue", "Safety Concern", "Other"];
 
@@ -1741,6 +1843,21 @@ function CrewRequestsScreen({ token }) {
     } else {
       showMsg("Failed to submit request.");
     }
+  }
+
+  function reloadRequests() {
+    apiFetch(`${API}/requests`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(data => setRequests(Array.isArray(data) ? data : []));
+  }
+
+  async function saveEdit(req) {
+    setSavingEdit(true);
+    const params = new URLSearchParams();
+    params.append("description", editDraft.description);
+    if (req.inventory_item && editDraft.quantity_requested) params.append("quantity_requested", editDraft.quantity_requested);
+    const res = await apiFetch(`${API}/requests/${req.request_id}?${params}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    setSavingEdit(false);
+    if (res.ok) { showMsg("Request updated."); setEditingId(null); reloadRequests(); }
+    else showMsg("Could not update request.");
   }
 
   const statusColor = (s) => s === "approved" ? theme.accent : s === "denied" ? theme.danger : theme.gold;
@@ -1816,17 +1933,44 @@ function CrewRequestsScreen({ token }) {
           {requests.map(req => (
             <div key={req.request_id} style={{ ...styles.card, padding: "14px 16px", borderLeft: `4px solid ${statusColor(req.status)}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "6px" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
                     <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase" }}>{req.status}</span>
                   </div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.job_name} · {new Date(req.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}</div>
+                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.job_name} · {timeAgo(req.created_at)}</div>
                 </div>
+                {req.status === "pending" && editingId !== req.request_id && (
+                  <button onClick={() => { setEditingId(req.request_id); setEditDraft({ description: req.description || "", quantity_requested: req.quantity_requested ? String(req.quantity_requested) : "" }); }} style={{ flexShrink: 0, fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
+                )}
               </div>
-              {req.description && <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "4px" }}>{req.description}</div>}
-              {req.inventory_item && <div style={{ fontSize: "12px", color: theme.accent, marginTop: "4px", fontWeight: "600" }}>{req.quantity_requested} {req.inventory_unit} of {req.inventory_item}</div>}
-              {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, marginTop: "6px", backgroundColor: theme.dangerLight, padding: "6px 10px", borderRadius: "6px" }}>Reason: {req.denial_reason}</div>}
+              {editingId === req.request_id ? (
+                <div style={{ marginTop: "8px" }}>
+                  {req.inventory_item && (
+                    <>
+                      <label style={styles.label}>Quantity</label>
+                      <input style={{ ...styles.input, marginTop: "4px" }} type="number" step="0.01" value={editDraft.quantity_requested} onChange={e => setEditDraft({ ...editDraft, quantity_requested: e.target.value })} />
+                    </>
+                  )}
+                  <label style={styles.label}>Description</label>
+                  <textarea style={{ ...styles.textarea, marginTop: "4px", minHeight: "60px" }} value={editDraft.description} onChange={e => setEditDraft({ ...editDraft, description: e.target.value })} />
+                  <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                    <button onClick={() => saveEdit(req)} disabled={savingEdit} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>{savingEdit ? <><Spinner size={14} /> Saving</> : "Save"}</button>
+                    <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "10px", backgroundColor: "#888" }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {req.description && <div style={{ fontSize: "12.5px", color: theme.textPrimary, marginTop: "6px", lineHeight: 1.45 }}>{req.description}</div>}
+                  {req.inventory_item && <div style={{ fontSize: "12px", color: theme.accent, marginTop: "6px", fontWeight: "600" }}>{req.quantity_requested} {req.inventory_unit} of {req.inventory_item}</div>}
+                  {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, marginTop: "6px", backgroundColor: theme.dangerLight, padding: "6px 10px", borderRadius: "6px" }}>Reason: {req.denial_reason}</div>}
+                  <button onClick={() => setOpenThread(openThread === req.request_id ? null : req.request_id)} style={{ marginTop: "10px", width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: openThread === req.request_id ? theme.bg : "white", color: theme.accent, fontWeight: "600", fontFamily: font.body, fontSize: "12.5px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    {openThread === req.request_id ? "Hide Discussion" : "Discuss"}
+                  </button>
+                  {openThread === req.request_id && <RequestThread token={token} requestId={req.request_id} />}
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -2377,10 +2521,13 @@ function Dashboard({ token }) {
   const [details, setDetails] = useState({});
   const [filter, setFilter] = useState("active");
   const [timeFilter, setTimeFilter] = useState("all");
+  const [coForms, setCoForms] = useState({});
+  const [coOpen, setCoOpen] = useState({});
+  const [coSaving, setCoSaving] = useState(false);
 
-  useEffect(() => {
+  function loadDashboard() {
     const h = { Authorization: `Bearer ${token}` };
-    Promise.all([
+    return Promise.all([
       apiFetch(`${API}/dashboard`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/mileage`, { headers: h }).then(r => r.json()),
     ]).then(([dashData, mileageData]) => {
@@ -2388,7 +2535,9 @@ function Dashboard({ token }) {
       setMileage(mileageData);
       setLoading(false);
     });
-  }, [token]);
+  }
+
+  useEffect(() => { loadDashboard(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = jobs.filter(j => filter === "all" || j.status === filter);
   const totals = {
@@ -2405,11 +2554,31 @@ function Dashboard({ token }) {
     setExpanded({...expanded, [job_id]: !isOpen});
     if (!isOpen && !details[job_id]) {
       const h = { Authorization: `Bearer ${token}` };
-      const [tsR, matR] = await Promise.all([
+      const [tsR, matR, coR] = await Promise.all([
         apiFetch(`${API}/jobs/${job_id}/timesheets`, { headers: h }),
-        apiFetch(`${API}/jobs/${job_id}/materials`, { headers: h })
+        apiFetch(`${API}/jobs/${job_id}/materials`, { headers: h }),
+        apiFetch(`${API}/jobs/${job_id}/change-orders`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => [])
       ]);
-      setDetails({...details, [job_id]: { timesheets: await tsR.json(), materials: await matR.json() }});
+      const tsData = await tsR.json();
+      const matData = await matR.json();
+      setDetails(prev => ({ ...prev, [job_id]: { timesheets: tsData, materials: matData, changeOrders: coR } }));
+    }
+  }
+
+  async function addChangeOrder(job_id) {
+    const f = coForms[job_id] || {};
+    if (!f.description || !f.description.trim() || !f.amount || parseFloat(f.amount) <= 0) return;
+    setCoSaving(true);
+    const params = new URLSearchParams({ description: f.description.trim(), amount: f.amount, order_type: f.order_type || "addition" });
+    const res = await apiFetch(`${API}/jobs/${job_id}/change-orders?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setCoSaving(false);
+    if (res.ok) {
+      const h = { Authorization: `Bearer ${token}` };
+      const coR = await apiFetch(`${API}/jobs/${job_id}/change-orders`, { headers: h }).then(r => r.json()).catch(() => []);
+      setDetails(prev => ({ ...prev, [job_id]: { ...(prev[job_id] || {}), changeOrders: coR } }));
+      setCoForms(prev => ({ ...prev, [job_id]: { description: "", amount: "", order_type: "addition" } }));
+      setCoOpen(prev => ({ ...prev, [job_id]: false }));
+      loadDashboard();
     }
   }
 
@@ -2626,14 +2795,118 @@ function GlobalStyles() {
       ::selection { background: rgba(45,106,79,0.15); }
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-thumb { background: #d4cfc6; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #bcb6ab; }
       ::-webkit-scrollbar-track { background: transparent; }
       @keyframes vlspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       @keyframes vlskeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      @keyframes vlFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes vlFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes vlScaleIn { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+      .vl-screen { animation: vlFadeUp 0.34s cubic-bezier(0.22,1,0.36,1) both; }
+      .vl-pop { animation: vlScaleIn 0.22s cubic-bezier(0.22,1,0.36,1) both; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      }
     `;
     document.head.appendChild(style);
     return () => { document.head.removeChild(style); };
   }, []);
   return null;
+}
+
+// ─── NOTIFICATION BELL ────────────────────────────────────────
+function NotificationBell({ token, role, setView, mobile }) {
+  const [open, setOpen] = useState(false);
+  const [count, setCount] = useState(0);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  function loadCount() {
+    apiFetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setCount(d.count || 0)).catch(() => {});
+  }
+
+  function loadItems() {
+    setLoading(true);
+    apiFetch(`${API}/notifications`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { setItems(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadCount();
+    const iv = setInterval(loadCount, 30000);
+    return () => clearInterval(iv);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next) loadItems();
+  }
+
+  async function markAllRead() {
+    await apiFetch(`${API}/notifications/mark-read`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    setCount(0);
+    loadItems();
+  }
+
+  function handleTap(n) {
+    setOpen(false);
+    if (count > 0) markAllRead();
+    if (n.related_type === "request") setView(role === "crew" ? "crew_requests" : "requests");
+    else if (n.related_type === "job") setView("dashboard");
+    else if (n.related_type === "schedule") setView(role === "crew" ? "home" : "schedule");
+  }
+
+  const iconColor = (t) => t === "new_request" ? theme.gold : t === "new_comment" ? theme.accent : t === "change_order" ? theme.primary : t === "budget_warning" ? theme.danger : theme.textSecondary;
+
+  return (
+    <div style={{ position: "fixed", top: mobile ? "12px" : "20px", right: mobile ? "14px" : "26px", zIndex: 1100 }}>
+      <button onClick={toggle} aria-label="Notifications" style={{ position: "relative", width: "42px", height: "42px", borderRadius: "12px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: theme.shadowMd }}>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={open ? theme.primary : theme.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        {count > 0 && (
+          <span style={{ position: "absolute", top: "-5px", right: "-5px", minWidth: "19px", height: "19px", padding: "0 5px", borderRadius: "10px", backgroundColor: theme.danger, color: "white", fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, border: "2px solid white", boxSizing: "border-box" }}>
+            {count > 9 ? "9+" : count}
+          </span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: -1 }} />
+          <div className="vl-pop" style={{ position: "absolute", top: "50px", right: 0, width: mobile ? "calc(100vw - 28px)" : "360px", maxWidth: "360px", backgroundColor: "white", borderRadius: "14px", border: `1px solid ${theme.border}`, boxShadow: theme.shadowLg, overflow: "hidden", transformOrigin: "top right" }}>
+            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>Notifications</span>
+              {items.some(i => !i.read) && <button onClick={markAllRead} style={{ fontSize: "11px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>Mark all read</button>}
+            </div>
+            <div style={{ maxHeight: "420px", overflowY: "auto" }}>
+              {loading ? (
+                <div style={{ padding: "24px", textAlign: "center", fontSize: "13px", color: theme.textLight }}>Loading...</div>
+              ) : items.length === 0 ? (
+                <div style={{ padding: "32px 24px", textAlign: "center" }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "8px" }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  <div style={{ fontSize: "13px", color: theme.textSecondary }}>You are all caught up.</div>
+                </div>
+              ) : (
+                items.map(n => (
+                  <div key={n.notification_id} onClick={() => handleTap(n)} style={{ padding: "13px 16px", borderBottom: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: n.read ? "white" : theme.accentLight, display: "flex", gap: "11px", alignItems: "flex-start", transition: "background 0.12s" }}>
+                    <div style={{ flexShrink: 0, width: "32px", height: "32px", borderRadius: "9px", backgroundColor: "white", border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", marginTop: "1px" }}>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: iconColor(n.type) }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: n.read ? "500" : "700", color: theme.textPrimary, marginBottom: "2px" }}>{n.title}</div>
+                      {n.message && <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4, marginBottom: "3px" }}>{n.message}</div>}
+                      <div style={{ fontSize: "10.5px", color: theme.textLight }}>{timeAgo(n.created_at)}</div>
+                    </div>
+                    {!n.read && <span style={{ flexShrink: 0, width: "8px", height: "8px", borderRadius: "50%", backgroundColor: theme.danger, marginTop: "5px" }} />}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ─── APP ROOT ─────────────────────────────────────────────────
@@ -2696,12 +2969,14 @@ export default function App() {
       <GlobalStyles />
       <div style={{ backgroundColor: theme.bg, minHeight: "100vh" }}>
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
+        <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
           {showOnboarding && (role === "owner" || role === "admin") && view === "schedule" && (
             <div style={{ maxWidth: "640px", margin: "0 auto", padding: "18px 18px 0" }}>
               <OnboardingChecklist token={token} onDismiss={() => setShowOnboarding(false)} />
             </div>
           )}
+          <div key={view} className="vl-screen">
           {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} />}
           {role === "crew" && view === "timesheet" && <TimesheetForm token={token} />}
           {role === "crew" && view === "materials" && <MaterialsForm token={token} />}
@@ -2712,6 +2987,7 @@ export default function App() {
           {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} />}
           {(role === "owner" || role === "admin") && view === "requests" && <RequestsScreen token={token} />}
           {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} />}
+          </div>
           {mobile && (
             <div style={{ padding: "8px 18px 100px", textAlign: "center" }}>
               <button onClick={handleLogout} style={{ fontSize: "13px", color: "white", background: theme.danger, border: "none", borderRadius: "7px", padding: "10px 26px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "40px" }}>
