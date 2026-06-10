@@ -2524,7 +2524,7 @@ function Dashboard({ token }) {
   const [details, setDetails] = useState({});
   const [filter, setFilter] = useState("active");
   const [timeFilter, setTimeFilter] = useState("all");
-  const [coForms, setCoForms] = useState({});
+
 
   function loadDashboard() {
     const h = { Authorization: `Bearer ${token}` };
