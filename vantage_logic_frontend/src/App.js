@@ -2525,8 +2525,6 @@ function Dashboard({ token }) {
   const [filter, setFilter] = useState("active");
   const [timeFilter, setTimeFilter] = useState("all");
   const [coForms, setCoForms] = useState({});
-  const [coOpen, setCoOpen] = useState({});
-  const [coSaving, setCoSaving] = useState(false);
 
   function loadDashboard() {
     const h = { Authorization: `Bearer ${token}` };
@@ -2565,23 +2563,6 @@ function Dashboard({ token }) {
       const tsData = await tsR.json();
       const matData = await matR.json();
       setDetails(prev => ({ ...prev, [job_id]: { timesheets: tsData, materials: matData, changeOrders: coR } }));
-    }
-  }
-
-  async function addChangeOrder(job_id) {
-    const f = coForms[job_id] || {};
-    if (!f.description || !f.description.trim() || !f.amount || parseFloat(f.amount) <= 0) return;
-    setCoSaving(true);
-    const params = new URLSearchParams({ description: f.description.trim(), amount: f.amount, order_type: f.order_type || "addition" });
-    const res = await apiFetch(`${API}/jobs/${job_id}/change-orders?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-    setCoSaving(false);
-    if (res.ok) {
-      const h = { Authorization: `Bearer ${token}` };
-      const coR = await apiFetch(`${API}/jobs/${job_id}/change-orders`, { headers: h }).then(r => r.json()).catch(() => []);
-      setDetails(prev => ({ ...prev, [job_id]: { ...(prev[job_id] || {}), changeOrders: coR } }));
-      setCoForms(prev => ({ ...prev, [job_id]: { description: "", amount: "", order_type: "addition" } }));
-      setCoOpen(prev => ({ ...prev, [job_id]: false }));
-      loadDashboard();
     }
   }
 
