@@ -1508,6 +1508,33 @@ def create_request(
         )
         db.add(notif)
     db.commit()
+
+    # Notify crew on same job for safety/equipment issues
+    if request_type in ["Safety Concern", "Equipment Issue"]:
+        job_schedules = db.query(models.Schedule).filter(
+            models.Schedule.job_id == job_id,
+            models.Schedule.company_id == current_user.company_id
+        ).all()
+        notified_crew = set()
+        for sched in job_schedules:
+            if sched.employee_id == current_user.employee_id or sched.employee_id in notified_crew:
+                continue
+            notified_crew.add(sched.employee_id)
+            crew_user = db.query(models.User).filter(
+                models.User.employee_id == sched.employee_id,
+                models.User.company_id == current_user.company_id
+            ).first()
+            if crew_user:
+                db.add(models.Notification(
+                    company_id=current_user.company_id,
+                    user_id=crew_user.user_id,
+                    type="new_request",
+                    title=f"{request_type} reported on {job.job_name if job else 'your job'}",
+                    message=f"{emp_name}: {description[:60] if description else 'No details'}",
+                    related_id=req.request_id,
+                    related_type="request"
+                ))
+        db.commit()
     return req
 
 @app.patch("/requests/{request_id}/approve")
@@ -1566,6 +1593,76 @@ def deny_request(
     req.reviewed_by = current_user.user_id
     db.commit()
     return {"message": "Request denied"}
+
+@app.patch("/requests/{request_id}/acknowledge")
+def acknowledge_request(
+    request_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    from datetime import datetime
+    req = db.query(models.Request).filter(
+        models.Request.request_id == request_id,
+        models.Request.company_id == current_user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    req.status = "acknowledged"
+    req.reviewed_at = datetime.utcnow()
+    req.reviewed_by = current_user.user_id
+    db.commit()
+    # Notify all crew on this job that safety concern was acknowledged
+    if req.request_type in ["Safety Concern", "Equipment Issue"]:
+        job_schedules = db.query(models.Schedule).filter(
+            models.Schedule.job_id == req.job_id,
+            models.Schedule.company_id == current_user.company_id
+        ).all()
+        notified = set()
+        for sched in job_schedules:
+            if sched.employee_id in notified:
+                continue
+            notified.add(sched.employee_id)
+            crew_user = db.query(models.User).filter(
+                models.User.employee_id == sched.employee_id,
+                models.User.company_id == current_user.company_id
+            ).first()
+            if crew_user:
+                db.add(models.Notification(
+                    company_id=current_user.company_id,
+                    user_id=crew_user.user_id,
+                    type="new_request",
+                    title=f"{req.request_type} acknowledged",
+                    message=f"Your {req.request_type.lower()} has been acknowledged by the admin.",
+                    related_id=req.request_id,
+                    related_type="request"
+                ))
+        db.commit()
+    return {"message": "Request acknowledged"}
+
+@app.patch("/requests/{request_id}/edit")
+def edit_request(
+    request_id: int,
+    description: str = None,
+    request_type: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    req = db.query(models.Request).filter(
+        models.Request.request_id == request_id,
+        models.Request.company_id == current_user.company_id
+    ).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if current_user.role == "crew":
+        if req.employee_id != current_user.employee_id:
+            raise HTTPException(status_code=403, detail="Not your request")
+        if req.status != "pending":
+            raise HTTPException(status_code=400, detail="Can only edit pending requests")
+    if description is not None: req.description = description
+    if request_type is not None: req.request_type = request_type
+    db.commit()
+    db.refresh(req)
+    return req
 
 @app.get("/requests/{request_id}/comments")
 def get_comments(
