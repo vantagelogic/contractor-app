@@ -430,6 +430,45 @@ function SignUp({ onLogin, onBack }) {
   );
 }
 
+// ─── SHARED INNER COMPONENTS ─────────────────────────────────
+function StatCard({ label, value, unit, sublabel }) {
+  return (
+    <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "18px 16px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 3px rgba(26,61,43,0.04)" }}>
+      <div style={{ fontSize: "11px", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: "600", marginBottom: "8px" }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "5px" }}>
+        <div style={{ fontSize: "26px", fontWeight: "700", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.5px" }}>{value}</div>
+        {unit && <div style={{ fontSize: "13px", color: theme.textSecondary, fontWeight: "500" }}>{unit}</div>}
+      </div>
+      {sublabel && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>{sublabel}</div>}
+    </div>
+  );
+}
+
+function QuickActionBtn({ label, icon: IconComponent, color, onClick }) {
+  return (
+    <button onClick={onClick} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", padding: "18px 12px", borderRadius: "12px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, color: theme.textPrimary, transition: "all 0.15s", minHeight: "92px", boxShadow: "0 1px 3px rgba(26,61,43,0.04)" }}>
+      <div style={{ width: "40px", height: "40px", borderRadius: "10px", backgroundColor: color, display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>{IconComponent ? IconComponent() : null}</div>
+      <span style={{ fontSize: "12px", fontWeight: "600" }}>{label}</span>
+    </button>
+  );
+}
+
+function Btn({ label, bg, color, onClick }) {
+  return <button onClick={onClick} style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: bg, color, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", minHeight: "28px" }}>{label}</button>;
+}
+
+function Row({ main, sub, actions }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "7px", marginBottom: "6px", border: `1px solid ${theme.border}`, gap: "8px" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: "600", fontSize: "13px", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{main}</div>
+        {sub && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{sub}</div>}
+      </div>
+      <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>{actions}</div>
+    </div>
+  );
+}
+
 // ─── CREW HOME (personalized stats) ───────────────────────────
 function CrewHome({ token, setView }) {
   const [stats, setStats] = useState(null);
@@ -461,23 +500,7 @@ function CrewHome({ token, setView }) {
   const today = new Date().toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" });
   const firstName = stats?.employee_name?.split(" ")[0] || "";
 
-  const StatCard = ({ label, value, unit, sublabel }) => (
-    <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "18px 16px", border: `1px solid ${theme.border}`, boxShadow: "0 1px 3px rgba(26,61,43,0.04)" }}>
-      <div style={{ fontSize: "11px", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: "600", marginBottom: "8px" }}>{label}</div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: "5px" }}>
-        <div style={{ fontSize: "26px", fontWeight: "700", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.5px" }}>{value}</div>
-        {unit && <div style={{ fontSize: "13px", color: theme.textSecondary, fontWeight: "500" }}>{unit}</div>}
-      </div>
-      {sublabel && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>{sublabel}</div>}
-    </div>
-  );
-
-  const QuickActionBtn = ({ label, Icon, color, onClick }) => (
-    <button onClick={onClick} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", padding: "18px 12px", borderRadius: "12px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, color: theme.textPrimary, transition: "all 0.15s", minHeight: "92px", boxShadow: "0 1px 3px rgba(26,61,43,0.04)" }}>
-      <div style={{ width: "40px", height: "40px", borderRadius: "10px", backgroundColor: color, display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}><Icon /></div>
-      <span style={{ fontSize: "12px", fontWeight: "600" }}>{label}</span>
-    </button>
-  );
+  /* StatCard and QuickActionBtn moved to module scope */
 
   if (loading) {
     return (
@@ -534,9 +557,9 @@ function CrewHome({ token, setView }) {
       <div style={{ marginBottom: "26px" }}>
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Quick Log</div>
         <div style={{ display: "flex", gap: "10px" }}>
-          <QuickActionBtn label="Hours" Icon={IconHours} color={theme.primary} onClick={() => setView("timesheet")} />
-          <QuickActionBtn label="Materials" Icon={IconMaterials} color={theme.gold} onClick={() => setView("materials")} />
-          <QuickActionBtn label="Mileage" Icon={IconMileage} color={theme.accent} onClick={() => setView("mileage")} />
+          <QuickActionBtn label="Hours" icon={IconHours} color={theme.primary} onClick={() => setView("timesheet")} />
+          <QuickActionBtn label="Materials" icon={IconMaterials} color={theme.gold} onClick={() => setView("materials")} />
+          <QuickActionBtn label="Mileage" icon={IconMileage} color={theme.accent} onClick={() => setView("mileage")} />
         </div>
       </div>
 
@@ -2103,22 +2126,7 @@ function ScheduleScreen({ token }) {
     byDate[s.scheduled_date].push(s);
   });
 
-  const TabBtn = ({ id, label }) => (
-    <button onClick={() => setTab(id)} style={{ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "14px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" }}>
-      {label}
-    </button>
-  );
-
-  const WeekNav = () => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", gap: "8px" }}>
-      <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8249;</button>
-      <div style={{ flex: 1, textAlign: "center" }}>
-        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
-        {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>This week</button>}
-      </div>
-      <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8250;</button>
-    </div>
-  );
+  const tabBtnStyle = (id) => ({ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "14px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" });
 
   return (
     <div style={styles.container}>
@@ -2128,13 +2136,20 @@ function ScheduleScreen({ token }) {
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
       <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}` }}>
-        <TabBtn id="view" label="View Schedule" />
-        <TabBtn id="add" label="Add Assignment" />
+        <button onClick={() => setTab("view")} style={tabBtnStyle("view")}>View Schedule</button>
+        <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Assignment</button>
       </div>
 
       {tab === "view" && (
         <>
-          <WeekNav />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", gap: "8px" }}>
+            <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8249;</button>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
+              {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>This week</button>}
+            </div>
+            <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8250;</button>
+          </div>
           {loading ? (
             <div>{[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
           ) : schedules.length === 0 ? (
@@ -2384,19 +2399,7 @@ function AdminScreen({ token }) {
   const completedJobs = jobs.filter(j => j.status === "completed");
   const inactiveJobs = jobs.filter(j => j.status === "inactive");
 
-  const Btn = ({ label, bg, color, onClick }) => (
-    <button onClick={onClick} style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: bg, color, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", minHeight: "28px" }}>{label}</button>
-  );
-
-  const Row = ({ main, sub, actions }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "7px", marginBottom: "6px", border: `1px solid ${theme.border}`, gap: "8px" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: "600", fontSize: "13px", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{main}</div>
-        {sub && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{sub}</div>}
-      </div>
-      <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>{actions}</div>
-    </div>
-  );
+  /* Btn and Row moved to module scope */
 
   return (
     <div style={styles.container}>
