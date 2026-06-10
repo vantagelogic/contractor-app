@@ -1375,6 +1375,7 @@ def get_requests(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    from datetime import datetime
     if current_user.role in ["owner", "admin"]:
         reqs = db.query(models.Request).filter(
             models.Request.company_id == current_user.company_id
@@ -1382,18 +1383,64 @@ def get_requests(
     else:
         if not current_user.employee_id:
             return []
-        reqs = db.query(models.Request).filter(
-            models.Request.company_id == current_user.company_id,
-            models.Request.employee_id == current_user.employee_id
-        ).order_by(models.Request.created_at.desc()).all()
+        # Get all jobs this crew member is scheduled on
+        scheduled_jobs = db.query(models.Schedule).filter(
+            models.Schedule.company_id == current_user.company_id,
+            models.Schedule.employee_id == current_user.employee_id
+        ).all()
+        job_ids = list(set(s.job_id for s in scheduled_jobs))
+        
+        if job_ids:
+            # Get requests from own submissions OR from shared jobs
+            # Exclude Scope Change requests from shared jobs (those are owner-only)
+            from sqlalchemy import or_, and_
+            reqs = db.query(models.Request).filter(
+                models.Request.company_id == current_user.company_id,
+                or_(
+                    models.Request.employee_id == current_user.employee_id,
+                    and_(
+                        models.Request.job_id.in_(job_ids),
+                        models.Request.request_type != "Scope Change"
+                    )
+                )
+            ).order_by(models.Request.created_at.desc()).all()
+        else:
+            reqs = db.query(models.Request).filter(
+                models.Request.company_id == current_user.company_id,
+                models.Request.employee_id == current_user.employee_id
+            ).order_by(models.Request.created_at.desc()).all()
+
     result = []
     for r in reqs:
         emp = db.query(models.Employee).filter(models.Employee.employee_id == r.employee_id).first()
         job = db.query(models.Job).filter(models.Job.job_id == r.job_id).first()
         inv = db.query(models.Inventory).filter(models.Inventory.inventory_id == r.inventory_id).first() if r.inventory_id else None
+        
+        # Get latest comment timestamp and count
+        comments = db.query(models.RequestComment).filter(
+            models.RequestComment.request_id == r.request_id
+        ).order_by(models.RequestComment.created_at.desc()).all()
+        last_comment_at = str(comments[0].created_at) if comments else None
+        last_activity_at = last_comment_at or str(r.created_at)
+        
+        # Get job participants (all crew scheduled on this job)
+        job_schedules = db.query(models.Schedule).filter(
+            models.Schedule.job_id == r.job_id,
+            models.Schedule.company_id == current_user.company_id
+        ).all()
+        participant_ids = list(set(s.employee_id for s in job_schedules))
+        participants = []
+        for pid in participant_ids:
+            pe = db.query(models.Employee).filter(models.Employee.employee_id == pid).first()
+            if pe:
+                participants.append(f"{pe.first_name} {pe.last_name}")
+
+        is_mine = r.employee_id == current_user.employee_id
+
         result.append({
             "request_id": r.request_id,
             "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "is_mine": is_mine,
             "job_name": job.job_name if job else "Unknown",
             "job_id": r.job_id,
             "request_type": r.request_type,
@@ -1404,8 +1451,15 @@ def get_requests(
             "status": r.status,
             "denial_reason": r.denial_reason,
             "created_at": str(r.created_at),
+            "last_activity_at": last_activity_at,
+            "comment_count": len(comments),
+            "last_comment_preview": comments[0].message[:60] if comments else None,
+            "participants": participants,
             "reviewed_at": str(r.reviewed_at) if r.reviewed_at else None,
         })
+    
+    # Sort by last activity
+    result.sort(key=lambda x: x["last_activity_at"], reverse=True)
     return result
 
 @app.post("/requests")
