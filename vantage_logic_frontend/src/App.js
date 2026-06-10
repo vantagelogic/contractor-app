@@ -1699,6 +1699,22 @@ function RequestsScreen({ token }) {
   const [denyingId, setDenyingId] = useState(null);
   const [denialReason, setDenialReason] = useState("");
   const [openThread, setOpenThread] = useState(null);
+  const [viewedMap, setViewedMap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("vl_req_viewed") || "{}"); } catch { return {}; }
+  });
+
+  function markViewed(id, activity) {
+    const updated = { ...viewedMap, [id]: activity };
+    setViewedMap(updated);
+    try { localStorage.setItem("vl_req_viewed", JSON.stringify(updated)); } catch {}
+  }
+
+  function hasUnread(req) {
+    if (!req.comment_count) return false;
+    const last = viewedMap[req.request_id];
+    if (!last) return true;
+    return req.last_activity_at > last;
+  }
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
@@ -1725,6 +1741,14 @@ function RequestsScreen({ token }) {
 
   const filtered = requests.filter(r => filter === "all" ? true : r.status === filter);
   const pendingCount = requests.filter(r => r.status === "pending").length;
+  const unreadCount = requests.filter(r => hasUnread(r)).length;
+
+  // Group by job
+  const byJob = {};
+  filtered.forEach(r => {
+    if (!byJob[r.job_name]) byJob[r.job_name] = [];
+    byJob[r.job_name].push(r);
+  });
 
   const statusColor = (s) => s === "approved" ? theme.accent : s === "denied" ? theme.danger : theme.gold;
   const statusBg = (s) => s === "approved" ? theme.accentLight : s === "denied" ? theme.dangerLight : theme.goldLight;
@@ -1733,13 +1757,16 @@ function RequestsScreen({ token }) {
     <div style={styles.container}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "4px" }}>
         <h1 style={styles.title}>Requests</h1>
-        {pendingCount > 0 && <span style={{ backgroundColor: theme.gold, color: "white", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "12px", marginTop: "4px" }}>{pendingCount} pending</span>}
+        <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+          {pendingCount > 0 && <span style={{ backgroundColor: theme.gold, color: "white", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "12px" }}>{pendingCount} pending</span>}
+          {unreadCount > 0 && <span style={{ backgroundColor: theme.danger, color: "white", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "12px" }}>{unreadCount} unread</span>}
+        </div>
       </div>
       <p style={styles.subtitle}>Review and respond to crew requests</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
-      <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
         {[["pending", "Pending"], ["approved", "Approved"], ["denied", "Denied"], ["all", "All"]].map(([val, label]) => (
           <button key={val} onClick={() => setFilter(val)} style={{ padding: "7px 14px", borderRadius: "20px", border: `1.5px solid ${filter === val ? theme.primary : theme.border}`, backgroundColor: filter === val ? theme.primary : "white", color: filter === val ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
             {label}{val === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
@@ -1754,47 +1781,85 @@ function RequestsScreen({ token }) {
           <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No {filter === "all" ? "" : filter} requests.</p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {filtered.map(req => (
-            <div key={req.request_id} style={{ ...styles.card, padding: "16px", borderLeft: `4px solid ${statusColor(req.status)}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
-                    <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{req.status}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.employee_name} · {req.job_name}</div>
-                  <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px" }}>{new Date(req.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-                </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {Object.entries(byJob).map(([jobName, jobReqs]) => (
+            <div key={jobName}>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                {jobName}
+                <span style={{ fontSize: "10px", color: theme.textLight, fontWeight: "500" }}>({jobReqs.length})</span>
               </div>
-              {req.description && <div style={{ fontSize: "13px", color: theme.textPrimary, backgroundColor: theme.bg, padding: "10px 12px", borderRadius: "8px", marginBottom: "10px", lineHeight: 1.5 }}>{req.description}</div>}
-              {req.inventory_item && (
-                <div style={{ fontSize: "12px", color: theme.accent, backgroundColor: theme.accentLight, padding: "8px 12px", borderRadius: "8px", marginBottom: "10px", fontWeight: "600" }}>
-                  Inventory: {req.quantity_requested} {req.inventory_unit} of {req.inventory_item}
-                </div>
-              )}
-              {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, backgroundColor: theme.dangerLight, padding: "8px 12px", borderRadius: "8px", marginBottom: "10px" }}>Denied: {req.denial_reason}</div>}
-              {req.status === "pending" && (
-                denyingId === req.request_id ? (
-                  <div>
-                    <textarea style={{ ...styles.textarea, minHeight: "60px", marginBottom: "8px" }} placeholder="Reason for denial (optional)" value={denialReason} onChange={e => setDenialReason(e.target.value)} />
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => deny(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.danger }}>Confirm Deny</button>
-                      <button onClick={() => { setDenyingId(null); setDenialReason(""); }} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {jobReqs.map(req => {
+                  const unread = hasUnread(req);
+                  const isOpen = openThread === req.request_id;
+                  return (
+                    <div key={req.request_id} style={{ ...styles.card, padding: "0", borderLeft: `4px solid ${unread ? theme.gold : statusColor(req.status)}`, overflow: "hidden", boxShadow: unread ? `0 2px 12px rgba(200,151,58,0.18)` : theme.shadowSm }}>
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "8px" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "3px" }}>
+                              <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
+                              <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{req.status}</span>
+                              {unread && <span style={{ fontSize: "10px", fontWeight: "700", backgroundColor: theme.gold, color: "white", padding: "2px 8px", borderRadius: "10px" }}>NEW</span>}
+                            </div>
+                            <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.employee_name} · {timeAgo(req.created_at)}</div>
+                          </div>
+                        </div>
+                        {req.description && <div style={{ fontSize: "13px", color: theme.textPrimary, backgroundColor: theme.bg, padding: "9px 12px", borderRadius: "8px", marginBottom: "8px", lineHeight: 1.5 }}>{req.description}</div>}
+                        {req.inventory_item && <div style={{ fontSize: "12px", color: theme.accent, backgroundColor: theme.accentLight, padding: "7px 12px", borderRadius: "8px", marginBottom: "8px", fontWeight: "600" }}>Inventory: {req.quantity_requested} {req.inventory_unit} of {req.inventory_item}</div>}
+                        {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, backgroundColor: theme.dangerLight, padding: "7px 12px", borderRadius: "8px", marginBottom: "8px" }}>Denied: {req.denial_reason}</div>}
+
+                        {req.participants && req.participants.length > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "10px", color: theme.textLight, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>On this job:</span>
+                            {req.participants.slice(0, 4).map((p, i) => (
+                              <span key={i} style={{ fontSize: "11px", backgroundColor: theme.bg, color: theme.textSecondary, padding: "2px 8px", borderRadius: "10px", border: `1px solid ${theme.border}`, fontWeight: "500" }}>{p}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {req.last_comment_preview && !isOpen && (
+                          <div style={{ fontSize: "12px", color: theme.textSecondary, backgroundColor: theme.bg, padding: "7px 12px", borderRadius: "8px", marginBottom: "8px", fontStyle: "italic", borderLeft: `3px solid ${theme.border}` }}>
+                            "{req.last_comment_preview}{req.last_comment_preview.length >= 60 ? "..." : ""}"
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <button onClick={() => {
+                            const next = isOpen ? null : req.request_id;
+                            setOpenThread(next);
+                            if (next) markViewed(req.request_id, req.last_activity_at);
+                          }} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "8px", border: `1.5px solid ${isOpen ? theme.primary : unread ? theme.gold : theme.border}`, cursor: "pointer", backgroundColor: isOpen ? theme.primary : unread ? theme.goldLight : "white", color: isOpen ? "white" : unread ? theme.gold : theme.textSecondary, fontWeight: "600", fontFamily: font.body, display: "flex", alignItems: "center", gap: "5px" }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            {isOpen ? "Close" : `Discussion${req.comment_count > 0 ? ` (${req.comment_count})` : ""}`}
+                          </button>
+                          {req.status === "pending" && !denyingId && (
+                            <>
+                              <button onClick={() => approve(req.request_id)} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.accent, color: "white", fontWeight: "600", fontFamily: font.body }}>Approve</button>
+                              <button onClick={() => setDenyingId(req.request_id)} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "8px", border: "none", cursor: "pointer", backgroundColor: theme.danger, color: "white", fontWeight: "600", fontFamily: font.body }}>Deny</button>
+                            </>
+                          )}
+                        </div>
+                        {denyingId === req.request_id && (
+                          <div style={{ marginTop: "10px" }}>
+                            <textarea style={{ ...styles.textarea, minHeight: "60px", marginBottom: "8px" }} placeholder="Reason for denial (optional)" value={denialReason} onChange={e => setDenialReason(e.target.value)} />
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button onClick={() => deny(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.danger }}>Confirm Deny</button>
+                              <button onClick={() => { setDenyingId(null); setDenialReason(""); }} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {isOpen && (
+                        <div style={{ borderTop: `1px solid ${theme.border}`, padding: "0 16px 16px" }}>
+                          <RequestThread token={token} requestId={req.request_id} onActivity={() => { loadRequests(); markViewed(req.request_id, new Date().toISOString()); }} />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => approve(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.accent }}>Approve</button>
-                    <button onClick={() => setDenyingId(req.request_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: theme.danger }}>Deny</button>
-                  </div>
-                )
-              )}
-              <button onClick={() => setOpenThread(openThread === req.request_id ? null : req.request_id)} style={{ marginTop: "10px", width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: openThread === req.request_id ? theme.bg : "white", color: theme.accent, fontWeight: "600", fontFamily: font.body, fontSize: "12.5px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                {openThread === req.request_id ? "Hide Discussion" : "Discuss"}
-              </button>
-              {openThread === req.request_id && <RequestThread token={token} requestId={req.request_id} />}
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
@@ -1815,15 +1880,29 @@ function CrewRequestsScreen({ token }) {
   const [form, setForm] = useState({ job_id: "", request_type: "Additional Materials", description: "", inventory_id: "", quantity_requested: "" });
   const [errors, setErrors] = useState({});
   const [openThread, setOpenThread] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ description: "", quantity_requested: "" });
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [tab, setTab] = useState("all");
+  const [viewedMap, setViewedMap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("vl_req_viewed") || "{}"); } catch { return {}; }
+  });
+
+  function markViewed(id, activity) {
+    const updated = { ...viewedMap, [id]: activity };
+    setViewedMap(updated);
+    try { localStorage.setItem("vl_req_viewed", JSON.stringify(updated)); } catch {}
+  }
+
+  function hasUnread(req) {
+    if (!req.comment_count) return false;
+    const last = viewedMap[req.request_id];
+    if (!last) return true;
+    return req.last_activity_at > last;
+  }
 
   const REQUEST_TYPES = ["Additional Materials", "Inventory Pull", "Scope Change", "Equipment Issue", "Safety Concern", "Other"];
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
-  useEffect(() => {
+  function loadAll() {
     const h = { Authorization: `Bearer ${token}` };
     Promise.all([
       apiFetch(`${API}/requests`, { headers: h }).then(r => r.json()),
@@ -1835,7 +1914,9 @@ function CrewRequestsScreen({ token }) {
       setJobs(Array.isArray(jobList) ? jobList : []);
       setLoading(false);
     });
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
+
+  useEffect(() => { loadAll(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function validate() {
     const e = {};
@@ -1862,34 +1943,34 @@ function CrewRequestsScreen({ token }) {
       showMsg("Request submitted.");
       setForm({ job_id: "", request_type: "Additional Materials", description: "", inventory_id: "", quantity_requested: "" });
       setShowForm(false);
-      apiFetch(`${API}/requests`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(data => setRequests(Array.isArray(data) ? data : []));
+      loadAll();
     } else {
       showMsg("Failed to submit request.");
     }
   }
 
-  function reloadRequests() {
-    apiFetch(`${API}/requests`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(data => setRequests(Array.isArray(data) ? data : []));
-  }
-
-  async function saveEdit(req) {
-    setSavingEdit(true);
-    const params = new URLSearchParams();
-    params.append("description", editDraft.description);
-    if (req.inventory_item && editDraft.quantity_requested) params.append("quantity_requested", editDraft.quantity_requested);
-    const res = await apiFetch(`${API}/requests/${req.request_id}?${params}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
-    setSavingEdit(false);
-    if (res.ok) { showMsg("Request updated."); setEditingId(null); reloadRequests(); }
-    else showMsg("Could not update request.");
-  }
+  const myRequests = requests.filter(r => r.is_mine);
+  const teamRequests = requests.filter(r => !r.is_mine);
+  const displayRequests = tab === "mine" ? myRequests : tab === "team" ? teamRequests : requests;
+  const unreadCount = requests.filter(r => hasUnread(r)).length;
 
   const statusColor = (s) => s === "approved" ? theme.accent : s === "denied" ? theme.danger : theme.gold;
   const statusBg = (s) => s === "approved" ? theme.accentLight : s === "denied" ? theme.dangerLight : theme.goldLight;
 
+  // Group by job
+  const byJob = {};
+  displayRequests.forEach(r => {
+    if (!byJob[r.job_name]) byJob[r.job_name] = [];
+    byJob[r.job_name].push(r);
+  });
+
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>My Requests</h1>
-      <p style={styles.subtitle}>Submit and track job requests</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "4px" }}>
+        <h1 style={styles.title}>Requests</h1>
+        {unreadCount > 0 && <span style={{ backgroundColor: theme.danger, color: "white", fontSize: "12px", fontWeight: "700", padding: "4px 10px", borderRadius: "12px", marginTop: "4px" }}>{unreadCount} new</span>}
+      </div>
+      <p style={styles.subtitle}>Job site requests and team discussion</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -1898,12 +1979,6 @@ function CrewRequestsScreen({ token }) {
           + New Request
         </button>
       ) : (
-        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-          <button onClick={() => setShowForm(false)} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: "#888" }}>Cancel</button>
-        </div>
-      )}
-
-      {showForm && (
         <div style={{ ...styles.card, marginBottom: "20px" }}>
           <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>Submit a Request</div>
 
@@ -1945,55 +2020,74 @@ function CrewRequestsScreen({ token }) {
         </div>
       )}
 
+      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}` }}>
+        {[["all", `All (${requests.length})`], ["mine", `Mine (${myRequests.length})`], ["team", `Team (${teamRequests.length})`]].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setTab(id)} style={{ flex: 1, padding: "9px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: tab === id ? "600" : "400", cursor: "pointer" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div>{[1,2].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
-      ) : requests.length === 0 ? (
+      ) : displayRequests.length === 0 ? (
         <div style={{ ...styles.card, textAlign: "center", padding: "32px" }}>
-          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No requests yet.</p>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>
+            {tab === "team" ? "No team requests on your jobs yet." : "No requests yet."}
+          </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {requests.map(req => (
-            <div key={req.request_id} style={{ ...styles.card, padding: "14px 16px", borderLeft: `4px solid ${statusColor(req.status)}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "6px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
-                    <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase" }}>{req.status}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>{req.job_name} · {timeAgo(req.created_at)}</div>
-                </div>
-                {req.status === "pending" && editingId !== req.request_id && (
-                  <button onClick={() => { setEditingId(req.request_id); setEditDraft({ description: req.description || "", quantity_requested: req.quantity_requested ? String(req.quantity_requested) : "" }); }} style={{ flexShrink: 0, fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
-                )}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {Object.entries(byJob).map(([jobName, jobReqs]) => (
+            <div key={jobName}>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                {jobName}
               </div>
-              {editingId === req.request_id ? (
-                <div style={{ marginTop: "8px" }}>
-                  {req.inventory_item && (
-                    <>
-                      <label style={styles.label}>Quantity</label>
-                      <input style={{ ...styles.input, marginTop: "4px" }} type="number" step="0.01" value={editDraft.quantity_requested} onChange={e => setEditDraft({ ...editDraft, quantity_requested: e.target.value })} />
-                    </>
-                  )}
-                  <label style={styles.label}>Description</label>
-                  <textarea style={{ ...styles.textarea, marginTop: "4px", minHeight: "60px" }} value={editDraft.description} onChange={e => setEditDraft({ ...editDraft, description: e.target.value })} />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                    <button onClick={() => saveEdit(req)} disabled={savingEdit} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>{savingEdit ? <><Spinner size={14} /> Saving</> : "Save"}</button>
-                    <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "10px", backgroundColor: "#888" }}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {req.description && <div style={{ fontSize: "12.5px", color: theme.textPrimary, marginTop: "6px", lineHeight: 1.45 }}>{req.description}</div>}
-                  {req.inventory_item && <div style={{ fontSize: "12px", color: theme.accent, marginTop: "6px", fontWeight: "600" }}>{req.quantity_requested} {req.inventory_unit} of {req.inventory_item}</div>}
-                  {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, marginTop: "6px", backgroundColor: theme.dangerLight, padding: "6px 10px", borderRadius: "6px" }}>Reason: {req.denial_reason}</div>}
-                  <button onClick={() => setOpenThread(openThread === req.request_id ? null : req.request_id)} style={{ marginTop: "10px", width: "100%", padding: "9px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: openThread === req.request_id ? theme.bg : "white", color: theme.accent, fontWeight: "600", fontFamily: font.body, fontSize: "12.5px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    {openThread === req.request_id ? "Hide Discussion" : "Discuss"}
-                  </button>
-                  {openThread === req.request_id && <RequestThread token={token} requestId={req.request_id} />}
-                </>
-              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {jobReqs.map(req => {
+                  const unread = hasUnread(req);
+                  const isOpen = openThread === req.request_id;
+                  return (
+                    <div key={req.request_id} style={{ ...styles.card, padding: "0", borderLeft: `4px solid ${unread ? theme.gold : statusColor(req.status)}`, overflow: "hidden", boxShadow: unread ? `0 2px 12px rgba(200,151,58,0.18)` : theme.shadowSm }}>
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "3px" }}>
+                              <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{req.request_type}</span>
+                              <span style={{ fontSize: "10px", fontWeight: "600", backgroundColor: statusBg(req.status), color: statusColor(req.status), padding: "2px 8px", borderRadius: "10px", textTransform: "uppercase" }}>{req.status}</span>
+                              {!req.is_mine && <span style={{ fontSize: "10px", backgroundColor: theme.bg, color: theme.textSecondary, padding: "2px 8px", borderRadius: "10px", border: `1px solid ${theme.border}`, fontWeight: "500" }}>by {req.employee_name}</span>}
+                              {unread && <span style={{ fontSize: "10px", fontWeight: "700", backgroundColor: theme.gold, color: "white", padding: "2px 8px", borderRadius: "10px" }}>NEW</span>}
+                            </div>
+                            <div style={{ fontSize: "11px", color: theme.textLight }}>{timeAgo(req.last_activity_at)}</div>
+                          </div>
+                        </div>
+                        {req.description && <div style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "8px", lineHeight: 1.5 }}>{req.description}</div>}
+                        {req.inventory_item && <div style={{ fontSize: "12px", color: theme.accent, marginBottom: "8px", fontWeight: "600" }}>{req.quantity_requested} {req.inventory_unit} of {req.inventory_item}</div>}
+                        {req.denial_reason && <div style={{ fontSize: "12px", color: theme.danger, backgroundColor: theme.dangerLight, padding: "6px 10px", borderRadius: "6px", marginBottom: "8px" }}>Reason: {req.denial_reason}</div>}
+                        {req.last_comment_preview && !isOpen && (
+                          <div style={{ fontSize: "12px", color: theme.textSecondary, backgroundColor: theme.bg, padding: "7px 12px", borderRadius: "8px", marginBottom: "8px", fontStyle: "italic", borderLeft: `3px solid ${theme.border}` }}>
+                            "{req.last_comment_preview}{req.last_comment_preview.length >= 60 ? "..." : ""}"
+                          </div>
+                        )}
+                        <button onClick={() => {
+                          const next = isOpen ? null : req.request_id;
+                          setOpenThread(next);
+                          if (next) markViewed(req.request_id, req.last_activity_at);
+                        }} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "8px", border: `1.5px solid ${isOpen ? theme.primary : unread ? theme.gold : theme.border}`, cursor: "pointer", backgroundColor: isOpen ? theme.primary : unread ? theme.goldLight : "white", color: isOpen ? "white" : unread ? theme.gold : theme.textSecondary, fontWeight: "600", fontFamily: font.body, display: "flex", alignItems: "center", gap: "5px" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          {isOpen ? "Close" : `Discussion${req.comment_count > 0 ? ` (${req.comment_count})` : ""}`}
+                        </button>
+                      </div>
+                      {isOpen && (
+                        <div style={{ borderTop: `1px solid ${theme.border}`, padding: "0 16px 16px" }}>
+                          <RequestThread token={token} requestId={req.request_id} onActivity={() => { loadAll(); markViewed(req.request_id, new Date().toISOString()); }} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
