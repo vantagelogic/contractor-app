@@ -48,6 +48,7 @@ const isMobile = () => window.innerWidth < 768;
 
 const styles = {
   container: { maxWidth: "640px", margin: "0 auto", padding: "24px 18px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
+  containerWide: { maxWidth: "1120px", margin: "0 auto", padding: "24px 24px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
   title: { fontSize: "27px", fontWeight: "800", color: theme.primary, marginBottom: "5px", fontFamily: font.display, letterSpacing: "-0.7px", lineHeight: 1.15 },
   subtitle: { fontSize: "14px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.4 },
   form: { display: "flex", flexDirection: "column", gap: "4px" },
@@ -103,23 +104,25 @@ function IdentityBadge({ name }) {
 function VantageLogo({ size = 40, dark = false, centered = false }) {
   const scale = size / 40;
   const textColor = dark ? "white" : theme.primary;
-  const subColor = dark ? "rgba(200,151,58,0.9)" : theme.gold;
+  const subColor = dark ? "rgba(212,162,58,0.95)" : theme.gold;
+  const iconBg = dark
+    ? "linear-gradient(145deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.07) 100%)"
+    : `linear-gradient(145deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`;
 
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: Math.round(10 * scale) + "px", margin: centered ? "0 auto" : "0" }}>
-      {/* Icon mark */}
-      <div style={{ width: Math.round(28 * scale) + "px", height: Math.round(28 * scale) + "px", borderRadius: Math.round(6 * scale) + "px", backgroundColor: dark ? "rgba(255,255,255,0.12)" : theme.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <svg width={Math.round(16 * scale)} height={Math.round(16 * scale)} viewBox="0 0 16 16" fill="none">
-          <path d="M2 12 L8 4 L14 12" stroke={theme.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M5 12 L8 7 L11 12" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6"/>
+      <div style={{ width: Math.round(30 * scale) + "px", height: Math.round(30 * scale) + "px", borderRadius: Math.round(8 * scale) + "px", background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: dark ? "inset 0 1px 0 rgba(255,255,255,0.18)" : `inset 0 1px 0 rgba(255,255,255,0.14), 0 1px 3px rgba(15,40,24,0.3)`, border: dark ? "1px solid rgba(255,255,255,0.14)" : "none", boxSizing: "border-box" }}>
+        <svg width={Math.round(18 * scale)} height={Math.round(18 * scale)} viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="3.6" r="1.5" fill={theme.gold}/>
+          <path d="M3 13.6 L9 6.4 L15 13.6" stroke={theme.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M6.1 13.6 L9 10.1 L11.9 13.6" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
         </svg>
       </div>
-      {/* Wordmark */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(15 * scale) + "px", fontWeight: "800", color: textColor, letterSpacing: "-0.3px", lineHeight: 1, whiteSpace: "nowrap" }}>
+        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(15 * scale) + "px", fontWeight: "800", color: textColor, letterSpacing: "-0.2px", lineHeight: 1, whiteSpace: "nowrap" }}>
           VANTAGE
         </span>
-        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(7 * scale) + "px", fontWeight: "500", color: subColor, letterSpacing: Math.round(3.5 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", marginTop: "3px", paddingLeft: "1px" }}>
+        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(7 * scale) + "px", fontWeight: "600", color: subColor, letterSpacing: Math.round(4 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", marginTop: Math.round(3 * scale) + "px", paddingLeft: "1px" }}>
           LOGIC
         </span>
       </div>
@@ -1480,7 +1483,7 @@ function InventoryScreen({ token }) {
   const totalChargeOut = items.reduce((s, i) => s + (parseFloat(i.quantity || 0) * parseFloat(i.charge_out_price || 0)), 0);
 
   return (
-    <div style={styles.container}>
+    <div style={styles.containerWide}>
       <h1 style={styles.title}>Inventory</h1>
       <p style={styles.subtitle}>Track materials and supplies on hand</p>
 
@@ -1694,7 +1697,7 @@ function RequestThread({ token, requestId, onActivity }) {
 function RequestsScreen({ token }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("pending");
+  const [filter, setFilter] = useState("all");
   const [message, setMessage] = useState("");
   const [denyingId, setDenyingId] = useState(null);
   const [denialReason, setDenialReason] = useState("");
@@ -1772,7 +1775,7 @@ function RequestsScreen({ token }) {
   });
 
   return (
-    <div style={styles.container}>
+    <div style={styles.containerWide}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
         <h1 style={styles.title}>Requests</h1>
         <div style={{ display: "flex", gap: "6px" }}>
@@ -1785,7 +1788,7 @@ function RequestsScreen({ token }) {
       {message && <div style={{ backgroundColor: theme.accentLight, color: theme.accent, padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginBottom: "14px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
       <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
-        {[["pending", "Pending"], ["approved", "Approved"], ["acknowledged", "Acknowledged"], ["denied", "Denied"], ["all", "All"]].map(([val, label]) => (
+        {[["all", "All"], ["pending", "Pending"], ["approved", "Approved"], ["acknowledged", "Acknowledged"], ["denied", "Denied"]].map(([val, label]) => (
           <button key={val} onClick={() => setFilter(val)} style={{ padding: "6px 13px", borderRadius: "20px", border: `1.5px solid ${filter === val ? theme.primary : theme.border}`, backgroundColor: filter === val ? theme.primary : "white", color: filter === val ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
             {label}{val === "pending" && pendingCount > 0 ? ` (${pendingCount})` : ""}
           </button>
@@ -1807,7 +1810,7 @@ function RequestsScreen({ token }) {
                 <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{jobName}</span>
                 <span style={{ fontSize: "11px", color: theme.textLight }}>({jobReqs.length} request{jobReqs.length !== 1 ? "s" : ""})</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div className="vl-grid2">
                 {jobReqs.map(req => {
                   const unread = hasUnread(req);
                   const isOpen = openThread === req.request_id;
@@ -2202,10 +2205,8 @@ function ScheduleScreen({ token }) {
       apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/schedules?start_date=${start}&end_date=${end}`, { headers: h }).then(r => r.json()),
     ]).then(([emps, jobList, ccs, sched]) => {
-      const activeEmps = emps.filter(e => e.active);
-      const activeJobs = jobList.filter(j => j.status === "active");
-      setEmployees(activeEmps);
-      setJobs(activeJobs);
+      setEmployees(emps.filter(e => e.active));
+      setJobs(jobList.filter(j => j.status === "active"));
       setCostCodes(ccs);
       setSchedules(Array.isArray(sched) ? sched : []);
       setLoading(false);
@@ -2242,6 +2243,7 @@ function ScheduleScreen({ token }) {
       showMsg("Assignment added.");
       setForm(f => ({ ...f, employee_id: "", job_id: "", cost_code_id: "", notes: "" }));
       setErrors({});
+      setTab("view");
       loadData();
     } else {
       showMsg("Failed to add. Please try again.");
@@ -2251,14 +2253,15 @@ function ScheduleScreen({ token }) {
   async function handleDelete(scheduleId) {
     if (!window.confirm("Remove this assignment?")) return;
     const res = await apiFetch(`${API}/schedules/${scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { showMsg("Removed."); loadData(); }
+    if (res.ok) { showMsg("Removed."); if (editingId === scheduleId) setEditingId(null); loadData(); }
   }
 
   async function handleEditSave(scheduleId) {
+    if (!editForm.cost_code_id) { showMsg("Pick a cost code to save."); return; }
     const params = new URLSearchParams({
       employee_id: editForm.employee_id,
       job_id: editForm.job_id,
-      cost_code_id: editForm.cost_code_id || "",
+      cost_code_id: editForm.cost_code_id,
       scheduled_date: editForm.scheduled_date,
       scheduled_hours: editForm.scheduled_hours,
     });
@@ -2270,22 +2273,36 @@ function ScheduleScreen({ token }) {
     loadData();
   }
 
+  function startEdit(s) {
+    setEditingId(s.schedule_id);
+    setEditForm({ employee_id: s.employee_id, job_id: s.job_id, cost_code_id: s.cost_code_id || "", scheduled_date: s.scheduled_date, scheduled_hours: s.scheduled_hours || 8, notes: s.notes || "" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function quickAdd(dateStr) {
+    setForm(f => ({ ...f, scheduled_date: dateStr }));
+    setErrors({});
+    setTab("add");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   const byDate = {};
   schedules.forEach(s => {
     if (!byDate[s.scheduled_date]) byDate[s.scheduled_date] = [];
     byDate[s.scheduled_date].push(s);
   });
+  const weekHours = schedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
 
   const tabBtnStyle = (id) => ({ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "14px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" });
 
   return (
-    <div style={styles.container}>
+    <div style={styles.containerWide}>
       <h1 style={styles.title}>Schedule</h1>
       <p style={styles.subtitle}>Plan and view your crew assignments</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
-      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}` }}>
+      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}`, maxWidth: "420px" }}>
         <button onClick={() => setTab("view")} style={tabBtnStyle("view")}>View Schedule</button>
         <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Assignment</button>
       </div>
@@ -2296,93 +2313,99 @@ function ScheduleScreen({ token }) {
             <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8249;</button>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
-              {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", marginTop: "2px", fontWeight: "600" }}>This week</button>}
+              <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>
+                {weekHours > 0 ? `${weekHours}h scheduled` : "Nothing scheduled yet"}
+                {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", marginLeft: "8px", padding: 0 }}>This week</button>}
+              </div>
             </div>
             <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8250;</button>
           </div>
+
+          {editingId && (
+            <div style={{ ...styles.card, marginBottom: "18px", border: `1.5px solid ${theme.gold}`, boxShadow: theme.shadowMd }}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "10px", fontFamily: font.display }}>Edit Assignment</div>
+              <div className="vl-grid2">
+                <div>
+                  <label style={styles.label}>Employee</label>
+                  <select style={{...styles.input, marginTop: "4px"}} value={editForm.employee_id} onChange={e => setEditForm({...editForm, employee_id: e.target.value})}>
+                    {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Job</label>
+                  <select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>
+                    {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Cost Code</label>
+                  <select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>
+                    <option value="">Select cost code</option>
+                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <label style={styles.label}>Date</label>
+                    <input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.scheduled_date} onChange={e => setEditForm({...editForm, scheduled_date: e.target.value})} />
+                  </div>
+                  <div>
+                    <label style={styles.label}>Hours</label>
+                    <input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.scheduled_hours} onChange={e => setEditForm({...editForm, scheduled_hours: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+              <label style={styles.label}>Notes</label>
+              <input style={{...styles.input, marginTop: "4px"}} placeholder="Optional" value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
+              <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
+                <button onClick={() => handleEditSave(editingId)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "12px" }}>Save Changes</button>
+                <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "12px", backgroundColor: "#888" }}>Cancel</button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
-            <div>{[1,2,3].map(i => <div key={i} style={{ marginBottom: "10px" }}><Skeleton width="100%" height="80px" radius="10px" /></div>)}</div>
-          ) : schedules.length === 0 ? (
-            <div style={{ ...styles.card, textAlign: "center", padding: "32px 22px" }}>
-              <p style={{ fontSize: "14px", color: theme.textSecondary, margin: "0 0 16px" }}>No assignments this week.</p>
-              <button onClick={() => setTab("add")} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, display: "inline-block", width: "auto", padding: "11px 24px" }}>Add Assignment</button>
+            <div className="vl-week">
+              {[1,2,3,4,5,6,7].map(i => <Skeleton key={i} width="100%" height="120px" radius="10px" />)}
             </div>
           ) : (
-            <div>
+            <div className="vl-week">
               {days.map(day => {
                 const dateStr = day.toISOString().split("T")[0];
                 const daySchedules = byDate[dateStr] || [];
-                if (daySchedules.length === 0) return null;
                 const isToday = dateStr === todayStr;
-                const dayLabel = day.toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric" });
+                const dayTotal = daySchedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
+                const dow = day.toLocaleDateString("en-CA", { weekday: "short" }).toUpperCase();
+                const dayNum = day.getDate();
                 return (
-                  <div key={dateStr} style={{ marginBottom: "20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                      <div style={{ fontSize: "12px", fontWeight: "700", color: isToday ? theme.gold : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px" }}>{dayLabel}</div>
-                      {isToday && <span style={{ backgroundColor: theme.gold, color: "white", padding: "2px 8px", borderRadius: "10px", fontSize: "10px", fontWeight: "700" }}>TODAY</span>}
+                  <div key={dateStr}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "8px", padding: "0 2px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                        <span style={{ fontSize: "10.5px", fontWeight: "700", color: isToday ? theme.gold : theme.textLight, letterSpacing: "0.8px" }}>{dow}</span>
+                        <span style={{ fontSize: "16px", fontWeight: "700", color: isToday ? theme.gold : theme.primary }}>{dayNum}</span>
+                        {isToday && <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: theme.gold, alignSelf: "center" }} />}
+                      </div>
+                      {dayTotal > 0 && <span style={{ fontSize: "10.5px", fontWeight: "700", color: theme.textSecondary }}>{dayTotal}h</span>}
                     </div>
-                    <div style={{ ...styles.card, padding: "0" }}>
-                      {daySchedules.map((s, i) => {
-                        const isEditing = editingId === s.schedule_id;
-                        return (
-                          <div key={s.schedule_id} style={{ borderBottom: i < daySchedules.length - 1 ? `1px solid ${theme.border}` : "none" }}>
-                            {!isEditing ? (
-                              <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>{s.employee_name}</div>
-                                  <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px" }}>{s.job_name}</div>
-                                  {s.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{s.notes}</div>}
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                                  <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: "16px", fontWeight: "700", color: theme.primary }}>{s.scheduled_hours}h</div>
-                                  </div>
-                                  <div style={{ display: "flex", gap: "4px" }}>
-                                    <button onClick={() => { setEditingId(s.schedule_id); setEditForm({ employee_id: s.employee_id, job_id: s.job_id, cost_code_id: s.cost_code_id || "", scheduled_date: s.scheduled_date, scheduled_hours: s.scheduled_hours || 8, notes: s.notes || "" }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
-                                    <button onClick={() => handleDelete(s.schedule_id)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={{ padding: "14px 16px", backgroundColor: theme.bg }}>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                                  <div>
-                                    <label style={styles.label}>Employee</label>
-                                    <select style={{...styles.input, marginTop: "4px"}} value={editForm.employee_id} onChange={e => setEditForm({...editForm, employee_id: e.target.value})}>
-                                      {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label style={styles.label}>Hours</label>
-                                    <input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.scheduled_hours} onChange={e => setEditForm({...editForm, scheduled_hours: e.target.value})} />
-                                  </div>
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                                  <div>
-                                    <label style={styles.label}>Job</label>
-                                    <select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>
-                                      {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label style={styles.label}>Date</label>
-                                    <input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.scheduled_date} onChange={e => setEditForm({...editForm, scheduled_date: e.target.value})} />
-                                  </div>
-                                </div>
-                                <div style={{ marginBottom: "8px" }}>
-                                  <label style={styles.label}>Notes</label>
-                                  <input style={{...styles.input, marginTop: "4px"}} placeholder="Optional" value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
-                                </div>
-                                <div style={{ display: "flex", gap: "8px" }}>
-                                  <button onClick={() => handleEditSave(s.schedule_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px" }}>Save</button>
-                                  <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
-                                </div>
-                              </div>
-                            )}
+
+                    {daySchedules.map(s => (
+                      <div key={s.schedule_id} style={{ backgroundColor: "white", borderRadius: "10px", padding: "10px 12px", marginBottom: "8px", border: `1.5px solid ${editingId === s.schedule_id ? theme.gold : theme.border}`, boxShadow: theme.shadowSm }}>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary, lineHeight: 1.3 }}>{s.employee_name}</div>
+                        <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.job_name}</div>
+                        {s.notes && <div style={{ fontSize: "10.5px", color: theme.textLight, marginTop: "3px", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.notes}</div>}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: "700", color: theme.accent, backgroundColor: theme.accentLight, padding: "2px 8px", borderRadius: "8px" }}>{s.scheduled_hours}h</span>
+                          <div style={{ display: "flex", gap: "10px" }}>
+                            <button onClick={() => startEdit(s)} style={{ fontSize: "11px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Edit</button>
+                            <button onClick={() => handleDelete(s.schedule_id)} style={{ fontSize: "11px", color: theme.danger, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Remove</button>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button onClick={() => quickAdd(dateStr)} style={{ width: "100%", padding: daySchedules.length === 0 ? "18px 8px" : "8px", borderRadius: "10px", border: `1.5px dashed ${theme.borderStrong}`, backgroundColor: "transparent", color: theme.textLight, cursor: "pointer", fontFamily: font.body, fontSize: "12px", fontWeight: "600", transition: "all 0.15s" }}>
+                      + Add
+                    </button>
                   </div>
                 );
               })}
@@ -2392,7 +2415,7 @@ function ScheduleScreen({ token }) {
       )}
 
       {tab === "add" && (
-        <div style={styles.card}>
+        <div style={{ ...styles.card, maxWidth: "640px" }}>
           <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary, marginBottom: "14px", fontFamily: font.display }}>New Assignment</div>
 
           <label style={styles.label}>Employee</label>
@@ -2552,7 +2575,7 @@ function AdminScreen({ token }) {
   /* Btn and Row moved to module scope */
 
   return (
-    <div style={styles.container}>
+    <div style={{ ...styles.container, maxWidth: "880px" }}>
       <h1 style={styles.title}>Admin</h1>
       <p style={styles.subtitle}>Manage your team, jobs, and access</p>
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
@@ -2672,9 +2695,9 @@ function Dashboard({ token }) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
   const [details, setDetails] = useState({});
-  const [filter, setFilter] = useState("active");
-  const [timeFilter, setTimeFilter] = useState("all");
-
+  const [filter, setFilter] = useState("all");
+  const [coDraft, setCoDraft] = useState(null);
+  const [savingCO, setSavingCO] = useState(false);
 
   function loadDashboard() {
     const h = { Authorization: `Bearer ${token}` };
@@ -2682,8 +2705,8 @@ function Dashboard({ token }) {
       apiFetch(`${API}/dashboard`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/mileage`, { headers: h }).then(r => r.json()),
     ]).then(([dashData, mileageData]) => {
-      setJobs(dashData);
-      setMileage(mileageData);
+      setJobs(Array.isArray(dashData) ? dashData : []);
+      setMileage(Array.isArray(mileageData) ? mileageData : []);
       setLoading(false);
     });
   }
@@ -2691,6 +2714,16 @@ function Dashboard({ token }) {
   useEffect(() => { loadDashboard(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = jobs.filter(j => filter === "all" || j.status === filter);
+  const sorted = [...filtered].sort((a, b) => {
+    const sa = a.status === "active" ? 0 : 1;
+    const sb = b.status === "active" ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    const la = a.last_activity || "";
+    const lb = b.last_activity || "";
+    if (la !== lb) return lb.localeCompare(la);
+    return (b.job_id || 0) - (a.job_id || 0);
+  });
+
   const totals = {
     hours: filtered.reduce((s, j) => s + j.total_hours, 0),
     labour: filtered.reduce((s, j) => s + j.labour_cost, 0),
@@ -2716,6 +2749,22 @@ function Dashboard({ token }) {
     }
   }
 
+  async function submitChangeOrder(job_id) {
+    if (!coDraft || !coDraft.description || !coDraft.description.trim()) { return; }
+    if (!coDraft.amount || parseFloat(coDraft.amount) <= 0) { return; }
+    setSavingCO(true);
+    const params = new URLSearchParams({ description: coDraft.description.trim(), amount: coDraft.amount, order_type: coDraft.order_type || "addition" });
+    const res = await apiFetch(`${API}/jobs/${job_id}/change-orders?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setSavingCO(false);
+    if (res.ok) {
+      const h = { Authorization: `Bearer ${token}` };
+      const coR = await apiFetch(`${API}/jobs/${job_id}/change-orders`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []);
+      setDetails(prev => ({ ...prev, [job_id]: { ...(prev[job_id] || {}), changeOrders: coR } }));
+      setCoDraft(null);
+      loadDashboard();
+    }
+  }
+
   const statCards = [
     { label: "Hours", value: totals.hours.toFixed(1) },
     { label: "Labour", value: `$${fmt(totals.labour)}` },
@@ -2731,31 +2780,24 @@ function Dashboard({ token }) {
     <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "90px" }}>
       {/* Header */}
       <div style={{ background: `linear-gradient(150deg, ${theme.primaryDark} 0%, ${theme.primary} 55%, ${theme.accent} 115%)`, padding: "32px 22px 38px", color: "white", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.06)" }}>
-        <div style={{ maxWidth: "940px", margin: "0 auto" }}>
+        <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
           <div style={{ marginBottom: "22px" }}>
             <VantageLogo size={32} dark={true} />
           </div>
           <h1 style={{ fontSize: "26px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.display, letterSpacing: "-0.5px" }}>Project Overview</h1>
-          <p style={{ fontSize: "13px", opacity: 0.65, margin: "0 0 22px" }}>Live job profitability</p>
+          <p style={{ fontSize: "13px", opacity: 0.65, margin: "0 0 20px" }}>Live job profitability, most recent activity first</p>
 
-          <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
-            {["active", "completed", "all"].map(f => (
+          <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
+            {["all", "active", "completed"].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{ padding: "6px 15px", borderRadius: "20px", border: filter === f ? "none" : "1px solid rgba(255,255,255,0.3)", cursor: "pointer", fontSize: "12px", fontWeight: "600", backgroundColor: filter === f ? "white" : "transparent", color: filter === f ? theme.primary : "white", fontFamily: font.body, minHeight: "32px" }}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
-            {[["all", "All Time"], ["week", "This Week"], ["month", "This Month"]].map(([val, label]) => (
-              <button key={val} onClick={() => setTimeFilter(val)} style={{ padding: "5px 13px", borderRadius: "20px", border: timeFilter === val ? "none" : "1px solid rgba(255,255,255,0.2)", cursor: "pointer", fontSize: "11px", fontWeight: "600", backgroundColor: timeFilter === val ? theme.gold : "transparent", color: "white", fontFamily: font.body }}>
-                {label}
-              </button>
-            ))}
-          </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+          <div className="vl-statgrid">
             {statCards.map((item, i) => (
-              <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "rgba(45,106,79,0.9)" : "rgba(184,50,50,0.9)") : "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)", borderRadius: "11px", padding: "14px 10px", textAlign: "center", border: item.highlight ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(255,255,255,0.1)" }}>
+              <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "rgba(45,106,79,0.9)" : "rgba(184,50,50,0.9)") : "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)", borderRadius: "11px", padding: "14px 10px", textAlign: "center", border: item.highlight ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.1)" }}>
                 <div style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>{item.value}</div>
                 <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "4px", textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: "600" }}>{item.label}</div>
               </div>
@@ -2764,92 +2806,154 @@ function Dashboard({ token }) {
         </div>
       </div>
 
-      <div style={{ padding: "18px", maxWidth: "940px", margin: "0 auto" }}>
+      <div style={{ padding: "18px", maxWidth: "1080px", margin: "0 auto" }}>
         {loading ? (
-          <div>
-            {[1,2,3].map(i => <div key={i} style={{ marginBottom: "12px" }}><Skeleton width="100%" height="140px" radius="12px" /></div>)}
+          <div className="vl-jobgrid">
+            {[1,2,3,4].map(i => <Skeleton key={i} width="100%" height="180px" radius="12px" />)}
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>No {filter} jobs.</div>
-        ) : filtered.map(job => {
+        ) : sorted.length === 0 ? (
+          <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>No {filter === "all" ? "" : filter} jobs yet.</div>
+        ) : (
+        <div className="vl-jobgrid">
+        {sorted.map(job => {
           const hasBudget = job.contract_value > 0;
-          const pct = job.budgeted_hours > 0 ? Math.min((job.total_hours / job.budgeted_hours) * 100, 100) : 0;
+          const contract = job.contract_value || 0;
+          const costPct = contract > 0 ? (job.total_cost / contract) * 100 : 0;
+          const labPct = contract > 0 ? Math.min((job.labour_cost / contract) * 100, 100) : 0;
+          const matPct = contract > 0 ? Math.max(Math.min(((job.labour_cost + job.materials_cost) / contract) * 100, 100) - labPct, 0) : 0;
+          const hoursPct = job.budgeted_hours > 0 ? (job.total_hours / job.budgeted_hours) * 100 : 0;
           const over = job.margin !== null && job.margin < 0;
-          const tight = pct > 70 && pct <= 90;
-          const overHours = pct > 90;
-          const barColor = over || overHours ? theme.danger : tight ? theme.warning : theme.accent;
+          const overCost = costPct > 100;
+          const overHours = hoursPct > 100;
+          const tight = (costPct > 85 && costPct <= 100) || (hoursPct > 90 && hoursPct <= 100);
+          const healthColor = over || overCost || overHours ? theme.danger : tight ? theme.warning : theme.accent;
           const isOpen = expanded[job.job_id];
+          const det = details[job.job_id];
 
           return (
-            <div key={job.job_id} onClick={() => toggleJob(job.job_id)} style={{ backgroundColor: "white", borderRadius: "12px", marginBottom: "12px", overflow: "hidden", boxShadow: "0 1px 4px rgba(26,61,43,0.06)", border: `1px solid ${theme.border}`, borderLeft: `4px solid ${barColor}`, cursor: "pointer" }}>
-              <div style={{ padding: "18px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
-                  <div>
+            <div key={job.job_id} style={{ backgroundColor: "white", borderRadius: "12px", overflow: "hidden", boxShadow: theme.shadowSm, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${healthColor}` }}>
+              <div onClick={() => toggleJob(job.job_id)} style={{ padding: "18px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", gap: "10px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: "700", fontSize: "16px", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.2px" }}>{job.job_name}</div>
-                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                       {job.city && <span>{job.city}</span>}
                       {job.city && <span style={{ opacity: 0.4 }}>·</span>}
-                      <span style={{ backgroundColor: job.status === "active" ? theme.accentLight : job.status === "completed" ? "#e8f5ee" : "#f5f5f5", color: job.status === "active" || job.status === "completed" ? theme.accent : "#888", padding: "2px 9px", borderRadius: "12px", fontSize: "11px", fontWeight: "600" }}>
+                      <span style={{ backgroundColor: job.status === "active" ? theme.accentLight : "#f0efeb", color: job.status === "active" ? theme.accent : theme.textSecondary, padding: "2px 9px", borderRadius: "12px", fontSize: "11px", fontWeight: "600" }}>
                         {job.status}
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
                     {hasBudget && job.margin !== null && (
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "18px", fontWeight: "700", color: over ? theme.danger : theme.accent, fontFamily: font.display, letterSpacing: "-0.3px" }}>
-                          {over ? "-" : ""}${fmt(Math.abs(job.margin))}
+                        <div style={{ display: "inline-block", backgroundColor: over ? theme.dangerLight : theme.accentLight, color: over ? theme.danger : theme.accent, fontSize: "13px", fontWeight: "800", padding: "4px 11px", borderRadius: "14px", letterSpacing: "-0.2px" }}>
+                          {over ? "OVER" : `${job.margin_percent}%`}
                         </div>
-                        <div style={{ fontSize: "11px", color: theme.textSecondary }}>{over ? "over budget" : `${job.margin_percent}% margin`}</div>
+                        <div style={{ fontSize: "11px", color: over ? theme.danger : theme.textSecondary, marginTop: "4px", fontWeight: "600" }}>
+                          {over ? "-" : ""}${fmt(Math.abs(job.margin))} margin
+                        </div>
                       </div>
                     )}
-                    <span style={{ fontSize: "11px", color: theme.textLight }}>{isOpen ? "▲" : "▼"}</span>
+                    <span style={{ fontSize: "11px", color: theme.textLight }}>{isOpen ? "\u25B2" : "\u25BC"}</span>
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                  {[["Labour", job.labour_cost], ["Materials", job.materials_cost], ["Total Cost", job.total_cost]].map(([label, val]) => (
-                    <div key={label} style={{ backgroundColor: theme.bg, borderRadius: "8px", padding: "10px 8px", textAlign: "center", border: `1px solid ${theme.border}` }}>
-                      <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>${fmt(val)}</div>
-                      <div style={{ fontSize: "10px", color: theme.textSecondary, marginTop: "3px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>{label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {job.budgeted_hours > 0 && (
-                  <div>
+                {hasBudget ? (
+                  <div style={{ marginBottom: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: theme.textSecondary, marginBottom: "6px" }}>
-                      <span>{job.total_hours}h of {job.budgeted_hours}h budgeted</span>
-                      <span style={{ color: overHours ? theme.danger : tight ? theme.warning : theme.textSecondary, fontWeight: "700" }}>{pct.toFixed(0)}%</span>
+                      <span>${fmt(job.total_cost)} spent of ${fmt(contract)}</span>
+                      <span style={{ color: overCost ? theme.danger : tight ? theme.warning : theme.textSecondary, fontWeight: "700" }}>{costPct.toFixed(0)}%</span>
                     </div>
-                    <div style={{ backgroundColor: theme.border, borderRadius: "3px", height: "6px" }}>
-                      <div style={{ width: `${pct}%`, height: "6px", borderRadius: "3px", backgroundColor: barColor, transition: "width 0.3s" }} />
+                    <div style={{ backgroundColor: theme.border, borderRadius: "4px", height: "8px", display: "flex", overflow: "hidden", border: overCost ? `1px solid ${theme.danger}` : "none" }}>
+                      <div style={{ width: `${labPct}%`, backgroundColor: overCost ? theme.danger : theme.primary, transition: "width 0.3s" }} />
+                      <div style={{ width: `${matPct}%`, backgroundColor: overCost ? theme.danger : theme.gold, transition: "width 0.3s" }} />
                     </div>
+                    <div style={{ display: "flex", gap: "14px", marginTop: "6px", fontSize: "10.5px", color: theme.textSecondary }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "5px" }}><span style={{ width: "8px", height: "8px", borderRadius: "2px", backgroundColor: theme.primary, display: "inline-block" }} />Labour ${fmt(job.labour_cost)}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "5px" }}><span style={{ width: "8px", height: "8px", borderRadius: "2px", backgroundColor: theme.gold, display: "inline-block" }} />Materials ${fmt(job.materials_cost)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                    {[["Labour", job.labour_cost], ["Materials", job.materials_cost], ["Total Cost", job.total_cost]].map(([label, val]) => (
+                      <div key={label} style={{ backgroundColor: theme.bg, borderRadius: "8px", padding: "10px 8px", textAlign: "center", border: `1px solid ${theme.border}` }}>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>${fmt(val)}</div>
+                        <div style={{ fontSize: "10px", color: theme.textSecondary, marginTop: "3px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>{label}</div>
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {(over || overHours) && (
+                {job.budgeted_hours > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ flex: 1, backgroundColor: theme.border, borderRadius: "2px", height: "4px" }}>
+                      <div style={{ width: `${Math.min(hoursPct, 100)}%`, height: "4px", borderRadius: "2px", backgroundColor: overHours ? theme.danger : hoursPct > 90 ? theme.warning : theme.accent, transition: "width 0.3s" }} />
+                    </div>
+                    <span style={{ fontSize: "11px", color: overHours ? theme.danger : theme.textSecondary, fontWeight: "600", whiteSpace: "nowrap" }}>{job.total_hours}h of {job.budgeted_hours}h</span>
+                  </div>
+                )}
+
+                {(over || overCost || overHours) && (
                   <div style={{ marginTop: "12px", padding: "10px 13px", backgroundColor: theme.dangerLight, borderRadius: "8px", border: `1px solid ${theme.danger}`, display: "flex", alignItems: "center", gap: "10px" }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.danger} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <span style={{ fontSize: "12px", fontWeight: "600", color: theme.danger }}>
-                      {over && overHours ? "Hours and budget exceeded" : over ? "Cost exceeds contract value" : "Hours exceeded budget"}
+                      {overCost && overHours ? "Cost and hours exceeded" : overCost || over ? "Cost exceeds contract value" : "Hours exceeded budget"}
                     </span>
-                  </div>
-                )}
-                {hasBudget && (
-                  <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${theme.border}`, fontSize: "12px", color: theme.textSecondary }}>
-                    Contract: ${fmt(job.contract_value)}
                   </div>
                 )}
               </div>
 
               {isOpen && (
-                <div style={{ padding: "0 18px 18px", borderTop: `1px solid ${theme.border}` }}>
-                  <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", paddingTop: "14px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Timesheet Entries</div>
-                  {details[job.job_id] ? (
-                    details[job.job_id].timesheets.length === 0
-                      ? <p style={{ fontSize: "12px", color: theme.textSecondary, margin: 0 }}>No entries yet.</p>
-                      : details[job.job_id].timesheets.map((t, i) => (
+                <div onClick={e => e.stopPropagation()} style={{ padding: "0 18px 18px", borderTop: `1px solid ${theme.border}` }}>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "14px", marginBottom: "10px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px" }}>Change Orders</div>
+                    {(!coDraft || coDraft.jobId !== job.job_id) && (
+                      <button onClick={() => setCoDraft({ jobId: job.job_id, description: "", amount: "", order_type: "addition" })} style={{ fontSize: "11px", color: theme.accent, fontWeight: "700", background: "none", border: "none", cursor: "pointer", fontFamily: font.body, padding: 0 }}>+ Add</button>
+                    )}
+                  </div>
+
+                  {coDraft && coDraft.jobId === job.job_id && (
+                    <div style={{ backgroundColor: theme.bg, borderRadius: "10px", padding: "12px", marginBottom: "10px", border: `1.5px solid ${theme.gold}` }}>
+                      <input style={{ ...styles.input, marginBottom: "8px" }} placeholder="What changed? e.g. Client added second bathroom" value={coDraft.description} onChange={e => setCoDraft({ ...coDraft, description: e.target.value })} />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+                        <input style={styles.input} type="number" step="0.01" placeholder="Amount $" value={coDraft.amount} onChange={e => setCoDraft({ ...coDraft, amount: e.target.value })} />
+                        <select style={styles.input} value={coDraft.order_type} onChange={e => setCoDraft({ ...coDraft, order_type: e.target.value })}>
+                          <option value="addition">Addition (+)</option>
+                          <option value="deduction">Deduction (-)</option>
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button onClick={() => submitChangeOrder(job.job_id)} disabled={savingCO} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                          {savingCO ? <><Spinner /> Saving...</> : "Save Change Order"}
+                        </button>
+                        <button onClick={() => setCoDraft(null)} style={{ ...styles.button, marginTop: 0, padding: "10px 16px", backgroundColor: "#888" }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {det ? (
+                    (det.changeOrders || []).length === 0 && (!coDraft || coDraft.jobId !== job.job_id)
+                      ? <p style={{ fontSize: "12px", color: theme.textLight, margin: "0 0 4px" }}>None yet. Contract adjustments will show here.</p>
+                      : (det.changeOrders || []).map((co, i) => (
+                        <div key={i} style={{ marginBottom: "6px", padding: "10px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{co.description}</div>
+                            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{co.created_at ? String(co.created_at).split("T")[0] : ""}</div>
+                          </div>
+                          <div style={{ fontSize: "14px", fontWeight: "700", color: co.order_type === "deduction" ? theme.danger : theme.accent, whiteSpace: "nowrap" }}>
+                            {co.order_type === "deduction" ? "-" : "+"}${fmt(co.amount)}
+                          </div>
+                        </div>
+                      ))
+                  ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
+
+                  <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginTop: "16px", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Timesheet Entries</div>
+                  {det ? (
+                    det.timesheets.length === 0
+                      ? <p style={{ fontSize: "12px", color: theme.textLight, margin: 0 }}>No entries yet.</p>
+                      : det.timesheets.map((t, i) => (
                         <div key={i} style={{ marginBottom: "6px", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
@@ -2865,10 +2969,10 @@ function Dashboard({ token }) {
                       ))
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
 
-                  {details[job.job_id]?.materials?.length > 0 && (
+                  {det?.materials?.length > 0 && (
                     <div style={{ marginTop: "16px" }}>
                       <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Materials</div>
-                      {details[job.job_id].materials.map((m, i) => (
+                      {det.materials.map((m, i) => (
                         <div key={i} style={{ marginBottom: "6px", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <div>
@@ -2886,6 +2990,8 @@ function Dashboard({ token }) {
             </div>
           );
         })}
+        </div>
+        )}
 
         {!loading && mileage.length > 0 && (
           <div style={{ marginTop: "26px" }}>
@@ -2938,6 +3044,18 @@ function GlobalStyles() {
       @keyframes vlScaleIn { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
       .vl-screen { animation: vlFadeUp 0.34s cubic-bezier(0.22,1,0.36,1) both; }
       .vl-pop { animation: vlScaleIn 0.22s cubic-bezier(0.22,1,0.36,1) both; }
+      .vl-grid2 { display: grid; grid-template-columns: 1fr; gap: 10px; align-items: start; }
+      .vl-jobgrid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
+      .vl-statgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+      @media (min-width: 1020px) {
+        .vl-grid2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+        .vl-jobgrid { grid-template-columns: 1fr 1fr; gap: 14px; }
+        .vl-statgrid { grid-template-columns: repeat(6, 1fr); }
+      }
+      .vl-week { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+      @media (min-width: 1020px) {
+        .vl-week { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+      }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
       }
