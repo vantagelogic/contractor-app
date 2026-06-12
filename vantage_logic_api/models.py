@@ -24,6 +24,10 @@ class User(Base):
     employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=True)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
 
 class Employee(Base):
     __tablename__ = "employees"
