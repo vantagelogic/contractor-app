@@ -42,7 +42,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 def send_welcome_email(to_email: str, company_name: str):
     try:
         resend.Emails.send({
-            "from": "Vantage Logic <onboarding@resend.dev>",
+            "from": "Vantage Logic <noreply@vantagelogic.ca>",
             "to": to_email,
             "subject": "Welcome to Vantage Logic",
             "html": f"""
@@ -71,7 +71,7 @@ def send_welcome_email(to_email: str, company_name: str):
 def send_crew_welcome_email(to_email: str, company_name: str):
     try:
         resend.Emails.send({
-            "from": "Vantage Logic <onboarding@resend.dev>",
+            "from": "Vantage Logic <noreply@vantagelogic.ca>",
             "to": to_email,
             "subject": f"You have been added to {company_name} on Vantage Logic",
             "html": f"""
@@ -100,7 +100,7 @@ def send_verification_email(to_email: str, token: str):
     link = f"https://app.vantagelogic.ca/?verify={token}"
     try:
         resend.Emails.send({
-            "from": "Vantage Logic <onboarding@resend.dev>",
+            "from": "Vantage Logic <noreply@vantagelogic.ca>",
             "to": to_email,
             "subject": "Verify your Vantage Logic account",
             "html": f"""
@@ -130,7 +130,7 @@ def send_reset_email(to_email: str, token: str):
     link = f"https://app.vantagelogic.ca/?reset={token}"
     try:
         resend.Emails.send({
-            "from": "Vantage Logic <onboarding@resend.dev>",
+            "from": "Vantage Logic <noreply@vantagelogic.ca>",
             "to": to_email,
             "subject": "Reset your Vantage Logic password",
             "html": f"""
