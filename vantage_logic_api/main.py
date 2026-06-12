@@ -10,6 +10,8 @@ import models
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import secrets
+from datetime import datetime, timedelta
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -94,6 +96,64 @@ def send_crew_welcome_email(to_email: str, company_name: str):
     except Exception as e:
         print(f"Email error: {e}")
 
+def send_verification_email(to_email: str, token: str):
+    link = f"https://app.vantagelogic.ca/?verify={token}"
+    try:
+        resend.Emails.send({
+            "from": "Vantage Logic <onboarding@resend.dev>",
+            "to": to_email,
+            "subject": "Verify your Vantage Logic account",
+            "html": f"""
+            <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
+                <div style="margin-bottom: 32px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #1a3d2b; margin: 0;">Vantage Logic</h1>
+                    <div style="height: 2px; background: #c8973a; margin-top: 6px; width: 60px;"></div>
+                </div>
+                <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 12px;">Confirm your email</h2>
+                <p style="font-size: 15px; color: #5c5c5c; line-height: 1.6; margin: 0 0 24px;">
+                    Click below to verify your email and activate your account.
+                </p>
+                <a href="{link}" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                    Verify Email
+                </a>
+                <p style="font-size: 13px; color: #9a9a9a; margin-top: 32px;">
+                    If you didn't create this account, you can ignore this email.
+                </p>
+            </div>
+            """
+        })
+    except Exception as e:
+        print(f"Email error: {e}")
+
+
+def send_reset_email(to_email: str, token: str):
+    link = f"https://app.vantagelogic.ca/?reset={token}"
+    try:
+        resend.Emails.send({
+            "from": "Vantage Logic <onboarding@resend.dev>",
+            "to": to_email,
+            "subject": "Reset your Vantage Logic password",
+            "html": f"""
+            <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
+                <div style="margin-bottom: 32px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #1a3d2b; margin: 0;">Vantage Logic</h1>
+                    <div style="height: 2px; background: #c8973a; margin-top: 6px; width: 60px;"></div>
+                </div>
+                <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin: 0 0 12px;">Reset your password</h2>
+                <p style="font-size: 15px; color: #5c5c5c; line-height: 1.6; margin: 0 0 24px;">
+                    Click below to set a new password. This link expires in 1 hour.
+                </p>
+                <a href="{link}" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                    Reset Password
+                </a>
+                <p style="font-size: 13px; color: #9a9a9a; margin-top: 32px;">
+                    If you didn't request this, you can ignore this email.
+                </p>
+            </div>
+            """
+        })
+    except Exception as e:
+        print(f"Email error: {e}")
 
 # =============================================
 # AUTH HELPERS
@@ -149,9 +209,11 @@ def root():
 @app.post("/login")
 @limiter.limit("10/minute")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == form_data.username.lower().strip()).first()
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Please verify your email before signing in. Check your inbox for the verification link.")
     token = create_access_token({"user_id": user.user_id, "company_id": user.company_id, "role": user.role})
     return {"access_token": token, "token_type": "bearer", "role": user.role, "company_id": user.company_id}
 
@@ -184,7 +246,7 @@ def signup(
     password: str,
     db: Session = Depends(get_db)
 ):
-    existing = db.query(models.User).filter(models.User.email == email.lower().strip()).first()
+    existing = db.query(models.User).filter(models.User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
 
@@ -196,15 +258,25 @@ def signup(
     db.commit()
     db.refresh(company)
 
+    verification_token = secrets.token_urlsafe(32)
+
     user = models.User(
         company_id=company.company_id,
-        email=email.lower().strip(),
+        email=email,
         hashed_password=hash_password(password),
-        role="owner"
+        role="owner",
+        is_verified=False,
+        verification_token=verification_token
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    send_verification_email(email, verification_token)
+    return {
+        "message": "Account created. Check your email to verify your account before signing in.",
+        "email": email
+    }
 
     token = create_access_token({
         "user_id": user.user_id,
@@ -221,6 +293,50 @@ def signup(
         "company_name": company.company_name,
         "trial_status": company.trial_status
     }
+
+@app.get("/verify-email")
+@limiter.limit("10/minute")
+def verify_email(request: Request, token: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.verification_token == token).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification link")
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+
+    company = db.query(models.Company).filter(models.Company.company_id == user.company_id).first()
+    if company:
+        send_welcome_email(user.email, company.company_name)
+
+    access_token = create_access_token({"user_id": user.user_id, "company_id": user.company_id, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer", "role": user.role, "company_id": user.company_id}
+
+
+@app.post("/forgot-password")
+@limiter.limit("5/minute")
+def forgot_password(request: Request, email: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user:
+        reset_token = secrets.token_urlsafe(32)
+        user.reset_token = reset_token
+        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        db.commit()
+        send_reset_email(email, reset_token)
+    # Always return success so we don't reveal whether an email exists
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@app.post("/reset-password")
+@limiter.limit("5/minute")
+def reset_password(request: Request, token: str, new_password: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.reset_token == token).first()
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired")
+    user.hashed_password = hash_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    return {"message": "Password updated. You can now sign in."}
 
 # =============================================
 # USERS
