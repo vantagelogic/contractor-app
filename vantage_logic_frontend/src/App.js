@@ -282,7 +282,7 @@ function OnboardingChecklist({ token, onDismiss }) {
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────
-function Login({ onLogin, onSignUp }) {
+function Login({ onLogin, onSignUp, onForgot }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -302,7 +302,8 @@ function Login({ onLogin, onSignUp }) {
       const data = await response.json();
       onLogin(data.access_token, data.role);
     } else {
-      setError("Incorrect email or password");
+      const data = await response.json().catch(() => ({}));
+      setError(data.detail || "Incorrect email or password");
     }
   }
 
@@ -342,7 +343,7 @@ function Login({ onLogin, onSignUp }) {
               Create an Account
             </button>
           </div>
-          <p style={{ textAlign: "center", fontSize: "11px", color: theme.textLight, marginTop: "18px" }}>Forgot your password? Contact your administrator.</p>
+          <div style={{ textAlign: "center", marginTop: "16px" }}><button onClick={onForgot} type="button" style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", fontWeight: "500", textDecoration: "underline" }}>Forgot your password?</button></div>
         </div>
       </div>
 
@@ -354,7 +355,7 @@ function Login({ onLogin, onSignUp }) {
 }
 
 // ─── SIGN UP ──────────────────────────────────────────────────
-function SignUp({ onLogin, onBack }) {
+function SignUp({ onCheckEmail, onBack }) {
   const [form, setForm] = useState({ company_name: "", email: "", password: "", confirm_password: "" });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -379,8 +380,7 @@ function SignUp({ onLogin, onBack }) {
     const response = await fetch(`${API}/signup?${params}`, { method: "POST" });
     setLoading(false);
     if (response.ok) {
-      const data = await response.json();
-      onLogin(data.access_token, data.role, true);
+      onCheckEmail(form.email);
     } else {
       const data = await response.json();
       setErrors({ general: data.detail || "Sign up failed. Please try again." });
@@ -430,6 +430,212 @@ function SignUp({ onLogin, onBack }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── AUTH SHELL (shared chrome for auth screens) ───────────────
+function AuthShell({ children, subtitle }) {
+  return (
+    <div style={{ minHeight: "100vh", background: `radial-gradient(120% 80% at 50% 0%, ${theme.primary} 0%, ${theme.primaryDark} 55%, #0a1c11 100%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "32px 20px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "-30%", left: "50%", transform: "translateX(-50%)", width: "600px", height: "600px", background: "radial-gradient(circle, rgba(200,151,58,0.10) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ marginBottom: "30px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", animation: "vlFadeUp 0.5s ease both" }}>
+        <VantageLogo size={58} dark={true} centered={true} />
+        {subtitle && <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.62)", marginTop: "20px", textAlign: "center", maxWidth: "330px", lineHeight: 1.55 }}>{subtitle}</p>}
+      </div>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", width: "100%", maxWidth: "404px", boxShadow: "0 24px 60px rgba(0,0,0,0.32), 0 8px 24px rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden", position: "relative", animation: "vlFadeUp 0.5s ease 0.08s both" }}>
+        <div style={{ height: "3px", background: `linear-gradient(90deg, ${theme.gold} 0%, #e0b75e 50%, ${theme.gold} 100%)` }} />
+        <div style={{ padding: "34px 32px" }}>{children}</div>
+      </div>
+      <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "28px", textAlign: "center", position: "relative" }}>© 2026 Vantage Logic</p>
+    </div>
+  );
+}
+
+// ─── CHECK YOUR EMAIL ───────────────────────────────────────────
+function CheckEmail({ email, onBack }) {
+  return (
+    <AuthShell>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <h1 style={{ fontSize: "21px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px", letterSpacing: "-0.5px" }}>Check your email</h1>
+        <p style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: 1.6, margin: "0 0 6px" }}>
+          We sent a verification link to
+        </p>
+        <p style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, margin: "0 0 20px" }}>{email}</p>
+        <p style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: 1.6, margin: "0 0 24px" }}>
+          Click the link in that email to verify your account and sign in. If you don't see it, check your spam folder.
+        </p>
+        <button onClick={onBack} type="button" style={{ width: "100%", fontSize: "14px", color: theme.accent, background: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "10px", padding: "12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "44px" }}>
+          Back to Sign In
+        </button>
+      </div>
+    </AuthShell>
+  );
+}
+
+// ─── VERIFYING EMAIL (handles ?verify=token) ───────────────────
+function VerifyEmail({ token, onVerified, onBack }) {
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    apiFetch(`${API}/verify-email?token=${encodeURIComponent(token)}`)
+      .then(async r => {
+        const data = await r.json();
+        if (r.ok) {
+          setStatus("success");
+          setTimeout(() => onVerified(data.access_token, data.role), 1100);
+        } else {
+          setStatus("error");
+        }
+      })
+      .catch(() => setStatus("error"));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <AuthShell>
+      <div style={{ textAlign: "center", padding: "10px 0" }}>
+        {status === "loading" && (
+          <>
+            <div style={{ marginBottom: "16px" }}><Spinner size={28} color={theme.primary} /></div>
+            <p style={{ fontSize: "14px", color: theme.textSecondary }}>Verifying your email...</p>
+          </>
+        )}
+        {status === "success" && (
+          <>
+            <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h1 style={{ fontSize: "21px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>Email verified</h1>
+            <p style={{ fontSize: "14px", color: theme.textSecondary }}>Signing you in...</p>
+          </>
+        )}
+        {status === "error" && (
+          <>
+            <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.dangerLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.danger} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </div>
+            <h1 style={{ fontSize: "21px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>Link expired or invalid</h1>
+            <p style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: 1.6, marginBottom: "20px" }}>This verification link is no longer valid. Try signing in, or sign up again.</p>
+            <button onClick={onBack} type="button" style={{ width: "100%", fontSize: "14px", color: theme.accent, background: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "10px", padding: "12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "44px" }}>
+              Back to Sign In
+            </button>
+          </>
+        )}
+      </div>
+    </AuthShell>
+  );
+}
+
+// ─── FORGOT PASSWORD ────────────────────────────────────────────
+function ForgotPassword({ onBack }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    const params = new URLSearchParams({ email });
+    await apiFetch(`${API}/forgot-password?${params}`, { method: "POST" });
+    setLoading(false);
+    setSent(true);
+  }
+
+  if (sent) {
+    return (
+      <AuthShell>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h1 style={{ fontSize: "21px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>Check your email</h1>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: 1.6, marginBottom: "24px" }}>
+            If an account exists for <strong>{email}</strong>, a reset link is on its way. It expires in 1 hour.
+          </p>
+          <button onClick={onBack} type="button" style={{ width: "100%", fontSize: "14px", color: theme.accent, background: "white", border: `1.5px solid ${theme.accent}`, borderRadius: "10px", padding: "12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "44px" }}>
+            Back to Sign In
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell>
+      <h1 style={{ fontSize: "23px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.5px" }}>Reset your password</h1>
+      <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 26px" }}>Enter your email and we'll send you a reset link.</p>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <label style={styles.label}>Email</label>
+        <input style={styles.input} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@yourcompany.com" />
+        <button style={{...styles.button, marginTop: "24px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
+          {loading ? <><Spinner /> Sending...</> : "Send Reset Link"}
+        </button>
+      </form>
+      <div style={{ textAlign: "center", marginTop: "20px" }}>
+        <button onClick={onBack} type="button" style={{ fontSize: "13px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", fontWeight: "500" }}>Back to Sign In</button>
+      </div>
+    </AuthShell>
+  );
+}
+
+// ─── RESET PASSWORD (handles ?reset=token) ─────────────────────
+function ResetPassword({ token, onDone }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!password || password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (password !== confirm) { setError("Passwords do not match"); return; }
+    setError("");
+    setLoading(true);
+    const params = new URLSearchParams({ token, new_password: password });
+    const res = await apiFetch(`${API}/reset-password?${params}`, { method: "POST" });
+    setLoading(false);
+    if (res.ok) {
+      setDone(true);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(data.detail || "This reset link is invalid or has expired.");
+    }
+  }
+
+  if (done) {
+    return (
+      <AuthShell>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h1 style={{ fontSize: "21px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>Password updated</h1>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "24px" }}>You can now sign in with your new password.</p>
+          <button onClick={onDone} type="button" style={{ ...styles.button, marginTop: 0, width: "100%" }}>Go to Sign In</button>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell>
+      <h1 style={{ fontSize: "23px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.5px" }}>Set a new password</h1>
+      <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 26px" }}>Choose a new password for your account.</p>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <label style={styles.label}>New Password</label>
+        <PasswordInput placeholder="At least 8 characters" value={password} onChange={e => { setPassword(e.target.value); setError(""); }} error={!!error} />
+        <label style={styles.label}>Confirm Password</label>
+        <PasswordInput placeholder="Confirm new password" value={confirm} onChange={e => { setConfirm(e.target.value); setError(""); }} error={!!error} />
+        {error && <p style={{...styles.errorMsg, marginTop: "10px"}}>{error}</p>}
+        <button style={{...styles.button, marginTop: "24px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
+          {loading ? <><Spinner /> Saving...</> : "Update Password"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -3171,6 +3377,26 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobile, setMobile] = useState(isMobile());
 
+  // Parse one-time auth URL params (?verify=... or ?reset=...) once on load
+  const [authScreen, setAuthScreen] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("verify")) return { type: "verify", token: params.get("verify") };
+      if (params.get("reset")) return { type: "reset", token: params.get("reset") };
+    } catch {}
+    return null;
+  });
+  const [checkEmailAddr, setCheckEmailAddr] = useState(null);
+
+  function clearAuthUrlParams() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("verify");
+      url.searchParams.delete("reset");
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  }
+
   // Keep the view valid for the current role (prevents owners landing on crew pages after refresh)
   useEffect(() => {
     const crewViews = ["home", "timesheet", "materials", "mileage", "crew_requests"];
@@ -3210,8 +3436,20 @@ export default function App() {
   }
 
   if (!token) {
-    if (showSignUp) return <><GlobalStyles /><SignUp onLogin={handleLogin} onBack={() => setShowSignUp(false)} /></>;
-    return <><GlobalStyles /><Login onLogin={handleLogin} onSignUp={() => setShowSignUp(true)} /></>;
+    if (authScreen?.type === "verify") {
+      return <><GlobalStyles /><VerifyEmail token={authScreen.token} onVerified={(t, r) => { clearAuthUrlParams(); setAuthScreen(null); handleLogin(t, r, true); }} onBack={() => { clearAuthUrlParams(); setAuthScreen(null); }} /></>;
+    }
+    if (authScreen?.type === "reset") {
+      return <><GlobalStyles /><ResetPassword token={authScreen.token} onDone={() => { clearAuthUrlParams(); setAuthScreen(null); }} /></>;
+    }
+    if (authScreen?.type === "forgot") {
+      return <><GlobalStyles /><ForgotPassword onBack={() => setAuthScreen(null)} /></>;
+    }
+    if (checkEmailAddr) {
+      return <><GlobalStyles /><CheckEmail email={checkEmailAddr} onBack={() => { setCheckEmailAddr(null); setShowSignUp(false); }} /></>;
+    }
+    if (showSignUp) return <><GlobalStyles /><SignUp onCheckEmail={(email) => setCheckEmailAddr(email)} onBack={() => setShowSignUp(false)} /></>;
+    return <><GlobalStyles /><Login onLogin={handleLogin} onSignUp={() => setShowSignUp(true)} onForgot={() => setAuthScreen({ type: "forgot" })} /></>;
   }
 
   const sidebarOffset = !mobile ? theme.sidebarWidth : "0px";
