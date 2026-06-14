@@ -2836,6 +2836,35 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
   );
 }
 
+// ─── SETUP SECTION ──────────────────────────────────────────────
+function SetupSection({ number, title, subtitle, complete, completeLabel, children }) {
+  const [open, setOpen] = useState(!complete);
+  return (
+    <div style={{ marginBottom: "14px", borderRadius: "12px", border: `1.5px solid ${complete ? theme.accent : theme.border}`, overflow: "hidden", backgroundColor: "white" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "14px", cursor: "pointer", backgroundColor: complete ? theme.accentLight : "white" }}>
+        <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: complete ? theme.accent : theme.primary, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", flexShrink: 0 }}>
+          {complete ? "✓" : number}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{title}</div>
+          {complete && completeLabel ? (
+            <div style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", marginTop: "2px" }}>{completeLabel}</div>
+          ) : (
+            <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px", lineHeight: 1.4 }}>{subtitle}</div>
+          )}
+        </div>
+        <span style={{ fontSize: "11px", color: theme.textLight, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+      </div>
+      {open && (
+        <div style={{ padding: "18px 20px", borderTop: `1px solid ${theme.border}` }}>
+          {!complete && <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px", lineHeight: 1.55 }}>{subtitle}</p>}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminScreen({ token, readonly = false }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
@@ -2938,42 +2967,10 @@ function AdminScreen({ token, readonly = false }) {
 
   return (
     <div style={{ ...styles.container, maxWidth: "880px" }}>
-      <h1 style={styles.title}>Admin</h1>
-      <p style={styles.subtitle}>Manage your team, jobs, and access</p>
+      <h1 style={styles.title}>Setup</h1>
+      <p style={styles.subtitle}>Get your team and jobs ready to go</p>
+
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
-
-      <CollapsibleSection title="Employees">
-        <p style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-          {editingEmp ? `Editing: ${editingEmp.first_name} ${editingEmp.last_name}` : "Add New Employee"}
-        </p>
-        {["first_name:First Name", "last_name:Last Name", "role:Role (e.g. Electrician)"].map(f => {
-          const [key, ph] = f.split(":");
-          return <input key={key} style={{...styles.input, marginBottom: "6px"}} placeholder={ph} value={empForm[key]} onChange={e => setEmpForm({...empForm, [key]: e.target.value})} />;
-        })}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-          <input style={styles.input} placeholder="Hourly Rate" type="number" value={empForm.hourly_rate} onChange={e => setEmpForm({...empForm, hourly_rate: e.target.value})} />
-          <input style={styles.input} placeholder="Burden Rate" type="number" value={empForm.burden_rate} onChange={e => setEmpForm({...empForm, burden_rate: e.target.value})} />
-        </div>
-        <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-          <button type="button" onClick={() => setEmpForm({...empForm, worker_type: "employee"})} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: `1.5px solid ${empForm.worker_type === "employee" ? theme.primary : theme.border}`, backgroundColor: empForm.worker_type === "employee" ? theme.accentLight : "white", color: empForm.worker_type === "employee" ? theme.primary : theme.textSecondary, fontWeight: "600", fontSize: "13px", cursor: "pointer", fontFamily: font.body }}>Employee</button>
-          <button type="button" onClick={() => setEmpForm({...empForm, worker_type: "contractor"})} style={{ flex: 1, padding: "11px", borderRadius: "8px", border: `1.5px solid ${empForm.worker_type === "contractor" ? theme.primary : theme.border}`, backgroundColor: empForm.worker_type === "contractor" ? theme.accentLight : "white", color: empForm.worker_type === "contractor" ? theme.primary : theme.textSecondary, fontWeight: "600", fontSize: "13px", cursor: "pointer", fontFamily: font.body }}>Contractor</button>
-        </div>
-        {editingEmp ? (
-          <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-            <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateEmployee}>Save Changes</button>
-            <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingEmp(null); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" }); }}>Cancel</button>
-          </div>
-        ) : <button style={styles.button} onClick={addEmployee}>Add Employee</button>}
-
-        {activeEmps.length > 0 && <div style={{ marginTop: "16px" }}>
-          <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
-          {activeEmps.map(emp => <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} sub={`${emp.worker_type === "contractor" ? "Contractor" : "Employee"} · ${emp.role || "No role"} · $${emp.hourly_rate || 0}/hr${emp.worker_type !== "contractor" ? ` · Burden $${emp.burden_rate || 0}/hr` : ""}`} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditEmp(emp)} />, <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => toggleEmployee(emp)} />]} />)}
-        </div>}
-        {inactiveEmps.length > 0 && <div style={{ marginTop: "8px" }}>
-          <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{showInactiveEmp ? "Hide" : "Show"} archived ({inactiveEmps.length})</button>
-          {showInactiveEmp && inactiveEmps.map(emp => <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => toggleEmployee(emp)} />]} />)}
-        </div>}
-      </CollapsibleSection>
 
       {showJobFlow ? (
         <JobSetupFlow
@@ -2984,86 +2981,200 @@ function AdminScreen({ token, readonly = false }) {
           onCancel={() => setShowJobFlow(false)}
         />
       ) : (
-      <CollapsibleSection title="Jobs">
-        {editingJob ? (
-          <>
-            <p style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-              Editing: {editingJob.job_name}
-            </p>
+        <>
+          {/* ── STEP 1: COST CODES ── */}
+          <SetupSection
+            number="1"
+            title="Cost Codes"
+            subtitle="How you break down work on a job (e.g. Framing, Electrical, Labour). You need at least one before adding jobs."
+            complete={costCodes.length > 0}
+            completeLabel={`${costCodes.length} code${costCodes.length !== 1 ? "s" : ""} set up`}
+          >
+            {editingCc ? (
+              <>
+                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingCc.code}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
+                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
+                </div>
+                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateCostCode}>Save</button>
+                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
+                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
+                </div>
+                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
+                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add Cost Code</button>
+              </>
+            )}
+            {costCodes.length > 0 && (
+              <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {costCodes.map(cc => (
+                  <Row key={cc.cost_code_id} main={`${cc.code} — ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />
+                ))}
+              </div>
+            )}
+          </SetupSection>
+
+          {/* ── STEP 2: EMPLOYEES ── */}
+          <SetupSection
+            number="2"
+            title="Your Crew"
+            subtitle="Add each person who works on your jobs. Set their hourly rate so labour costs are accurate."
+            complete={activeEmps.length > 0}
+            completeLabel={`${activeEmps.length} crew member${activeEmps.length !== 1 ? "s" : ""} added`}
+          >
+            {editingEmp ? (
+              <>
+                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingEmp.first_name} {editingEmp.last_name}</p>
+              </>
+            ) : (
+              <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "12px" }}>New crew member</p>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-              <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
-              <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
-              <input style={styles.input} placeholder="Contract Value" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
-              <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+              <input style={styles.input} placeholder="First Name" value={empForm.first_name} onChange={e => setEmpForm({...empForm, first_name: e.target.value})} />
+              <input style={styles.input} placeholder="Last Name" value={empForm.last_name} onChange={e => setEmpForm({...empForm, last_name: e.target.value})} />
+              <input style={styles.input} placeholder="Trade / Role" value={empForm.role} onChange={e => setEmpForm({...empForm, role: e.target.value})} />
+              <div />
+              <input style={styles.input} placeholder="Hourly Rate $" type="number" value={empForm.hourly_rate} onChange={e => setEmpForm({...empForm, hourly_rate: e.target.value})} />
+              <input style={styles.input} placeholder="Burden Rate $ (optional)" type="number" value={empForm.burden_rate} onChange={e => setEmpForm({...empForm, burden_rate: e.target.value})} />
             </div>
-            <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-              <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
-              <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+              {["employee", "contractor"].map(type => (
+                <button key={type} type="button" onClick={() => setEmpForm({...empForm, worker_type: type})} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: `1.5px solid ${empForm.worker_type === type ? theme.primary : theme.border}`, backgroundColor: empForm.worker_type === type ? theme.accentLight : "white", color: empForm.worker_type === type ? theme.primary : theme.textSecondary, fontWeight: "600", fontSize: "13px", cursor: "pointer", fontFamily: font.body, textTransform: "capitalize" }}>{type}</button>
+              ))}
             </div>
-          </>
-        ) : (
-          <button onClick={() => setShowJobFlow(true)} style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-            + Add New Job
-          </button>
-        )}
+            {editingEmp ? (
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateEmployee}>Save Changes</button>
+                <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingEmp(null); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" }); }}>Cancel</button>
+              </div>
+            ) : (
+              <button style={{...styles.button, marginTop: 0}} onClick={addEmployee}>Add to Crew</button>
+            )}
+            {activeEmps.length > 0 && (
+              <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {activeEmps.map(emp => (
+                  <Row key={emp.employee_id}
+                    main={`${emp.first_name} ${emp.last_name}`}
+                    sub={`${emp.worker_type === "contractor" ? "Contractor" : "Employee"} · ${emp.role || "No role"} · $${emp.hourly_rate || 0}/hr`}
+                    actions={[
+                      <Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditEmp(emp)} />,
+                      <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => toggleEmployee(emp)} />
+                    ]}
+                  />
+                ))}
+              </div>
+            )}
+            {inactiveEmps.length > 0 && (
+              <div style={{ marginTop: "8px" }}>
+                <button onClick={() => setShowInactiveEmp(!showInactiveEmp)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  {showInactiveEmp ? "Hide" : "Show"} archived ({inactiveEmps.length})
+                </button>
+                {showInactiveEmp && inactiveEmps.map(emp => (
+                  <Row key={emp.employee_id} main={`${emp.first_name} ${emp.last_name}`} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => toggleEmployee(emp)} />]} />
+                ))}
+              </div>
+            )}
+          </SetupSection>
 
-        {activeJobs.length > 0 && <div style={{ marginTop: "16px" }}>
-          <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
-          {activeJobs.map(job => <Row key={job.job_id} main={job.job_name} sub={`${job.city || ""}${job.contract_value ? ` · $${fmt(job.contract_value)}` : ""}${job.budgeted_hours ? ` · ${job.budgeted_hours}h` : ""}`} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJob(job)} />, <Btn key="c" label="Complete" bg="#e8f5ee" color={theme.accent} onClick={() => setJobStatus(job, "completed")} />, <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => setJobStatus(job, "inactive")} />]} />)}
-        </div>}
-        {completedJobs.length > 0 && <div style={{ marginTop: "8px" }}>
-          <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Completed</p>
-          {completedJobs.map(job => <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />)}
-        </div>}
-        {inactiveJobs.length > 0 && <div style={{ marginTop: "8px" }}>
-          <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>{showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})</button>
-          {showInactiveJob && inactiveJobs.map(job => <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />)}
-        </div>}
-      </CollapsibleSection>
+          {/* ── STEP 3: JOBS ── */}
+          <SetupSection
+            number="3"
+            title="Jobs"
+            subtitle="Add a job and assign your crew. This is what powers the dashboard and tracks your margin."
+            complete={activeJobs.length > 0}
+            completeLabel={`${activeJobs.length} active job${activeJobs.length !== 1 ? "s" : ""}`}
+          >
+            {editingJob ? (
+              <>
+                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingJob.job_name}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
+                  <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
+                  <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
+                  <input style={styles.input} placeholder="Contract Value $" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
+                  <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
+                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <button onClick={() => setShowJobFlow(true)} style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, width: "100%" }}>
+                + Add New Job
+              </button>
+            )}
+            {activeJobs.length > 0 && (
+              <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
+                {activeJobs.map(job => (
+                  <Row key={job.job_id}
+                    main={job.job_name}
+                    sub={`${job.city || ""}${job.contract_value ? ` · $${fmt(job.contract_value)}` : ""}${job.budgeted_hours ? ` · ${job.budgeted_hours}h budgeted` : ""}`}
+                    actions={[
+                      <Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJob(job)} />,
+                      <Btn key="c" label="Complete" bg="#e8f5ee" color={theme.accent} onClick={() => setJobStatus(job, "completed")} />,
+                      <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => setJobStatus(job, "inactive")} />
+                    ]}
+                  />
+                ))}
+              </div>
+            )}
+            {completedJobs.length > 0 && (
+              <div style={{ marginTop: "10px" }}>
+                <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Completed</p>
+                {completedJobs.map(job => (
+                  <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
+                ))}
+              </div>
+            )}
+            {inactiveJobs.length > 0 && (
+              <div style={{ marginTop: "8px" }}>
+                <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  {showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})
+                </button>
+                {showInactiveJob && inactiveJobs.map(job => (
+                  <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
+                ))}
+              </div>
+            )}
+          </SetupSection>
+
+          {/* ── STEP 4: CREW LOGINS ── */}
+          <SetupSection
+            number="4"
+            title="Give Crew App Access"
+            subtitle="Create a login for each crew member so they can log hours and materials from their phone."
+            complete={false}
+          >
+            <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "12px" }}>Pick the crew member, set their email and password, and send them the link to app.vantagelogic.ca.</p>
+            <select style={{...styles.input, marginBottom: "6px"}} value={loginForm.employee_id} onChange={e => setLoginForm({...loginForm, employee_id: e.target.value})}>
+              <option value="">Link to crew member (optional)</option>
+              {activeEmps.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+            </select>
+            <input style={{...styles.input, marginBottom: "6px"}} placeholder="Their email address" type="email" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
+            <div style={{ marginBottom: "6px" }}><PasswordInput placeholder="Set a password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} /></div>
+            <div style={{ marginBottom: "6px" }}><PasswordInput placeholder="Confirm password" value={loginForm.confirm_password} onChange={e => setLoginForm({...loginForm, confirm_password: e.target.value})} /></div>
+            <select style={{...styles.input, marginBottom: "10px"}} value={loginForm.employee_role} onChange={e => setLoginForm({...loginForm, employee_role: e.target.value})}>
+              <option value="crew">Crew (field logging only)</option>
+              <option value="admin">Admin (full access)</option>
+              <option value="owner">Owner (full access)</option>
+            </select>
+            {loginError && <p style={styles.errorMsg}>{loginError}</p>}
+            <button style={{...styles.button, backgroundColor: theme.accent, marginTop: 0}} onClick={createLogin}>Create Login</button>
+            <UserManagement token={token} activeEmps={activeEmps} refreshSignal={userRefresh} />
+          </SetupSection>
+        </>
       )}
-
-      <CollapsibleSection title="Cost Codes">
-        <p style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-          {editingCc ? `Editing: ${editingCc.code}` : "Add New Cost Code"}
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-          <input style={styles.input} placeholder="Code (e.g. 001)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
-          <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
-        </div>
-        <input style={{...styles.input, marginBottom: "6px"}} placeholder="Description" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
-        {editingCc ? (
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateCostCode}>Save Changes</button>
-            <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
-          </div>
-        ) : <button style={styles.button} onClick={addCostCode}>Add Cost Code</button>}
-        {costCodes.length > 0 && <div style={{ marginTop: "16px" }}>
-          <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Current</p>
-          {costCodes.map(cc => <Row key={cc.cost_code_id} main={`${cc.code} ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />)}
-        </div>}
-      </CollapsibleSection>
-
-      <CollapsibleSection title="Create Crew Login">
-        <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "12px" }}>Give a crew member access to the app</p>
-        <select style={{...styles.input, marginBottom: "6px"}} value={loginForm.employee_id} onChange={e => setLoginForm({...loginForm, employee_id: e.target.value})}>
-          <option value="">Link to employee (optional)</option>
-          {activeEmps.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
-        </select>
-        <input style={{...styles.input, marginBottom: "6px"}} placeholder="Email" type="email" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} />
-        <div style={{ marginBottom: "6px" }}><PasswordInput placeholder="Password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} /></div>
-        <div style={{ marginBottom: "6px" }}><PasswordInput placeholder="Confirm Password" value={loginForm.confirm_password} onChange={e => setLoginForm({...loginForm, confirm_password: e.target.value})} /></div>
-        {loginError && <p style={styles.errorMsg}>{loginError}</p>}
-        <select style={{...styles.input, marginBottom: "6px"}} value={loginForm.employee_role} onChange={e => setLoginForm({...loginForm, employee_role: e.target.value})}>
-          <option value="crew">Crew</option>
-          <option value="admin">Admin</option>
-          <option value="owner">Owner</option>
-        </select>
-        <button style={{...styles.button, backgroundColor: theme.accent}} onClick={createLogin}>Create Login</button>
-      </CollapsibleSection>
-
-      <UserManagement token={token} activeEmps={activeEmps} refreshSignal={userRefresh} />
     </div>
-  );
+  )
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────
