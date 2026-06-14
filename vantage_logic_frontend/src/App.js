@@ -679,7 +679,7 @@ function Row({ main, sub, actions }) {
 }
 
 // ─── CREW HOME (personalized stats) ───────────────────────────
-function CrewHome({ token, setView }) {
+function CrewHome({ token, setView, readonly = false }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -766,9 +766,9 @@ function CrewHome({ token, setView }) {
       <div style={{ marginBottom: "26px" }}>
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Quick Log</div>
         <div style={{ display: "flex", gap: "10px" }}>
-          <QuickActionBtn label="Hours" icon={IconHours} color={theme.primary} onClick={() => setView("timesheet")} />
-          <QuickActionBtn label="Materials" icon={IconMaterials} color={theme.gold} onClick={() => setView("materials")} />
-          <QuickActionBtn label="Mileage" icon={IconMileage} color={theme.accent} onClick={() => setView("mileage")} />
+          <QuickActionBtn label="Hours" icon={IconHours} color={readonly ? theme.textLight : theme.primary} onClick={() => !readonly && setView("timesheet")} />
+          <QuickActionBtn label="Materials" icon={IconMaterials} color={readonly ? theme.textLight : theme.gold} onClick={() => !readonly && setView("materials")} />
+          <QuickActionBtn label="Mileage" icon={IconMileage} color={readonly ? theme.textLight : theme.accent} onClick={() => !readonly && setView("mileage")} />
         </div>
       </div>
 
@@ -1015,7 +1015,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
 }
 
 // ─── TIMESHEET ────────────────────────────────────────────────
-function TimesheetForm({ token }) {
+function TimesheetForm({ token, readonly = false }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1200,7 +1200,7 @@ function TimesheetForm({ token }) {
 }
 
 // ─── MATERIALS ────────────────────────────────────────────────
-function MaterialsForm({ token }) {
+function MaterialsForm({ token, readonly = false }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: new Date().toISOString().split("T")[0], notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1395,7 +1395,7 @@ function MaterialsForm({ token }) {
 }
 
 // ─── MILEAGE ──────────────────────────────────────────────────
-function MileageForm({ token }) {
+function MileageForm({ token, readonly = false }) {
   const [formData, setFormData] = useState({ job_id: "", trip_date: new Date().toISOString().split("T")[0], km_driven: "", purpose: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1622,7 +1622,7 @@ function UserManagement({ token, activeEmps, refreshSignal }) {
 }
 
 // ─── INVENTORY SCREEN ─────────────────────────────────────────
-function InventoryScreen({ token }) {
+function InventoryScreen({ token, readonly = false }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -1900,7 +1900,7 @@ function RequestThread({ token, requestId, onActivity }) {
 }
 
 // ─── REQUESTS SCREEN (OWNER) ───────────────────────────────────
-function RequestsScreen({ token }) {
+function RequestsScreen({ token, readonly = false }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -2116,7 +2116,7 @@ function RequestsScreen({ token }) {
 }
 
 // ─── CREW REQUESTS SCREEN ──────────────────────────────────────
-function CrewRequestsScreen({ token }) {
+function CrewRequestsScreen({ token, readonly = false }) {
   const [requests, setRequests] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -2231,8 +2231,8 @@ function CrewRequestsScreen({ token }) {
       {message && <div style={{ backgroundColor: theme.accentLight, color: theme.accent, padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginBottom: "14px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
       {!showForm ? (
-        <button onClick={() => setShowForm(true)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: theme.accent, width: "100%" }}>
-          + New Request
+        <button onClick={() => !readonly && setShowForm(true)} disabled={readonly} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: readonly ? theme.textLight : theme.accent, width: "100%", opacity: readonly ? 0.6 : 1 }}>
+          {readonly ? "Submissions paused" : "+ New Request"}
         </button>
       ) : (
         <div style={{ ...styles.card, marginBottom: "20px" }}>
@@ -2362,7 +2362,7 @@ function CrewRequestsScreen({ token }) {
 }
 
 // ─── SCHEDULE SCREEN ──────────────────────────────────────────
-function ScheduleScreen({ token }) {
+function ScheduleScreen({ token, readonly = false }) {
   const [tab, setTab] = useState("view");
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -2378,6 +2378,7 @@ function ScheduleScreen({ token }) {
     employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: ""
   });
   const [errors, setErrors] = useState({});
+  const [jobFilter, setJobFilter] = useState("all");
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
@@ -2492,12 +2493,13 @@ function ScheduleScreen({ token }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  const filteredSchedules = jobFilter === "all" ? schedules : schedules.filter(s => String(s.job_id) === jobFilter);
   const byDate = {};
-  schedules.forEach(s => {
+  filteredSchedules.forEach(s => {
     if (!byDate[s.scheduled_date]) byDate[s.scheduled_date] = [];
     byDate[s.scheduled_date].push(s);
   });
-  const weekHours = schedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
+  const weekHours = filteredSchedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
 
   const tabBtnStyle = (id) => ({ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "14px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" });
 
@@ -2515,6 +2517,12 @@ function ScheduleScreen({ token }) {
 
       {tab === "view" && (
         <>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "14px", flexWrap: "wrap" }}>
+            <button onClick={() => setJobFilter("all")} style={{ padding: "5px 12px", borderRadius: "16px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>All Jobs</button>
+            {jobs.map(j => (
+              <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "5px 12px", borderRadius: "16px", border: `1.5px solid ${jobFilter === String(j.job_id) ? theme.primary : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? theme.primary : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>{j.job_name}</button>
+            ))}
+          </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", gap: "8px" }}>
             <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8249;</button>
             <div style={{ flex: 1, textAlign: "center" }}>
@@ -2675,7 +2683,160 @@ function ScheduleScreen({ token }) {
 }
 
 // ─── ADMIN ────────────────────────────────────────────────────
-function AdminScreen({ token }) {
+// ─── JOB SETUP FLOW ─────────────────────────────────────────────
+function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
+  const [step, setStep] = useState(1); // 1=job details, 2=assign crew, 3=done
+  const [jobForm, setJobForm] = useState({ job_name: "", city: "", contract_value: "", budgeted_hours: "" });
+  const [createdJob, setCreatedJob] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [schedAssignments, setSchedAssignments] = useState([{ employee_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8" }]);
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  async function createJob() {
+    if (!jobForm.job_name.trim()) { setError("Job name is required"); return; }
+    setSaving(true); setError("");
+    const res = await apiFetch(`${API}/jobs?${new URLSearchParams(jobForm)}`, { method: "POST", headers });
+    setSaving(false);
+    if (res.ok) {
+      const data = await res.json();
+      setCreatedJob(data);
+      setStep(2);
+    } else {
+      setError("Failed to create job. Please try again.");
+    }
+  }
+
+  async function assignCrew() {
+    setSaving(true);
+    const valid = schedAssignments.filter(a => a.employee_id && a.cost_code_id && a.scheduled_date);
+    for (const a of valid) {
+      await apiFetch(`${API}/schedules?${new URLSearchParams({ ...a, job_id: createdJob.job_id })}`, { method: "POST", headers });
+    }
+    setSaving(false);
+    setStep(3);
+  }
+
+  const steps = [
+    { n: 1, label: "Job Details" },
+    { n: 2, label: "Assign Crew" },
+    { n: 3, label: "Done" }
+  ];
+
+  return (
+    <div style={{ ...styles.card, maxWidth: "640px", padding: "28px" }}>
+      {/* Stepper */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: "28px" }}>
+        {steps.map((s, i) => (
+          <div key={s.n} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : 0 }}>
+            <div style={{ display: "flex", flex: "none", flexDirection: "column", alignItems: "center", gap: "5px" }}>
+              <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: step >= s.n ? theme.primary : theme.border, color: step >= s.n ? "white" : theme.textLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", transition: "all 0.2s" }}>
+                {step > s.n ? "✓" : s.n}
+              </div>
+              <span style={{ fontSize: "10px", fontWeight: "600", color: step >= s.n ? theme.primary : theme.textLight, textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>{s.label}</span>
+            </div>
+            {i < steps.length - 1 && <div style={{ flex: 1, height: "2px", backgroundColor: step > s.n ? theme.primary : theme.border, margin: "0 8px", marginBottom: "18px", transition: "background 0.2s" }} />}
+          </div>
+        ))}
+      </div>
+
+      {/* Step 1: Job Details */}
+      {step === 1 && (
+        <>
+          <h3 style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, margin: "0 0 18px", fontFamily: font.display }}>New Job</h3>
+          <label style={styles.label}>Job Name *</label>
+          <input style={styles.input} placeholder="e.g. Johnson Basement Reno" value={jobForm.job_name} onChange={e => { setJobForm({...jobForm, job_name: e.target.value}); setError(""); }} />
+          <label style={styles.label}>City</label>
+          <input style={styles.input} placeholder="e.g. Burnaby" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={styles.label}>Contract Value ($)</label>
+              <input style={styles.input} type="number" placeholder="0.00" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
+            </div>
+            <div>
+              <label style={styles.label}>Budgeted Hours</label>
+              <input style={styles.input} type="number" placeholder="0" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+            </div>
+          </div>
+          {error && <p style={styles.errorMsg}>{error}</p>}
+          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            <button onClick={createJob} disabled={saving} style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              {saving ? <><Spinner /> Creating...</> : "Create Job →"}
+            </button>
+            <button onClick={onCancel} style={{ ...styles.button, flex: 0, padding: "12px 18px", backgroundColor: "#888" }}>Cancel</button>
+          </div>
+        </>
+      )}
+
+      {/* Step 2: Assign Crew */}
+      {step === 2 && createdJob && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+            <div style={{ backgroundColor: theme.accentLight, color: theme.accent, padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "700" }}>✓ Created</div>
+            <h3 style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, margin: 0, fontFamily: font.display }}>{createdJob.job_name}</h3>
+          </div>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px" }}>Assign crew to this job. You can always add more from the Schedule screen later.</p>
+          {schedAssignments.map((a, idx) => (
+            <div key={idx} style={{ backgroundColor: theme.bg, borderRadius: "10px", padding: "14px", marginBottom: "10px", border: `1px solid ${theme.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary }}>Assignment {idx + 1}</span>
+                {schedAssignments.length > 1 && <button onClick={() => setSchedAssignments(prev => prev.filter((_, i) => i !== idx))} style={{ fontSize: "11px", color: theme.danger, background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>Remove</button>}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <div>
+                  <label style={styles.label}>Employee</label>
+                  <select style={styles.input} value={a.employee_id} onChange={e => setSchedAssignments(prev => prev.map((x, i) => i === idx ? {...x, employee_id: e.target.value} : x))}>
+                    <option value="">Select</option>
+                    {employees.filter(emp => emp.active).map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Cost Code</label>
+                  <select style={styles.input} value={a.cost_code_id} onChange={e => setSchedAssignments(prev => prev.map((x, i) => i === idx ? {...x, cost_code_id: e.target.value} : x))}>
+                    <option value="">Select</option>
+                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Date</label>
+                  <input style={styles.input} type="date" value={a.scheduled_date} onChange={e => setSchedAssignments(prev => prev.map((x, i) => i === idx ? {...x, scheduled_date: e.target.value} : x))} />
+                </div>
+                <div>
+                  <label style={styles.label}>Hours</label>
+                  <input style={styles.input} type="number" step="0.5" value={a.scheduled_hours} onChange={e => setSchedAssignments(prev => prev.map((x, i) => i === idx ? {...x, scheduled_hours: e.target.value} : x))} />
+                </div>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setSchedAssignments(prev => [...prev, { employee_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8" }])} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1.5px dashed ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "600", marginBottom: "14px" }}>
+            + Add Another
+          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={assignCrew} disabled={saving} style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              {saving ? <><Spinner /> Saving...</> : "Assign Crew →"}
+            </button>
+            <button onClick={() => setStep(3)} style={{ ...styles.button, flex: 0, padding: "12px 16px", backgroundColor: theme.textLight, fontSize: "12px" }}>Skip</button>
+          </div>
+        </>
+      )}
+
+      {/* Step 3: Done */}
+      {step === 3 && createdJob && (
+        <div style={{ textAlign: "center", padding: "16px 0" }}>
+          <div style={{ width: "60px", height: "60px", borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h3 style={{ fontSize: "18px", fontWeight: "700", color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>{createdJob.job_name} is ready</h3>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.6 }}>Job created and crew assigned. Your crew can start logging hours and you'll see it live on the dashboard.</p>
+          <button onClick={onDone} style={{ ...styles.button, width: "100%", marginTop: 0 }}>Done</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminScreen({ token, readonly = false }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -2687,6 +2848,7 @@ function AdminScreen({ token }) {
   const [editingCc, setEditingCc] = useState(null);
   const [showInactiveEmp, setShowInactiveEmp] = useState(false);
   const [showInactiveJob, setShowInactiveJob] = useState(false);
+  const [showJobFlow, setShowJobFlow] = useState(false);
   const [empForm, setEmpForm] = useState({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" });
   const [jobForm, setJobForm] = useState({ job_name: "", city: "", contract_value: "", budgeted_hours: "" });
   const [ccForm, setCcForm] = useState({ code: "", description: "", category: "" });
@@ -2819,22 +2981,37 @@ function AdminScreen({ token }) {
         </div>}
       </CollapsibleSection>
 
+      {showJobFlow ? (
+        <JobSetupFlow
+          token={token}
+          employees={employees}
+          costCodes={costCodes}
+          onDone={() => { setShowJobFlow(false); refresh(); }}
+          onCancel={() => setShowJobFlow(false)}
+        />
+      ) : (
       <CollapsibleSection title="Jobs">
-        <p style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-          {editingJob ? `Editing: ${editingJob.job_name}` : "Add New Job"}
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-          <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
-          <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
-          <input style={styles.input} placeholder="Contract Value" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
-          <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
-        </div>
         {editingJob ? (
-          <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-            <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
-            <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
-          </div>
-        ) : <button style={styles.button} onClick={addJob}>Add Job</button>}
+          <>
+            <p style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
+              Editing: {editingJob.job_name}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+              <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
+              <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
+              <input style={styles.input} placeholder="Contract Value" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
+              <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+            </div>
+            <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+              <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
+              <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
+            </div>
+          </>
+        ) : (
+          <button onClick={() => setShowJobFlow(true)} style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            + Add New Job
+          </button>
+        )}
 
         {activeJobs.length > 0 && <div style={{ marginTop: "16px" }}>
           <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
@@ -2849,6 +3026,7 @@ function AdminScreen({ token }) {
           {showInactiveJob && inactiveJobs.map(job => <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />)}
         </div>}
       </CollapsibleSection>
+      )}
 
       <CollapsibleSection title="Cost Codes">
         <p style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "10px", marginTop: 0, textTransform: "uppercase", letterSpacing: "0.6px" }}>
@@ -2895,7 +3073,51 @@ function AdminScreen({ token }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────
-function Dashboard({ token }) {
+
+// ─── EMP TIMESHEET GROUP (Dashboard) ───────────────────────────
+function EmpTimesheetGroup({ empName, empData }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginBottom: "8px", border: `1px solid ${theme.border}`, borderRadius: "10px", overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", cursor: "pointer", backgroundColor: open ? theme.green_tint || "#f4f8f6" : "white", transition: "background 0.15s" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ width: "30px", height: "30px", borderRadius: "50%", backgroundColor: theme.primary, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "12px", fontWeight: "700", flexShrink: 0 }}>
+            {empName.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+          </div>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "700", color: theme.textPrimary }}>{empName}</div>
+            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "1px" }}>{empData.entries.length} shift{empData.entries.length !== 1 ? "s" : ""}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ fontSize: "18px", fontWeight: "800", color: theme.primary, fontFamily: "inherit" }}>{empData.total.toFixed(1)}<span style={{ fontSize: "11px", fontWeight: "500", color: theme.textSecondary }}>h</span></div>
+          <span style={{ fontSize: "11px", color: theme.textLight }}>{open ? "▲" : "▼"}</span>
+        </div>
+      </div>
+      {open && (
+        <div style={{ borderTop: `1px solid ${theme.border}`, padding: "8px" }}>
+          {empData.entries.map((t, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", backgroundColor: i % 2 === 0 ? theme.bg : "white", borderRadius: "6px", marginBottom: "3px" }}>
+              <div>
+                <div style={{ fontSize: "12px", color: theme.textPrimary, fontWeight: "500" }}>{t.shift_date}</div>
+                {t.field_notes && t.field_notes.toLowerCase() !== "yes" && t.field_notes.toLowerCase() !== "no" && (
+                  <div style={{ fontSize: "11px", color: theme.textSecondary, fontStyle: "italic", marginTop: "2px" }}>{t.field_notes}</div>
+                )}
+              </div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked}h</div>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderTop: `1px solid ${theme.border}`, marginTop: "4px" }}>
+            <span style={{ fontSize: "11px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px" }}>Total</span>
+            <span style={{ fontSize: "14px", fontWeight: "800", color: theme.primary }}>{empData.total.toFixed(1)}h</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Dashboard({ token, readonly = false }) {
   const [jobs, setJobs] = useState([]);
   const [mileage, setMileage] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3155,24 +3377,21 @@ function Dashboard({ token }) {
                       ))
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
 
-                  <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginTop: "16px", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Timesheet Entries</div>
+                  <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginTop: "16px", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Hours by Person</div>
                   {det ? (
                     det.timesheets.length === 0
                       ? <p style={{ fontSize: "12px", color: theme.textLight, margin: 0 }}>No entries yet.</p>
-                      : det.timesheets.map((t, i) => (
-                        <div key={i} style={{ marginBottom: "6px", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{t.employee_name}</div>
-                              <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{t.shift_date}</div>
-                            </div>
-                            <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{t.hours_worked}h</div>
-                          </div>
-                          {t.field_notes && t.field_notes.toLowerCase() !== "yes" && t.field_notes.toLowerCase() !== "no" && (
-                            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "6px", paddingTop: "6px", borderTop: `1px solid ${theme.border}`, fontStyle: "italic" }}>{t.field_notes}</div>
-                          )}
-                        </div>
-                      ))
+                      : (() => {
+                          const byEmp = {};
+                          det.timesheets.forEach(t => {
+                            if (!byEmp[t.employee_name]) byEmp[t.employee_name] = { entries: [], total: 0 };
+                            byEmp[t.employee_name].entries.push(t);
+                            byEmp[t.employee_name].total += Number(t.hours_worked || 0);
+                          });
+                          return Object.entries(byEmp).map(([empName, empData]) => (
+                            <EmpTimesheetGroup key={empName} empName={empName} empData={empData} />
+                          ));
+                        })()
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
 
                   {det?.materials?.length > 0 && (
@@ -3546,10 +3765,6 @@ export default function App() {
     return <><GlobalStyles /><Login onLogin={handleLogin} onSignUp={() => setShowSignUp(true)} onForgot={() => setAuthScreen({ type: "forgot" })} /></>;
   }
 
-  if (token && role === "owner" && subStatus === "expired") {
-    return <><GlobalStyles /><Paywall token={token} onLogout={handleLogout} daysRemaining={0} /></>;
-  }
-
   const sidebarOffset = !mobile ? theme.sidebarWidth : "0px";
 
   return (
@@ -3562,14 +3777,29 @@ export default function App() {
             <button onClick={() => setPaymentMsg(null)} style={{ marginLeft: "16px", background: "none", border: "none", color: "white", cursor: "pointer", fontSize: "16px" }}>×</button>
           </div>
         )}
-        {subStatus === "trial" && daysRemaining !== null && daysRemaining <= 7 && role === "owner" && (
-          <div style={{ backgroundColor: theme.gold, color: "white", padding: "10px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600" }}>
-            {daysRemaining === 0 ? "Your trial ends today." : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in your trial.`}
+        {subStatus === "expired" && role === "owner" && (
+          <div style={{ backgroundColor: theme.danger, color: "white", padding: "11px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", flexWrap: "wrap" }}>
+            <span>Your trial has ended. Your data is safe — subscribe to resume full access.</span>
             <button onClick={async () => {
               const res = await apiFetch(`${API}/create-checkout-session`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
               const data = await res.json();
               if (data.checkout_url) window.location.href = data.checkout_url;
-            }} style={{ marginLeft: "12px", backgroundColor: "white", color: theme.gold, border: "none", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
+            }} style={{ backgroundColor: "white", color: theme.danger, border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
+          </div>
+        )}
+        {subStatus === "expired" && role === "crew" && (
+          <div style={{ backgroundColor: theme.danger, color: "white", padding: "11px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600" }}>
+            This account is currently on hold. Contact your administrator for support.
+          </div>
+        )}
+        {subStatus === "trial" && daysRemaining !== null && daysRemaining <= 7 && role === "owner" && (
+          <div style={{ backgroundColor: theme.gold, color: "white", padding: "10px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+            <span>{daysRemaining === 0 ? "Your trial ends today." : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in your trial.`}</span>
+            <button onClick={async () => {
+              const res = await apiFetch(`${API}/create-checkout-session`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+              const data = await res.json();
+              if (data.checkout_url) window.location.href = data.checkout_url;
+            }} style={{ backgroundColor: "white", color: theme.gold, border: "none", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
           </div>
         )}
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
@@ -3581,16 +3811,16 @@ export default function App() {
             </div>
           )}
           <div key={view} className="vl-screen">
-          {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} />}
-          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} />}
-          {role === "crew" && view === "materials" && <MaterialsForm token={token} />}
-          {role === "crew" && view === "mileage" && <MileageForm token={token} />}
-          {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} />}
-          {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} />}
-          {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} />}
-          {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} />}
-          {(role === "owner" || role === "admin") && view === "requests" && <RequestsScreen token={token} />}
-          {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} />}
+          {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "materials" && <MaterialsForm token={token} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "mileage" && <MileageForm token={token} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "requests" && <RequestsScreen token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} readonly={subStatus === "expired"} />}
           </div>
           {mobile && (
             <div style={{ padding: "8px 18px 100px", textAlign: "center" }}>
