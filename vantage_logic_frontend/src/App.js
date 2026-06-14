@@ -3507,6 +3507,19 @@ export default function App() {
       .then(r => r.json()).then(data => { setSubStatus(data.status); setDaysRemaining(data.days_remaining); }).catch(() => {});
   }
 
+  // Re-check subscription status on mount and when page regains focus
+  useEffect(() => {
+    if (!token) return;
+    function checkSub() {
+      apiFetch(`${API}/subscription-status`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(data => { setSubStatus(data.status); setDaysRemaining(data.days_remaining); }).catch(() => {});
+    }
+    checkSub();
+    window.addEventListener("focus", checkSub);
+    document.addEventListener("visibilitychange", checkSub);
+    return () => { window.removeEventListener("focus", checkSub); document.removeEventListener("visibilitychange", checkSub); };
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleLogout() {
     setStoredAuth(null, null);
     setToken(null);
