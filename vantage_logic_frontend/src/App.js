@@ -2884,12 +2884,6 @@ function AdminScreen({ token, readonly = false }) {
     else showMsg("Error updating employee.");
   }
 
-  async function addJob() {
-    const res = await apiFetch(`${API}/jobs?${new URLSearchParams(jobForm)}`, { method: "POST", headers });
-    if (res.ok) { showMsg("Job added."); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
-    else showMsg("Error adding job.");
-  }
-
   async function updateJob() {
     const res = await apiFetch(`${API}/jobs/${editingJob.job_id}?${new URLSearchParams(jobForm)}`, { method: "PATCH", headers });
     if (res.ok) { showMsg("Job updated."); setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
@@ -3446,73 +3440,6 @@ function Dashboard({ token, readonly = false }) {
 }
 
 
-// ─── PAYWALL ────────────────────────────────────────────────────
-function Paywall({ token, onLogout, daysRemaining }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const isExpired = daysRemaining === 0;
-
-  async function handleSubscribe() {
-    setLoading(true); setError("");
-    try {
-      const res = await apiFetch(`${API}/create-checkout-session`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (data.checkout_url) { window.location.href = data.checkout_url; }
-      else { setError("Something went wrong. Please try again or contact support."); }
-    } catch { setError("Something went wrong. Please try again or contact support."); }
-    setLoading(false);
-  }
-
-  return (
-    <div style={{ minHeight: "100vh", background: `radial-gradient(120% 80% at 50% 0%, ${theme.primary} 0%, ${theme.primaryDark} 55%, #0a1c11 100%)`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font.body, padding: "32px 20px" }}>
-      <div style={{ marginBottom: "28px" }}><VantageLogo size={52} dark={true} centered={true} /></div>
-      <div style={{ backgroundColor: "white", borderRadius: "16px", width: "100%", maxWidth: "420px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.32)" }}>
-        <div style={{ height: "3px", background: `linear-gradient(90deg, ${theme.gold} 0%, #e0b75e 50%, ${theme.gold} 100%)` }} />
-        <div style={{ padding: "36px 32px" }}>
-          <div style={{ textAlign: "center", marginBottom: "28px" }}>
-            {isExpired ? (
-              <>
-                <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.dangerLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.danger} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                </div>
-                <h1 style={{ fontSize: "22px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>Your trial has ended</h1>
-                <p style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: 1.6, margin: 0 }}>Subscribe to keep access to your jobs, crew, and dashboard. Your data is safe and waiting.</p>
-              </>
-            ) : (
-              <>
-                <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: theme.goldLight, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                </div>
-                <h1 style={{ fontSize: "22px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>{daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left in your trial</h1>
-                <p style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: 1.6, margin: 0 }}>Subscribe now to keep uninterrupted access when your trial ends.</p>
-              </>
-            )}
-          </div>
-          <div style={{ backgroundColor: theme.bg, borderRadius: "12px", padding: "20px", marginBottom: "24px", border: `1px solid ${theme.border}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
-              <span style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>Vantage Logic</span>
-              <div>
-                <span style={{ fontSize: "24px", fontWeight: "800", color: theme.primary, fontFamily: font.display }}>$99.99</span>
-                <span style={{ fontSize: "12px", color: theme.textSecondary }}>/month</span>
-              </div>
-            </div>
-            <p style={{ fontSize: "12px", color: theme.textSecondary, margin: "10px 0 0", lineHeight: 1.6 }}>Full access for your entire team. Job costing, crew tracking, inventory, requests, scheduling, and profit visibility on every active job.</p>
-          </div>
-          {error && <p style={{ fontSize: "13px", color: theme.danger, backgroundColor: theme.dangerLight, padding: "10px 14px", borderRadius: "8px", marginBottom: "16px", textAlign: "center" }}>{error}</p>}
-          <button onClick={handleSubscribe} disabled={loading} style={{ width: "100%", padding: "15px", backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: font.body, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: loading ? 0.8 : 1, minHeight: "52px" }}>
-            {loading ? <><Spinner /> Processing...</> : "Subscribe Now"}
-          </button>
-          <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "14px", lineHeight: 1.5 }}>Secure payment via Stripe. Cancel anytime. Your data is always yours.</p>
-          <div style={{ borderTop: `1px solid ${theme.border}`, marginTop: "20px", paddingTop: "16px", textAlign: "center" }}>
-            <button onClick={onLogout} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>Sign out</button>
-            <span style={{ color: theme.border, margin: "0 8px" }}>·</span>
-            <a href="mailto:vantagelogic@outlook.com" style={{ fontSize: "12px", color: theme.textSecondary }}>Contact support</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── GLOBAL STYLES INJECTION ──────────────────────────────────
 function GlobalStyles() {
