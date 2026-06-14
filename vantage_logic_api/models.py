@@ -12,6 +12,9 @@ class Company(Base):
     trial_start_date = Column(DateTime, server_default=func.now())
     trial_status = Column(String(50), default="trial")
     created_at = Column(DateTime, server_default=func.now())
+    stripe_customer_id = Column(String, nullable=True)
+    subscription_status = Column(String, default="trial")
+    trial_end_date = Column(DateTime, nullable=True)
 
 class User(Base):
     __tablename__ = "users"
