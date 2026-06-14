@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import secrets
 from datetime import datetime, timedelta
+import os
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "")
@@ -21,7 +22,6 @@ limiter = Limiter(key_func=get_remote_address)
 
 models.Base.metadata.create_all(bind=engine)
 
-import os
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key")
