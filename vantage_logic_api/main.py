@@ -12,6 +12,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import secrets
 from datetime import datetime, timedelta
+import stripe
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -215,7 +219,16 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Please verify your email before signing in. Check your inbox for the verification link.")
     token = create_access_token({"user_id": user.user_id, "company_id": user.company_id, "role": user.role})
-    return {"access_token": token, "token_type": "bearer", "role": user.role, "company_id": user.company_id}
+    company = db.query(models.Company).filter(models.Company.company_id == user.company_id).first()
+    sub_status = "active"
+    if company:
+        if company.subscription_status == "active":
+            sub_status = "active"
+        elif company.trial_end_date and datetime.utcnow() < company.trial_end_date:
+            sub_status = "trial"
+        else:
+            sub_status = "expired"
+    return {"access_token": token, "token_type": "bearer", "role": user.role, "company_id": user.company_id, "subscription_status": sub_status}
 
 # =============================================
 # COMPANIES
@@ -337,6 +350,77 @@ def reset_password(request: Request, token: str, new_password: str, db: Session 
     user.reset_token_expires = None
     db.commit()
     return {"message": "Password updated. You can now sign in."}
+
+@app.post("/create-checkout-session")
+def create_checkout_session(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    try:
+        if not company.stripe_customer_id:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=company.company_name,
+                metadata={"company_id": company.company_id}
+            )
+            company.stripe_customer_id = customer.id
+            db.commit()
+        session = stripe.checkout.Session.create(
+            customer=company.stripe_customer_id,
+            payment_method_types=["card"],
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            mode="subscription",
+            success_url="https://app.vantagelogic.ca/?payment=success",
+            cancel_url="https://app.vantagelogic.ca/?payment=cancelled",
+        )
+        return {"checkout_url": session.url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/stripe-webhook")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    if event["type"] == "checkout.session.completed":
+        customer_id = event["data"]["object"].get("customer")
+        if customer_id:
+            company = db.query(models.Company).filter(models.Company.stripe_customer_id == customer_id).first()
+            if company:
+                company.subscription_status = "active"
+                db.commit()
+    elif event["type"] == "customer.subscription.deleted":
+        customer_id = event["data"]["object"].get("customer")
+        if customer_id:
+            company = db.query(models.Company).filter(models.Company.stripe_customer_id == customer_id).first()
+            if company:
+                company.subscription_status = "expired"
+                db.commit()
+    return {"received": True}
+
+
+@app.get("/subscription-status")
+def get_subscription_status(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
+    if not company:
+        return {"status": "active", "days_remaining": None}
+    if company.subscription_status == "active":
+        return {"status": "active", "days_remaining": None}
+    if company.trial_end_date:
+        remaining = (company.trial_end_date - datetime.utcnow()).days
+        if remaining > 0:
+            return {"status": "trial", "days_remaining": remaining}
+    return {"status": "expired", "days_remaining": 0}
 
 # =============================================
 # USERS
