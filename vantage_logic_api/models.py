@@ -15,6 +15,7 @@ class Company(Base):
     stripe_customer_id = Column(String, nullable=True)
     subscription_status = Column(String, default="trial")
     trial_end_date = Column(DateTime, nullable=True)
+    subscription_tier = Column(String, nullable=True)
 
 class User(Base):
     __tablename__ = "users"

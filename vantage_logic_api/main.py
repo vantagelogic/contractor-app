@@ -15,7 +15,21 @@ from datetime import datetime, timedelta
 import os
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
-STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "")
+STRIPE_PRICE_GROWTH = os.environ.get("STRIPE_PRICE_GROWTH", "")
+STRIPE_PRICE_PRO = os.environ.get("STRIPE_PRICE_PRO", "")
+
+TIER_LIMITS = {
+    "starter": 5,
+    "growth": 15,
+    "pro": 30,
+}
+
+PRICE_TO_TIER = {
+    STRIPE_PRICE_STARTER: "starter",
+    STRIPE_PRICE_GROWTH: "growth",
+    STRIPE_PRICE_PRO: "pro",
+}
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 limiter = Limiter(key_func=get_remote_address)
@@ -353,12 +367,17 @@ def reset_password(request: Request, token: str, new_password: str, db: Session 
 
 @app.post("/create-checkout-session")
 def create_checkout_session(
+    price_id: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Use provided price_id or default to growth tier
+    selected_price = price_id if price_id in PRICE_TO_TIER else STRIPE_PRICE_GROWTH
+    
     try:
         if not company.stripe_customer_id:
             customer = stripe.Customer.create(
@@ -371,7 +390,7 @@ def create_checkout_session(
         session = stripe.checkout.Session.create(
             customer=company.stripe_customer_id,
             payment_method_types=["card"],
-            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            line_items=[{"price": selected_price, "quantity": 1}],
             mode="subscription",
             success_url="https://app.vantagelogic.ca/?payment=success",
             cancel_url="https://app.vantagelogic.ca/?payment=cancelled",
@@ -390,11 +409,15 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
     if event["type"] == "checkout.session.completed":
-        customer_id = event["data"]["object"].get("customer")
+        session_obj = event["data"]["object"]
+        customer_id = session_obj.get("customer")
         if customer_id:
             company = db.query(models.Company).filter(models.Company.stripe_customer_id == customer_id).first()
             if company:
                 company.subscription_status = "active"
+                subscription = stripe.Subscription.retrieve(session_obj.get("subscription"))
+                price_id = subscription["items"]["data"][0]["price"]["id"]
+                company.subscription_tier = PRICE_TO_TIER.get(price_id, "growth")
                 db.commit()
     elif event["type"] == "customer.subscription.deleted":
         customer_id = event["data"]["object"].get("customer")
@@ -413,14 +436,23 @@ def get_subscription_status(
 ):
     company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
     if not company:
-        return {"status": "active", "days_remaining": None}
+        return {"status": "active", "days_remaining": None, "tier": None, "crew_count": 0, "tier_limit": None}
+    
+    crew_count = db.query(models.Employee).filter(
+        models.Employee.company_id == current_user.company_id,
+        models.Employee.active == True
+    ).count()
+
+    tier = company.subscription_tier
+    tier_limit = TIER_LIMITS.get(tier) if tier else None
+
     if company.subscription_status == "active":
-        return {"status": "active", "days_remaining": None}
+        return {"status": "active", "days_remaining": None, "tier": tier, "crew_count": crew_count, "tier_limit": tier_limit}
     if company.trial_end_date:
         remaining = (company.trial_end_date - datetime.utcnow()).days
         if remaining > 0:
-            return {"status": "trial", "days_remaining": remaining}
-    return {"status": "expired", "days_remaining": 0}
+            return {"status": "trial", "days_remaining": remaining, "tier": tier, "crew_count": crew_count, "tier_limit": tier_limit}
+    return {"status": "expired", "days_remaining": 0, "tier": tier, "crew_count": crew_count, "tier_limit": tier_limit}
 
 # =============================================
 # USERS

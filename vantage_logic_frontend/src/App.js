@@ -2885,7 +2885,7 @@ function SetupSection({ number, title, subtitle, complete, completeLabel, childr
   );
 }
 
-function AdminScreen({ token, readonly = false }) {
+function AdminScreen({ token, readonly = false, subTier = null, crewCount = null, tierLimit = null, onPlanPicker = null, onSubRefresh = null }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -2922,9 +2922,18 @@ function AdminScreen({ token, readonly = false }) {
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
   async function addEmployee() {
+    // Check tier limit before adding
+    if (tierLimit !== null && crewCount !== null && crewCount >= tierLimit) {
+      if (onPlanPicker) onPlanPicker();
+      return;
+    }
     const res = await apiFetch(`${API}/employees?${new URLSearchParams(empForm)}`, { method: "POST", headers });
-    if (res.ok) { showMsg("Employee added."); setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" }); refresh(); }
-    else showMsg("Error adding employee.");
+    if (res.ok) {
+      showMsg("Employee added.");
+      setEmpForm({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" });
+      refresh();
+      if (onSubRefresh) onSubRefresh();
+    } else showMsg("Error adding employee.");
   }
 
   async function updateEmployee() {
@@ -3091,6 +3100,16 @@ function AdminScreen({ token, readonly = false }) {
               </>
             ) : (
               <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "12px" }}>New crew member</p>
+            )}
+            {!editingEmp && subTier && crewCount !== null && tierLimit !== null && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: crewCount >= tierLimit ? theme.dangerLight : theme.accentLight, border: `1px solid ${crewCount >= tierLimit ? theme.danger : theme.accent}`, borderRadius: "8px", padding: "9px 14px", marginBottom: "12px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "600", color: crewCount >= tierLimit ? theme.danger : theme.accent }}>
+                  {crewCount >= tierLimit ? `Plan limit reached (${crewCount}/${tierLimit} crew)` : `${crewCount} of ${tierLimit} crew slots used`}
+                </span>
+                {crewCount >= tierLimit && onPlanPicker && (
+                  <button onClick={onPlanPicker} style={{ fontSize: "11px", fontWeight: "700", color: "white", backgroundColor: theme.danger, border: "none", borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontFamily: font.body }}>Upgrade plan</button>
+                )}
+              </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
               <input style={styles.input} placeholder="First Name" value={empForm.first_name} onChange={e => setEmpForm({...empForm, first_name: e.target.value})} />
@@ -3613,6 +3632,92 @@ function Dashboard({ token, readonly = false }) {
 
 
 
+// ─── PLAN PICKER ─────────────────────────────────────────────────
+const TIERS = [
+  { key: "starter", label: "Starter", crew: "1-5 crew", price: "$49", priceId: "price_1Tic7A8kfViKkfYDhUfTkCmq", limit: 5, color: theme.accent },
+  { key: "growth", label: "Growth", crew: "6-15 crew", price: "$99", priceId: "price_1TiKLQ8kfViKkfYD51QPtE6f", limit: 15, color: theme.primary },
+  { key: "pro", label: "Pro", crew: "16-30 crew", price: "$179", priceId: "price_1Tic8s8kfViKkfYDlSGRdOM2", limit: 30, color: theme.gold },
+];
+
+function PlanPicker({ token, currentTier, crewCount, onClose, onSuccess }) {
+  const [loading, setLoading] = useState(null);
+  const [error, setError] = useState("");
+
+  async function selectPlan(tier) {
+    setLoading(tier.key); setError("");
+    try {
+      const params = new URLSearchParams({ price_id: tier.priceId });
+      const res = await apiFetch(`${API}/create-checkout-session?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.checkout_url) { window.location.href = data.checkout_url; }
+      else { setError(data.detail || "Something went wrong. Please try again."); setLoading(null); }
+    } catch { setError("Something went wrong. Please try again."); setLoading(null); }
+  }
+
+  const activeCrew = crewCount || 0;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
+      <div style={{ backgroundColor: "white", borderRadius: "16px", width: "100%", maxWidth: "480px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
+        <div style={{ height: "3px", background: `linear-gradient(90deg, ${theme.gold} 0%, #e0b75e 50%, ${theme.gold} 100%)` }} />
+        <div style={{ padding: "28px 28px 24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+            <div>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: 0 }}>Choose your plan</h2>
+              <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: "4px" }}>
+                You currently have <strong style={{ color: theme.primary }}>{activeCrew} active crew member{activeCrew !== 1 ? "s" : ""}</strong>. Pick the plan that fits.
+              </p>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", color: theme.textLight, cursor: "pointer", padding: "0 0 0 10px", lineHeight: 1 }}>×</button>
+          </div>
+
+          {error && <div style={{ backgroundColor: theme.dangerLight, color: theme.danger, padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginBottom: "14px" }}>{error}</div>}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "16px" }}>
+            {TIERS.map(tier => {
+              const isCurrent = currentTier === tier.key;
+              const tooSmall = activeCrew > tier.limit;
+              const recommended = activeCrew <= tier.limit && (TIERS.findIndex(t => t.key === tier.key) === TIERS.findIndex(t => activeCrew <= t.limit));
+              return (
+                <div key={tier.key} style={{ border: `2px solid ${isCurrent ? tier.color : recommended ? tier.color : theme.border}`, borderRadius: "12px", padding: "16px 18px", opacity: tooSmall ? 0.45 : 1, backgroundColor: isCurrent ? `${tier.color}11` : "white", position: "relative" }}>
+                  {recommended && !isCurrent && (
+                    <div style={{ position: "absolute", top: "-10px", right: "14px", backgroundColor: tier.color, color: "white", fontSize: "10px", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Recommended</div>
+                  )}
+                  {isCurrent && (
+                    <div style={{ position: "absolute", top: "-10px", right: "14px", backgroundColor: tier.color, color: "white", fontSize: "10px", fontWeight: "700", padding: "2px 10px", borderRadius: "20px", letterSpacing: "0.5px", textTransform: "uppercase" }}>Current Plan</div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{tier.label}</div>
+                      <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{tier.crew}</div>
+                    </div>
+                    <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div>
+                        <span style={{ fontSize: "22px", fontWeight: "800", color: theme.primary, fontFamily: font.display }}>{tier.price}</span>
+                        <span style={{ fontSize: "11px", color: theme.textSecondary }}>/mo</span>
+                      </div>
+                      {!isCurrent && !tooSmall && (
+                        <button onClick={() => selectPlan(tier)} disabled={!!loading} style={{ padding: "9px 18px", borderRadius: "8px", border: "none", backgroundColor: tier.color, color: "white", fontSize: "13px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: font.body, display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", minHeight: "40px" }}>
+                          {loading === tier.key ? <><Spinner /> Loading...</> : "Select"}
+                        </button>
+                      )}
+                      {tooSmall && <span style={{ fontSize: "11px", color: theme.danger, fontWeight: "600" }}>Too small for your crew</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "18px", lineHeight: 1.5 }}>
+            Secure payment via Stripe. Cancel anytime. Need help? <a href="mailto:vantagelogic@outlook.com" style={{ color: theme.primary }}>Contact us</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── GLOBAL STYLES INJECTION ──────────────────────────────────
 function GlobalStyles() {
   useEffect(() => {
@@ -3776,6 +3881,10 @@ export default function App() {
   const [checkEmailAddr, setCheckEmailAddr] = useState(null);
   const [subStatus, setSubStatus] = useState(null);
   const [daysRemaining, setDaysRemaining] = useState(null);
+  const [subTier, setSubTier] = useState(null);
+  const [crewCount, setCrewCount] = useState(null);
+  const [tierLimit, setTierLimit] = useState(null);
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [paymentMsg, setPaymentMsg] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -3822,7 +3931,13 @@ export default function App() {
     setView(userRole === "crew" ? "home" : "schedule");
     if (newUser) setShowOnboarding(true);
     apiFetch(`${API}/subscription-status`, { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(r => r.json()).then(data => { setSubStatus(data.status); setDaysRemaining(data.days_remaining); }).catch(() => {});
+      .then(r => r.json()).then(data => {
+        setSubStatus(data.status);
+        setDaysRemaining(data.days_remaining);
+        setSubTier(data.tier || null);
+        setCrewCount(data.crew_count ?? null);
+        setTierLimit(data.tier_limit ?? null);
+      }).catch(() => {});
   }
 
   // Re-check subscription status on mount and when page regains focus
@@ -3830,7 +3945,13 @@ export default function App() {
     if (!token) return;
     function checkSub() {
       apiFetch(`${API}/subscription-status`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(data => { setSubStatus(data.status); setDaysRemaining(data.days_remaining); }).catch(() => {});
+        .then(r => r.json()).then(data => {
+          setSubStatus(data.status);
+          setDaysRemaining(data.days_remaining);
+          setSubTier(data.tier || null);
+          setCrewCount(data.crew_count ?? null);
+          setTierLimit(data.tier_limit ?? null);
+        }).catch(() => {});
     }
     checkSub();
     window.addEventListener("focus", checkSub);
@@ -3879,11 +4000,7 @@ export default function App() {
         {subStatus === "expired" && role === "owner" && (
           <div style={{ backgroundColor: theme.danger, color: "white", padding: "11px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", flexWrap: "wrap" }}>
             <span>Your trial has ended. Your data is safe, subscribe to resume full access.</span>
-            <button onClick={async () => {
-              const res = await apiFetch(`${API}/create-checkout-session`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-              const data = await res.json();
-              if (data.checkout_url) window.location.href = data.checkout_url;
-            }} style={{ backgroundColor: "white", color: theme.danger, border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
+            <button onClick={() => setShowPlanPicker(true)} style={{ backgroundColor: "white", color: theme.danger, border: "none", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
           </div>
         )}
         {subStatus === "expired" && role === "crew" && (
@@ -3894,14 +4011,11 @@ export default function App() {
         {subStatus === "trial" && daysRemaining !== null && daysRemaining <= 7 && role === "owner" && (
           <div style={{ backgroundColor: theme.gold, color: "white", padding: "10px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
             <span>{daysRemaining === 0 ? "Your trial ends today." : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} left in your trial.`}</span>
-            <button onClick={async () => {
-              const res = await apiFetch(`${API}/create-checkout-session`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-              const data = await res.json();
-              if (data.checkout_url) window.location.href = data.checkout_url;
-            }} style={{ backgroundColor: "white", color: theme.gold, border: "none", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
+            <button onClick={() => setShowPlanPicker(true)} style={{ backgroundColor: "white", color: theme.gold, border: "none", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
           </div>
         )}
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
+        {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
         <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
           {showOnboarding && (role === "owner" || role === "admin") && view === "schedule" && (
@@ -3919,7 +4033,7 @@ export default function App() {
           {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "requests" && <RequestsScreen token={token} readonly={subStatus === "expired"} />}
-          {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} readonly={subStatus === "expired"} subTier={subTier} crewCount={crewCount} tierLimit={tierLimit} onPlanPicker={() => setShowPlanPicker(true)} onSubRefresh={() => { apiFetch(`${API}/subscription-status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(data => { setSubStatus(data.status); setSubTier(data.tier); setCrewCount(data.crew_count); setTierLimit(data.tier_limit); }); }} />}
           </div>
           {mobile && (
             <div style={{ padding: "8px 18px 100px", textAlign: "center" }}>
