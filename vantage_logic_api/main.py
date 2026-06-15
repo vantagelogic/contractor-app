@@ -784,6 +784,35 @@ def update_cost_code(
     db.refresh(cc)
     return cc
 
+@app.delete("/cost-codes/{cost_code_id}")
+def delete_cost_code(
+    cost_code_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    cc = db.query(models.CostCode).filter(
+        models.CostCode.cost_code_id == cost_code_id,
+        models.CostCode.company_id == current_user.company_id
+    ).first()
+    if not cc:
+        raise HTTPException(status_code=404, detail="Cost code not found")
+
+    # Refuse to delete if the cost code is still in use anywhere
+    used_in_timesheets = db.query(models.Timesheet).filter(models.Timesheet.cost_code_id == cost_code_id).first()
+    used_in_materials = db.query(models.Material).filter(models.Material.cost_code_id == cost_code_id).first()
+    used_in_schedules = db.query(models.Schedule).filter(models.Schedule.cost_code_id == cost_code_id).first()
+    used_in_budgets = db.query(models.JobBudget).filter(models.JobBudget.cost_code_id == cost_code_id).first()
+
+    if used_in_timesheets or used_in_materials or used_in_schedules or used_in_budgets:
+        raise HTTPException(
+            status_code=400,
+            detail="This cost code is in use on timesheets, materials, or schedules and cannot be deleted. You can edit it instead."
+        )
+
+    db.delete(cc)
+    db.commit()
+    return {"deleted": True}
+
 # =============================================
 # TIMESHEETS
 # =============================================

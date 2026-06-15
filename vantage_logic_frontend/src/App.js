@@ -359,6 +359,7 @@ function SignUp({ onCheckEmail, onBack }) {
   const [form, setForm] = useState({ company_name: "", email: "", password: "", confirm_password: "" });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   function validate() {
     const e = {};
@@ -368,6 +369,7 @@ function SignUp({ onCheckEmail, onBack }) {
     if (!form.password) e.password = "Password is required";
     else if (form.password.length < 8) e.password = "Password must be at least 8 characters";
     if (form.password !== form.confirm_password) e.confirm_password = "Passwords do not match";
+    if (!termsAgreed) e.terms = "You must agree to the Terms of Service to continue";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -419,7 +421,24 @@ function SignUp({ onCheckEmail, onBack }) {
 
           {errors.general && <p style={{...styles.errorMsg, marginTop: "10px"}}>{errors.general}</p>}
 
-          <button style={{...styles.button, marginTop: "24px", backgroundColor: theme.accent, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "18px", padding: "14px", backgroundColor: theme.bg, borderRadius: "10px", border: errors.terms ? `1.5px solid ${theme.danger}` : `1px solid ${theme.border}` }}>
+            <input
+              type="checkbox"
+              id="terms-agree"
+              checked={termsAgreed}
+              onChange={e => { setTermsAgreed(e.target.checked); setErrors(prev => ({...prev, terms: ""})); }}
+              style={{ marginTop: "2px", width: "16px", height: "16px", flexShrink: 0, accentColor: theme.primary, cursor: "pointer" }}
+            />
+            <label htmlFor="terms-agree" style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.55, cursor: "pointer" }}>
+              I have read and agree to the{" "}
+              <a href="https://vantagelogic.ca/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, fontWeight: "600", textDecoration: "underline" }}>Terms of Service</a>
+              {" "}and{" "}
+              <a href="https://vantagelogic.ca/privacy" target="_blank" rel="noopener noreferrer" style={{ color: theme.primary, fontWeight: "600", textDecoration: "underline" }}>Privacy Policy</a>.
+            </label>
+          </div>
+          {errors.terms && <p style={styles.errorMsg}>{errors.terms}</p>}
+
+          <button style={{...styles.button, marginTop: "16px", backgroundColor: theme.accent, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
             {loading ? <><Spinner /> Creating account...</> : "Create Free Account"}
           </button>
         </form>
@@ -2958,6 +2977,18 @@ function AdminScreen({ token, readonly = false }) {
   function startEditJob(job) { setEditingJob(job); setJobForm({ job_name: job.job_name, city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" }); }
   function startEditCc(cc) { setEditingCc(cc); setCcForm({ code: cc.code, description: cc.description, category: cc.category || "" }); }
 
+  async function deleteCostCode(cc) {
+    if (!window.confirm(`Delete cost code "${cc.code}"? This only works if it is not used on any job, timesheet, or material.`)) return;
+    const res = await apiFetch(`${API}/cost-codes/${cc.cost_code_id}`, { method: "DELETE", headers });
+    if (res.ok) {
+      showMsg(`Cost code "${cc.code}" deleted.`);
+      refresh();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      showMsg(d.detail || "Could not delete this cost code.");
+    }
+  }
+
   const activeEmps = employees.filter(e => e.active);
   const inactiveEmps = employees.filter(e => !e.active);
   const activeJobs = jobs.filter(j => j.status === "active");
@@ -3142,7 +3173,7 @@ function AdminScreen({ token, readonly = false }) {
             {costCodes.length > 0 && (
               <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
                 {costCodes.map(cc => (
-                  <Row key={cc.cost_code_id} main={`${cc.code}  ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />
+                  <Row key={cc.cost_code_id} main={`${cc.code}  ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />, <Btn key="d" label="Delete" bg={theme.dangerLight} color={theme.danger} onClick={() => deleteCostCode(cc)} />]} />
                 ))}
               </div>
             )}
