@@ -1573,19 +1573,21 @@ function UserManagement({ token, activeEmps, refreshSignal }) {
   }
 
   return (
-    <CollapsibleSection title="Manage Logins">
-      <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px" }}>
-        See which employee is linked to each login and edit the link.
-      </p>
-      <div style={{ display: "flex", gap: "8px", marginBottom: users.length > 0 ? "12px" : "0" }}>
-        <button onClick={loadUsers} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, flex: 1 }}>
-          {loaded ? "Refresh List" : "Load Accounts"}
+    <div style={{ marginTop: "18px", paddingTop: "18px", borderTop: `1px solid ${theme.border}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <div>
+          <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>Existing Logins</div>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, margin: "2px 0 0" }}>See who has access and which crew member they're linked to.</p>
+        </div>
+        <button onClick={loadUsers} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: "7px", border: `1px solid ${theme.accent}`, cursor: "pointer", backgroundColor: "white", color: theme.accent, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", flexShrink: 0 }}>
+          {loaded ? "Refresh" : "Show Logins"}
         </button>
       </div>
       {loading && <p style={{ fontSize: "13px", color: theme.textSecondary }}>Loading...</p>}
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "10px", backgroundColor: theme.accentLight, padding: "9px 12px", borderRadius: "7px", fontSize: "13px" }}>{message}</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {users.map(u => (
-        <div key={u.user_id} style={{ padding: "12px 13px", backgroundColor: theme.bg, borderRadius: "8px", marginBottom: "6px", border: `1px solid ${theme.border}` }}>
+        <div key={u.user_id} style={{ padding: "12px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</div>
@@ -1617,7 +1619,8 @@ function UserManagement({ token, activeEmps, refreshSignal }) {
           )}
         </div>
       ))}
-    </CollapsibleSection>
+      </div>
+    </div>
   );
 }
 
@@ -2840,24 +2843,22 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
 function SetupSection({ number, title, subtitle, complete, completeLabel, children }) {
   const [open, setOpen] = useState(!complete);
   return (
-    <div style={{ marginBottom: "14px", borderRadius: "12px", border: `1.5px solid ${complete ? theme.accent : theme.border}`, overflow: "hidden", backgroundColor: "white" }}>
-      <div onClick={() => setOpen(o => !o)} style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "14px", cursor: "pointer", backgroundColor: complete ? theme.accentLight : "white" }}>
-        <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: complete ? theme.accent : theme.primary, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", flexShrink: 0 }}>
+    <div style={{ marginBottom: "10px", borderRadius: "12px", border: `1.5px solid ${complete ? theme.accent : theme.border}`, overflow: "hidden", backgroundColor: "white" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", backgroundColor: complete ? theme.accentLight : "white" }}>
+        <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: complete ? theme.accent : theme.primary, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", flexShrink: 0 }}>
           {complete ? "✓" : number}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{title}</div>
-          {complete && completeLabel ? (
-            <div style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", marginTop: "2px" }}>{completeLabel}</div>
-          ) : (
-            <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px", lineHeight: 1.4 }}>{subtitle}</div>
+          {complete && completeLabel && (
+            <div style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", marginTop: "1px" }}>{completeLabel}</div>
           )}
         </div>
         <span style={{ fontSize: "11px", color: theme.textLight, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
       </div>
       {open && (
-        <div style={{ padding: "18px 20px", borderTop: `1px solid ${theme.border}` }}>
-          {!complete && <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px", lineHeight: 1.55 }}>{subtitle}</p>}
+        <div style={{ padding: "16px", borderTop: `1px solid ${theme.border}` }}>
+          {subtitle && <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px", lineHeight: 1.5 }}>{subtitle}</p>}
           {children}
         </div>
       )}
@@ -2966,9 +2967,9 @@ function AdminScreen({ token, readonly = false }) {
   /* Btn and Row moved to module scope */
 
   return (
-    <div style={{ ...styles.container, maxWidth: "880px" }}>
+    <div style={{ ...styles.container, maxWidth: "720px" }}>
       <h1 style={styles.title}>Setup</h1>
-      <p style={styles.subtitle}>Get your team and jobs ready to go</p>
+      <p style={styles.subtitle}>Get your jobs and team ready to go</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -2982,47 +2983,70 @@ function AdminScreen({ token, readonly = false }) {
         />
       ) : (
         <>
-          {/* ── STEP 1: COST CODES ── */}
+          {/* ── STEP 1: JOBS ── */}
           <SetupSection
             number="1"
-            title="Cost Codes"
-            subtitle="How you break down work on a job (e.g. Framing, Electrical, Labour). You need at least one before adding jobs."
-            complete={costCodes.length > 0}
-            completeLabel={`${costCodes.length} code${costCodes.length !== 1 ? "s" : ""} set up`}
+            title="Jobs"
+            subtitle="Add a job and assign your crew. This is what powers the dashboard and tracks your margin."
+            complete={activeJobs.length > 0}
+            completeLabel={`${activeJobs.length} active job${activeJobs.length !== 1 ? "s" : ""}`}
           >
-            {editingCc ? (
+            {editingJob ? (
               <>
-                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingCc.code}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
-                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
+                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingJob.job_name}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
+                  <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
+                  <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
+                  <input style={styles.input} placeholder="Contract Value $" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
+                  <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
                 </div>
-                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateCostCode}>Save</button>
-                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
+                  <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
+                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
                 </div>
               </>
             ) : (
-              <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
-                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
-                </div>
-                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
-                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add Cost Code</button>
-              </>
+              <button onClick={() => setShowJobFlow(true)} style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, width: "100%" }}>
+                + Add New Job
+              </button>
             )}
-            {costCodes.length > 0 && (
+            {activeJobs.length > 0 && (
               <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                {costCodes.map(cc => (
-                  <Row key={cc.cost_code_id} main={`${cc.code} — ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />
+                <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
+                {activeJobs.map(job => (
+                  <Row key={job.job_id}
+                    main={job.job_name}
+                    sub={`${job.city || ""}${job.contract_value ? ` · $${fmt(job.contract_value)}` : ""}${job.budgeted_hours ? ` · ${job.budgeted_hours}h budgeted` : ""}`}
+                    actions={[
+                      <Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJob(job)} />,
+                      <Btn key="c" label="Complete" bg="#e8f5ee" color={theme.accent} onClick={() => setJobStatus(job, "completed")} />,
+                      <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => setJobStatus(job, "inactive")} />
+                    ]}
+                  />
+                ))}
+              </div>
+            )}
+            {completedJobs.length > 0 && (
+              <div style={{ marginTop: "10px" }}>
+                <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Completed</p>
+                {completedJobs.map(job => (
+                  <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
+                ))}
+              </div>
+            )}
+            {inactiveJobs.length > 0 && (
+              <div style={{ marginTop: "8px" }}>
+                <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  {showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})
+                </button>
+                {showInactiveJob && inactiveJobs.map(job => (
+                  <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
                 ))}
               </div>
             )}
           </SetupSection>
 
-          {/* ── STEP 2: EMPLOYEES ── */}
+          {/* ── STEP 2: CREW ── */}
           <SetupSection
             number="2"
             title="Your Crew"
@@ -3084,64 +3108,41 @@ function AdminScreen({ token, readonly = false }) {
             )}
           </SetupSection>
 
-          {/* ── STEP 3: JOBS ── */}
+          {/* ── STEP 3: COST CODES ── */}
           <SetupSection
             number="3"
-            title="Jobs"
-            subtitle="Add a job and assign your crew. This is what powers the dashboard and tracks your margin."
-            complete={activeJobs.length > 0}
-            completeLabel={`${activeJobs.length} active job${activeJobs.length !== 1 ? "s" : ""}`}
+            title="Cost Codes"
+            subtitle="How you break down work on a job (e.g. Framing, Electrical, Labour). Used for tracking where time and money go."
+            complete={costCodes.length > 0}
+            completeLabel={`${costCodes.length} code${costCodes.length !== 1 ? "s" : ""} set up`}
           >
-            {editingJob ? (
+            {editingCc ? (
               <>
-                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingJob.job_name}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
-                  <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
-                  <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
-                  <input style={styles.input} placeholder="Contract Value $" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
-                  <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
+                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingCc.code}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
+                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
                 </div>
+                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateJob}>Save Changes</button>
-                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); }}>Cancel</button>
+                  <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateCostCode}>Save</button>
+                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
                 </div>
               </>
             ) : (
-              <button onClick={() => setShowJobFlow(true)} style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, width: "100%" }}>
-                + Add New Job
-              </button>
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
+                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
+                </div>
+                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
+                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add Cost Code</button>
+              </>
             )}
-            {activeJobs.length > 0 && (
+            {costCodes.length > 0 && (
               <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                <p style={{ fontSize: "11px", color: theme.textSecondary, marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Active</p>
-                {activeJobs.map(job => (
-                  <Row key={job.job_id}
-                    main={job.job_name}
-                    sub={`${job.city || ""}${job.contract_value ? ` · $${fmt(job.contract_value)}` : ""}${job.budgeted_hours ? ` · ${job.budgeted_hours}h budgeted` : ""}`}
-                    actions={[
-                      <Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJob(job)} />,
-                      <Btn key="c" label="Complete" bg="#e8f5ee" color={theme.accent} onClick={() => setJobStatus(job, "completed")} />,
-                      <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => setJobStatus(job, "inactive")} />
-                    ]}
-                  />
-                ))}
-              </div>
-            )}
-            {completedJobs.length > 0 && (
-              <div style={{ marginTop: "10px" }}>
-                <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Completed</p>
-                {completedJobs.map(job => (
-                  <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
-                ))}
-              </div>
-            )}
-            {inactiveJobs.length > 0 && (
-              <div style={{ marginTop: "8px" }}>
-                <button onClick={() => setShowInactiveJob(!showInactiveJob)} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                  {showInactiveJob ? "Hide" : "Show"} archived ({inactiveJobs.length})
-                </button>
-                {showInactiveJob && inactiveJobs.map(job => (
-                  <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Restore" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
+                {costCodes.map(cc => (
+                  <Row key={cc.cost_code_id} main={`${cc.code}  ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />]} />
                 ))}
               </div>
             )}
@@ -3340,6 +3341,35 @@ function Dashboard({ token, readonly = false }) {
       </div>
 
       <div style={{ padding: "18px", maxWidth: "1080px", margin: "0 auto" }}>
+        {!loading && sorted.length > 0 && (() => {
+          let onTrack = 0, watch = 0, overBudget = 0;
+          sorted.forEach(j => {
+            const c = j.contract_value || 0;
+            const cPct = c > 0 ? (j.total_cost / c) * 100 : 0;
+            const hPct = j.budgeted_hours > 0 ? (j.total_hours / j.budgeted_hours) * 100 : 0;
+            const isOver = (j.margin !== null && j.margin < 0) || cPct > 100 || hPct > 100;
+            const isTight = !isOver && ((cPct > 85) || (hPct > 90));
+            if (isOver) overBudget++;
+            else if (isTight) watch++;
+            else onTrack++;
+          });
+          const pills = [
+            { label: "On Track", count: onTrack, color: theme.accent, bg: theme.accentLight },
+            { label: "Watch", count: watch, color: theme.warning, bg: theme.warningLight },
+            { label: "Over Budget", count: overBudget, color: theme.danger, bg: theme.dangerLight },
+          ].filter(p => p.count > 0);
+          return (
+            <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+              {pills.map(p => (
+                <div key={p.label} style={{ display: "flex", alignItems: "center", gap: "8px", backgroundColor: "white", border: `1px solid ${theme.border}`, borderRadius: "10px", padding: "8px 14px", flex: "1 1 auto", minWidth: "120px" }}>
+                  <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: p.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: "20px", fontWeight: "800", color: theme.primary }}>{p.count}</span>
+                  <span style={{ fontSize: "12px", color: theme.textSecondary, fontWeight: "600" }}>{p.label}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {loading ? (
           <div className="vl-jobgrid">
             {[1,2,3,4].map(i => <Skeleton key={i} width="100%" height="180px" radius="12px" />)}
@@ -3817,7 +3847,7 @@ export default function App() {
         )}
         {subStatus === "expired" && role === "owner" && (
           <div style={{ backgroundColor: theme.danger, color: "white", padding: "11px 20px", textAlign: "center", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", flexWrap: "wrap" }}>
-            <span>Your trial has ended. Your data is safe — subscribe to resume full access.</span>
+            <span>Your trial has ended. Your data is safe, subscribe to resume full access.</span>
             <button onClick={async () => {
               const res = await apiFetch(`${API}/create-checkout-session`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
               const data = await res.json();
