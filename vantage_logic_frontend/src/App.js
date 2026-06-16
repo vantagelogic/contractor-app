@@ -1234,6 +1234,14 @@ function MaterialsForm({ token, readonly = false }) {
   const [invForm, setInvForm] = useState({ job_id: "", inventory_id: "", quantity_requested: "", description: "" });
   const [invErrors, setInvErrors] = useState({});
   const [invSubmitting, setInvSubmitting] = useState(false);
+  const [costCodes, setCostCodes] = useState([]);
+  const [scanJob, setScanJob] = useState("");
+  const [scanCostCode, setScanCostCode] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [scanError, setScanError] = useState("");
+  const [scanItems, setScanItems] = useState([]);
+  const [savingItems, setSavingItems] = useState(false);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -1242,7 +1250,8 @@ function MaterialsForm({ token, readonly = false }) {
       apiFetch(`${API}/my-jobs`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/inventory`, { headers: h }).then(r => r.json()).catch(() => []),
-    ]).then(([me, jobList, emps, inv]) => {
+      apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).catch(() => []),
+    ]).then(([me, jobList, emps, inv, ccs]) => {
       if (me.employee_id) {
         setLinkedEmployeeId(me.employee_id);
         setFormData(prev => ({ ...prev, employee_id: me.employee_id }));
@@ -1250,6 +1259,7 @@ function MaterialsForm({ token, readonly = false }) {
       setJobs(jobList.filter(j => j.status === "active"));
       setEmployees(emps);
       setInventory(Array.isArray(inv) ? inv : []);
+      setCostCodes(Array.isArray(ccs) ? ccs : []);
       setLoading(false);
     });
   }, [token]);
@@ -1314,14 +1324,180 @@ function MaterialsForm({ token, readonly = false }) {
       <p style={styles.subtitle}>Record a material purchase or inventory pull</p>
 
       <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "16px", border: `1px solid ${theme.border}` }}>
-        {[["store", "Store Bought"], ["inventory", "From Inventory"]].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => setMatTab(id)} style={{ flex: 1, padding: "10px", borderRadius: "7px", border: matTab === id ? `1px solid ${theme.border}` : "none", backgroundColor: matTab === id ? "white" : "transparent", color: matTab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: matTab === id ? "600" : "400", cursor: "pointer" }}>
+        {[["store", "Store Bought"], ["scan", "Scan Receipt"], ["inventory", "From Inventory"]].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => { setMatTab(id); setScanResult(null); setScanError(""); }} style={{ flex: 1, padding: "10px", borderRadius: "7px", border: matTab === id ? `1px solid ${theme.border}` : "none", backgroundColor: matTab === id ? "white" : "transparent", color: matTab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "12px", fontWeight: matTab === id ? "600" : "400", cursor: "pointer" }}>
             {label}
           </button>
         ))}
       </div>
 
-      {matTab === "inventory" ? (
+      {matTab === "scan" ? (
+        <div style={styles.card}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "4px" }}>Scan a Receipt</div>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px", lineHeight: 1.5 }}>Take a photo of a receipt. We'll read the line items automatically and pre-fill the form for you to review.</p>
+
+          <label style={styles.label}>Job</label>
+          <select style={styles.input} value={scanJob} onChange={e => setScanJob(e.target.value)}>
+            <option value="">Select job first</option>
+            {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+          </select>
+
+          <label style={styles.label}>Cost Code</label>
+          <select style={styles.input} value={scanCostCode} onChange={e => setScanCostCode(e.target.value)}>
+            <option value="">Select cost code</option>
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+          </select>
+
+          {!scanResult && (
+            <div style={{ marginTop: "8px" }}>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                id="receipt-input"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  if (!scanJob) { setScanError("Please select a job first."); return; }
+                  setScanError("");
+                  setScanning(true);
+                  setScanResult(null);
+                  try {
+                    const base64 = await new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result.split(",")[1]);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(file);
+                    });
+                    const params = new URLSearchParams({ job_id: scanJob });
+                    if (scanCostCode) params.append("cost_code_id", scanCostCode);
+                    const res = await apiFetch(`${API}/receipts/parse?${params}`, {
+                      method: "POST",
+                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                      body: JSON.stringify({ image_base64: base64 })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      setScanResult(data);
+                      setScanItems(data.items.map((item, i) => ({ ...item, id: i, include: true })));
+                    } else {
+                      setScanError(data.message || "Could not read the receipt. Please try again or enter manually.");
+                    }
+                  } catch {
+                    setScanError("Something went wrong. Please try again.");
+                  }
+                  setScanning(false);
+                  e.target.value = "";
+                }}
+              />
+              <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "18px", backgroundColor: scanning ? theme.bg : theme.primary, color: "white", borderRadius: "10px", cursor: scanning ? "not-allowed" : "pointer", fontSize: "15px", fontWeight: "700", fontFamily: font.body, transition: "background 0.2s" }}>
+                {scanning ? (
+                  <><Spinner color="white" size={18} /> Reading receipt...</>
+                ) : (
+                  <>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Take Receipt Photo
+                  </>
+                )}
+              </label>
+              {scanError && <p style={{ ...styles.errorMsg, marginTop: "12px" }}>{scanError}</p>}
+            </div>
+          )}
+
+          {scanResult && (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>
+                  {scanResult.vendor ? `From: ${scanResult.vendor}` : "Receipt parsed"}
+                </div>
+                <button onClick={() => { setScanResult(null); setScanItems([]); setScanError(""); }} style={{ fontSize: "12px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Retake</button>
+              </div>
+
+              <div style={{ backgroundColor: theme.bg, borderRadius: "10px", border: `1px solid ${theme.border}`, overflow: "hidden", marginBottom: "14px" }}>
+                {scanItems.map((item, i) => (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderBottom: i < scanItems.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+                    <input type="checkbox" checked={item.include} onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: theme.primary, cursor: "pointer" }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <input
+                        value={item.description}
+                        onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
+                        style={{ ...styles.input, marginTop: 0, fontSize: "13px", padding: "6px 10px" }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                      <span style={{ fontSize: "11px", color: theme.textSecondary }}>qty</span>
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))}
+                        style={{ ...styles.input, marginTop: 0, width: "52px", fontSize: "13px", padding: "6px 8px", textAlign: "center" }}
+                      />
+                    </div>
+                    <div style={{ flexShrink: 0, minWidth: "60px", textAlign: "right" }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={item.line_total}
+                        onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, line_total: e.target.value } : x))}
+                        style={{ ...styles.input, marginTop: 0, width: "72px", fontSize: "13px", padding: "6px 8px", textAlign: "right" }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 14px", backgroundColor: "white", borderTop: `1px solid ${theme.border}` }}>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>Total</span>
+                  <span style={{ fontSize: "14px", fontWeight: "800", color: theme.primary }}>${parseFloat(scanResult.total || 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "14px", lineHeight: 1.5 }}>Uncheck any items you don't want to save. Edit descriptions or amounts directly. Each checked item saves as a separate material entry.</p>
+
+              {scanError && <p style={{ ...styles.errorMsg, marginBottom: "10px" }}>{scanError}</p>}
+
+              <button
+                disabled={savingItems || scanItems.filter(x => x.include).length === 0}
+                onClick={async () => {
+                  const toSave = scanItems.filter(x => x.include);
+                  if (toSave.length === 0) return;
+                  setSavingItems(true);
+                  setScanError("");
+                  const h = { Authorization: `Bearer ${token}` };
+                  const today = new Date().toISOString().split("T")[0];
+                  let failed = 0;
+                  for (const item of toSave) {
+                    const params = new URLSearchParams({
+                      job_id: scanJob,
+                      description: item.description,
+                      total_cost: item.line_total,
+                      purchase_date: today,
+                    });
+                    if (scanResult.vendor) params.append("supplier", scanResult.vendor);
+                    if (linkedEmployeeId) params.append("purchased_by", linkedEmployeeId);
+                    if (scanCostCode) params.append("cost_code_id", scanCostCode);
+                    const res = await apiFetch(`${API}/materials?${params}`, { method: "POST", headers: h });
+                    if (!res.ok) failed++;
+                  }
+                  setSavingItems(false);
+                  if (failed === 0) {
+                    setScanResult(null);
+                    setScanItems([]);
+                    setScanJob("");
+                    setScanCostCode("");
+                    setMatTab("store");
+                    setSubmitted(true);
+                  } else {
+                    setScanError(`${failed} item(s) failed to save. Please try again.`);
+                  }
+                }}
+                style={{ ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: savingItems ? 0.75 : 1 }}
+              >
+                {savingItems ? <><Spinner /> Saving...</> : `Save ${scanItems.filter(x => x.include).length} Item${scanItems.filter(x => x.include).length !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : matTab === "inventory" ? (
         <div style={styles.card}>
           <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>Pull from Inventory</div>
           {linkedEmployeeId && <IdentityBadge name={linkedEmployeeName} />}

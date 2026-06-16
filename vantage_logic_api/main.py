@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Request, Body
+from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -982,12 +983,15 @@ def create_material(
     db.refresh(material)
     return material
 
+class ReceiptRequest(BaseModel):
+    image_base64: str
+
 @app.post("/receipts/parse")
 def parse_receipt(
     request: Request,
     job_id: int,
-    cost_code_id: int,
-    image_base64: str,
+    cost_code_id: int = None,
+    body: ReceiptRequest = Body(...),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
