@@ -1064,6 +1064,65 @@ If you cannot read the receipt clearly, return {"error": "could not parse receip
         print(f"Receipt parse error: {e}")
         return {"success": False, "message": "Something went wrong. Please try again."}
     
+class VoiceRequest(BaseModel):
+    transcript: str
+
+@app.post("/voice/parse-timesheet")
+def parse_voice_timesheet(
+    body: VoiceRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        jobs = db.query(models.Job).filter(
+            models.Job.company_id == current_user.company_id,
+            models.Job.status == "active"
+        ).all()
+        cost_codes = db.query(models.CostCode).filter(
+            models.CostCode.company_id == current_user.company_id
+        ).all()
+
+        job_names = [j.job_name for j in jobs]
+        cc_names = [f"{c.code} {c.description}" for c in cost_codes]
+
+        prompt = f"""Extract a timesheet entry from this voice note: "{body.transcript}"
+
+Available jobs: {job_names}
+Available cost codes: {cc_names}
+
+Return ONLY a JSON object with this exact structure, no other text:
+{{
+  "hours": 0.0,
+  "job_name": "closest matching job name from the list or empty string",
+  "cost_code": "closest matching cost code from the list or empty string",
+  "notes": "brief 1-sentence summary of any extra context, issues, or observations mentioned. Empty string if nothing extra."
+}}
+
+Match job_name and cost_code to the closest option from the lists provided. If nothing matches, return empty string. Hours should be a number — convert phrases like 'half a day' to 4.0 or 'six and a half' to 6.5."""
+
+        from google.genai import types
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt]
+        )
+
+        raw = response.text.strip()
+        raw = re.sub(r"```json\s*", "", raw)
+        raw = re.sub(r"```\s*", "", raw)
+        raw = raw.strip()
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+
+        parsed = json.loads(raw)
+        return {"success": True, **parsed}
+
+    except json.JSONDecodeError:
+        return {"success": False, "message": "Could not parse the voice entry. Please try again."}
+    except Exception as e:
+        print(f"Voice parse error: {e}")
+        return {"success": False, "message": "Something went wrong. Please try again."}
+    
 @app.delete("/materials/{material_id}")
 def delete_material(
     material_id: int,
