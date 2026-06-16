@@ -701,19 +701,30 @@ function Row({ main, sub, actions }) {
 function CrewHome({ token, setView, readonly = false }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-
   const [schedule, setSchedule] = useState([]);
   const [schedWeek, setSchedWeek] = useState(0);
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split("T")[0]);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceProcessing, setVoiceProcessing] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceResult, setVoiceResult] = useState(null);
+  const [jobs, setJobs] = useState([]);
+  const [costCodes, setCostCodes] = useState([]);
+  const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
     Promise.all([
       apiFetch(`${API}/me/stats`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/my-schedule`, { headers: h }).then(r => r.json()),
-    ]).then(([statsData, schedData]) => {
+      apiFetch(`${API}/my-jobs`, { headers: h }).then(r => r.json()).catch(() => []),
+      apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).catch(() => []),
+    ]).then(([statsData, schedData, jobsData, ccData]) => {
       setStats(statsData);
       setSchedule(Array.isArray(schedData) ? schedData : []);
+      setJobs(Array.isArray(jobsData) ? jobsData.filter(j => j.status === "active") : []);
+      setCostCodes(Array.isArray(ccData) ? ccData : []);
       setLoading(false);
     });
   }, [token]);
@@ -790,6 +801,176 @@ function CrewHome({ token, setView, readonly = false }) {
           <QuickActionBtn label="Mileage" icon={IconMileage} color={readonly ? theme.textLight : theme.accent} onClick={() => !readonly && setView("mileage")} />
         </div>
       </div>
+
+      {/* Voice Entry */}
+      {voiceSupported && !readonly && (
+        <div style={{ marginBottom: "22px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Voice Log</div>
+          <div style={{ ...styles.card, padding: "16px", background: voiceListening ? `linear-gradient(135deg, ${theme.primary} 0%, #0d3d2e 100%)` : "white", transition: "background 0.3s" }}>
+            {voiceResult ? (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>
+                    {voiceResult.type === "timesheet" ? "Hours Entry" : voiceResult.type === "material" ? "Material Entry" : voiceResult.type === "mileage" ? "Mileage Entry" : "Request"}
+                  </div>
+                  <button onClick={() => { setVoiceResult(null); setVoiceTranscript(""); setVoiceError(""); }} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontFamily: font.body }}>Redo</button>
+                </div>
+                <div style={{ backgroundColor: theme.bg, borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {voiceResult.type === "timesheet" && <>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Hours</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{voiceResult.hours || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Cost Code</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedCCLabel || voiceResult.cost_code || "?"}</span></div>
+                    {voiceResult.cost_code_confidence === "low" && (
+                      <div style={{ marginTop: "4px" }}>
+                        <label style={{ fontSize: "11px", color: theme.warning, fontWeight: "600", display: "block", marginBottom: "4px" }}>Cost code unclear — pick one:</label>
+                        <select style={{ ...styles.input, marginTop: 0, fontSize: "13px" }} value={voiceResult._matchedCCId || ""} onChange={e => {
+                          const cc = costCodes.find(c => String(c.cost_code_id) === e.target.value);
+                          setVoiceResult(prev => ({ ...prev, _matchedCCId: e.target.value, _matchedCCLabel: cc ? `${cc.code} ${cc.description}` : "" }));
+                        }}>
+                          <option value="">Select cost code</option>
+                          {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {voiceResult.notes && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Notes</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.notes}</span></div>}
+                  </>}
+                  {voiceResult.type === "material" && <>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Item</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult.description || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    {voiceResult.amount > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Amount</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>${voiceResult.amount}</span></div>}
+                    {voiceResult.notes && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Notes</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.notes}</span></div>}
+                  </>}
+                  {voiceResult.type === "mileage" && <>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>KM</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{voiceResult.km || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    {voiceResult.notes && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Notes</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.notes}</span></div>}
+                  </>}
+                  {voiceResult.type === "request" && <>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Type</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult.request_type || "Other"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    {(voiceResult.description || voiceResult.notes) && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Details</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.description || voiceResult.notes}</span></div>}
+                  </>}
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => {
+                    const type = voiceResult.type;
+                    if (type === "timesheet") setView("timesheet");
+                    else if (type === "material") setView("materials");
+                    else if (type === "mileage") setView("mileage");
+                    else if (type === "request") setView("requests");
+                    setVoiceResult(null);
+                  }} style={{ flex: 1, ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                    Edit and Submit
+                  </button>
+                </div>
+                <p style={{ fontSize: "11px", color: theme.textSecondary, textAlign: "center", marginTop: "10px", marginBottom: 0 }}>Review the entry on the next screen before it saves</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <button
+                  type="button"
+                  onPointerDown={() => {
+                    setVoiceError("");
+                    setVoiceTranscript("");
+                    setVoiceResult(null);
+                    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    const recognition = new SR();
+                    recognition.lang = "en-CA";
+                    recognition.continuous = false;
+                    recognition.interimResults = true;
+                    window._crewVoiceRecognition = recognition;
+                    window._crewVoiceTranscript = "";
+                    recognition.onresult = (e) => {
+                      const t = Array.from(e.results).map(r => r[0].transcript).join("");
+                      setVoiceTranscript(t);
+                      window._crewVoiceTranscript = t;
+                    };
+                    recognition.onerror = (e) => {
+                      setVoiceListening(false);
+                      setVoiceError(e.error === "not-allowed" ? "Microphone access denied. Check your browser settings." : "Could not hear clearly. Try again.");
+                    };
+                    recognition.onend = async () => {
+                      setVoiceListening(false);
+                      const transcript = window._crewVoiceTranscript;
+                      if (!transcript || transcript.trim().length < 3) {
+                        setVoiceError("Nothing captured. Hold the button and speak clearly.");
+                        return;
+                      }
+                      setVoiceProcessing(true);
+                      try {
+                        const res = await apiFetch(`${API}/voice/parse-entry`, {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                          body: JSON.stringify({ transcript })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          const matchedJob = jobs.find(j => {
+                            const jn = j.job_name.toLowerCase();
+                            const hint = (data.job_name || "").toLowerCase();
+                            return hint && (jn.includes(hint) || hint.includes(jn) || jn.split(" ").some(w => w.length > 3 && hint.includes(w)));
+                          });
+                          const matchedCC = costCodes.find(c => {
+                            const ccStr = `${c.code} ${c.description}`.toLowerCase();
+                            const hint = (data.cost_code || "").toLowerCase();
+                            return hint && (ccStr.includes(hint) || hint.includes(c.code.toLowerCase()) || hint.split(" ").some(w => w.length > 3 && ccStr.includes(w)));
+                          });
+                          setVoiceResult({
+                            ...data,
+                            _matchedJobId: matchedJob ? String(matchedJob.job_id) : "",
+                            _matchedJobName: matchedJob ? matchedJob.job_name : (data.job_name || ""),
+                            _matchedCCId: matchedCC ? String(matchedCC.cost_code_id) : "",
+                            _matchedCCLabel: matchedCC ? `${matchedCC.code} ${matchedCC.description}` : (data.cost_code || ""),
+                          });
+                        } else {
+                          setVoiceError(data.message || "Could not parse. Try again.");
+                        }
+                      } catch {
+                        setVoiceError("Something went wrong. Try again.");
+                      }
+                      setVoiceProcessing(false);
+                      setVoiceTranscript("");
+                    };
+                    setVoiceListening(true);
+                    recognition.start();
+                  }}
+                  onPointerUp={() => { if (window._crewVoiceRecognition) window._crewVoiceRecognition.stop(); }}
+                  onPointerLeave={() => { if (window._crewVoiceRecognition && voiceListening) window._crewVoiceRecognition.stop(); }}
+                  style={{ width: "60px", height: "60px", borderRadius: "50%", border: "none", backgroundColor: voiceListening ? "rgba(255,255,255,0.2)" : theme.accentLight, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", boxShadow: voiceListening ? "0 0 0 10px rgba(255,255,255,0.12)" : "none" }}
+                >
+                  {voiceProcessing ? (
+                    <Spinner size={24} color={voiceListening ? "white" : theme.primary} />
+                  ) : (
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={voiceListening ? "white" : theme.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                      <line x1="12" y1="19" x2="12" y2="23"/>
+                      <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                  )}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {voiceListening ? (
+                    <>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: "white", marginBottom: "3px" }}>Listening... release when done</div>
+                      {voiceTranscript && <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{voiceTranscript}</div>}
+                    </>
+                  ) : voiceProcessing ? (
+                    <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary }}>Reading your entry...</div>
+                  ) : voiceError ? (
+                    <div style={{ fontSize: "13px", color: theme.danger, fontWeight: "500" }}>{voiceError}</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "2px" }}>Log by voice</div>
+                      <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4 }}>Hold and speak. Works for hours, materials, mileage, or requests.</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* This Month + All Time */}
       <div style={{ marginBottom: "28px" }}>
