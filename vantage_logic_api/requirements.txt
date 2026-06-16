@@ -11,3 +11,4 @@ alembic
 slowapi==0.1.9
 resend
 stripe
+google-generativeai

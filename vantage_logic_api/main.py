@@ -11,6 +11,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import secrets
+import google.generativeai as genai
+import base64
+import json
+import re
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+
 from datetime import datetime, timedelta
 import os
 import stripe
@@ -976,6 +982,78 @@ def create_material(
     db.commit()
     db.refresh(material)
     return material
+
+@app.post("/receipts/parse")
+def parse_receipt(
+    request: Request,
+    job_id: int,
+    cost_code_id: int,
+    image_base64: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify job belongs to this company
+    job = db.query(models.Job).filter(
+        models.Job.job_id == job_id,
+        models.Job.company_id == current_user.company_id
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    try:
+        # Decode base64 to raw bytes
+        image_bytes = base64.b64decode(image_base64)
+
+        # Set up Gemini vision model
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # Build the prompt and image part
+        prompt = """You are a receipt parser. Extract all line items from this receipt image.
+Return ONLY a JSON object with this exact structure, no other text:
+{
+  "vendor": "store name or empty string",
+  "total": 0.00,
+  "items": [
+    {"description": "item name", "quantity": 1, "unit_price": 0.00, "line_total": 0.00}
+  ]
+}
+If you cannot read the receipt clearly, return {"error": "could not parse receipt"}."""
+
+        # Send to Gemini
+        response = model.generate_content([
+            prompt,
+            {"mime_type": "image/jpeg", "data": image_bytes}
+        ])
+
+        raw = response.text.strip()
+
+        # Strip markdown fences if present
+        raw = re.sub(r"```json\s*", "", raw)
+        raw = re.sub(r"```\s*", "", raw)
+        raw = raw.strip()
+
+        # Find JSON object defensively if there's surrounding text
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+
+        parsed = json.loads(raw)
+
+        if "error" in parsed:
+            return {"success": False, "message": parsed["error"]}
+
+        return {
+            "success": True,
+            "vendor": parsed.get("vendor", ""),
+            "total": parsed.get("total", 0),
+            "items": parsed.get("items", [])
+        }
+
+    except json.JSONDecodeError:
+        return {"success": False, "message": "Could not parse the receipt. Please try again or enter manually."}
+    except Exception as e:
+        print(f"Receipt parse error: {e}")
+        return {"success": False, "message": "Something went wrong. Please try again."}
 
 # =============================================
 # MILEAGE
