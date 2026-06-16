@@ -2918,7 +2918,7 @@ function ScheduleScreen({ token, readonly = false }) {
 // ─── JOB SETUP FLOW ─────────────────────────────────────────────
 function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
   const [step, setStep] = useState(1); // 1=job details, 2=assign crew, 3=done
-  const [jobForm, setJobForm] = useState({ job_name: "", city: "", contract_value: "", budgeted_hours: "" });
+  const [jobForm, setJobForm] = useState({ job_name: "", job_code: "", city: "", contract_value: "", budgeted_hours: "" });
   const [createdJob, setCreatedJob] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -2979,6 +2979,8 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
           <h3 style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, margin: "0 0 18px", fontFamily: font.display }}>New Job</h3>
           <label style={styles.label}>Job Name *</label>
           <input style={styles.input} placeholder="e.g. Johnson Basement Reno" value={jobForm.job_name} onChange={e => { setJobForm({...jobForm, job_name: e.target.value}); setError(""); }} />
+          <label style={styles.label}>Job Code (optional)</label>
+          <input style={styles.input} placeholder="e.g. JB-2024-047" value={jobForm.job_code} onChange={e => setJobForm({...jobForm, job_code: e.target.value})} />
           <label style={styles.label}>City</label>
           <input style={styles.input} placeholder="e.g. Burnaby" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
@@ -3109,7 +3111,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
   const [showInactiveJob, setShowInactiveJob] = useState(false);
   const [showJobFlow, setShowJobFlow] = useState(false);
   const [empForm, setEmpForm] = useState({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" });
-  const [jobForm, setJobForm] = useState({ job_name: "", city: "", contract_value: "", budgeted_hours: "" });
+  const [jobForm, setJobForm] = useState({ job_name: "", job_code: "", city: "", contract_value: "", budgeted_hours: "" });
   const [ccForm, setCcForm] = useState({ code: "", description: "", category: "" });
   const [loginForm, setLoginForm] = useState({ email: "", password: "", confirm_password: "", employee_role: "crew", employee_id: "" });
   const [loginError, setLoginError] = useState("");
@@ -3193,7 +3195,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
   }
 
   function startEditEmp(emp) { setEditingEmp(emp); setEmpForm({ first_name: emp.first_name, last_name: emp.last_name, role: emp.role || "", hourly_rate: emp.hourly_rate || "", burden_rate: emp.burden_rate || "", worker_type: emp.worker_type || "employee" }); }
-  function startEditJob(job) { setEditingJob(job); setJobForm({ job_name: job.job_name, city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" }); }
+  function startEditJob(job) { setEditingJob(job); setJobForm({ job_name: job.job_name, job_code: job.job_code || "", city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" }); }
   function startEditCc(cc) { setEditingCc(cc); setCcForm({ code: cc.code, description: cc.description, category: cc.category || "" }); }
 
   async function deleteCostCode(cc) {
@@ -3246,6 +3248,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
                 <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingJob.job_name}</p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
                   <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
+                  <input style={styles.input} placeholder="Job Code (optional)" value={jobForm.job_code || ""} onChange={e => setJobForm({...jobForm, job_code: e.target.value})} />
                   <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
                   <input style={styles.input} placeholder="Contract Value $" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
                   <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
@@ -3795,11 +3798,18 @@ function Dashboard({ token, readonly = false }) {
                       {det.materials.map((m, i) => (
                         <div key={i} style={{ marginBottom: "6px", padding: "11px 13px", backgroundColor: theme.bg, borderRadius: "8px", border: `1px solid ${theme.border}` }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{m.description}</div>
                               <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{m.supplier || "Unknown supplier"} · {m.purchase_date}</div>
                             </div>
-                            <div style={{ fontSize: "15px", fontWeight: "700", color: theme.gold }}>${fmt(m.total_cost)}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                              <div style={{ fontSize: "15px", fontWeight: "700", color: theme.gold }}>${fmt(m.total_cost)}</div>
+                              <button onClick={async () => {
+                                if (!window.confirm("Delete this material entry?")) return;
+                                const res = await apiFetch(`${API}/materials/${m.material_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                                if (res.ok) toggleJob(job.job_id);
+                              }} style={{ fontSize: "11px", color: theme.danger, background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontFamily: font.body, padding: 0 }}>Delete</button>
+                            </div>
                           </div>
                         </div>
                       ))}
