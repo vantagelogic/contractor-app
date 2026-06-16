@@ -913,6 +913,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
   const [message, setMessage] = useState("");
 
   const endpoint = type === "timesheet" ? "/timesheets" : type === "material" ? "/materials" : "/mileage";
@@ -964,6 +965,22 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
     }
   }
 
+  async function deleteEntry(id) {
+    if (!window.confirm("Delete this entry? This cannot be undone.")) return;
+    setDeleting(id);
+    const path = type === "timesheet" ? "timesheets" : type === "material" ? "materials" : "mileage";
+    const res = await apiFetch(`${API}/${path}/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setDeleting(null);
+    if (res.ok) {
+      setMessage("Entry deleted.");
+      setTimeout(() => setMessage(""), 3000);
+      fetchEntries();
+    } else {
+      setMessage("Could not delete. Please try again.");
+      setTimeout(() => setMessage(""), 3000);
+    }
+  }
+
   if (loading) return <div style={{ marginTop: "24px" }}><Skeleton width="100%" height="120px" radius="12px" /></div>;
   if (entries.length === 0) return null;
 
@@ -991,6 +1008,9 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
                   <span style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{valueLabel}</span>
                   <button onClick={() => isEditing ? setEditingId(null) : startEdit(entry)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: isEditing ? "#eee" : theme.accentLight, color: isEditing ? theme.textSecondary : theme.accent, fontWeight: "600", fontFamily: font.body }}>
                     {isEditing ? "Cancel" : "Edit"}
+                  </button>
+                  <button onClick={() => deleteEntry(id)} disabled={deleting === id} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>
+                    {deleting === id ? "..." : "Delete"}
                   </button>
                 </div>
               </div>
@@ -3444,7 +3464,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
 // ─── DASHBOARD ────────────────────────────────────────────────
 
 // ─── EMP TIMESHEET GROUP (Dashboard) ───────────────────────────
-function EmpTimesheetGroup({ empName, empData }) {
+function EmpTimesheetGroup({ empName, empData, token, onDelete }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ marginBottom: "8px", border: `1px solid ${theme.border}`, borderRadius: "10px", overflow: "hidden" }}>
@@ -3467,13 +3487,23 @@ function EmpTimesheetGroup({ empName, empData }) {
         <div style={{ borderTop: `1px solid ${theme.border}`, padding: "8px" }}>
           {empData.entries.map((t, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", backgroundColor: i % 2 === 0 ? theme.bg : "white", borderRadius: "6px", marginBottom: "3px" }}>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "12px", color: theme.textPrimary, fontWeight: "500" }}>{t.shift_date}</div>
                 {t.field_notes && t.field_notes.toLowerCase() !== "yes" && t.field_notes.toLowerCase() !== "no" && (
                   <div style={{ fontSize: "11px", color: theme.textSecondary, fontStyle: "italic", marginTop: "2px" }}>{t.field_notes}</div>
                 )}
               </div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked}h</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked}h</div>
+                {token && onDelete && (
+                  <button onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!window.confirm("Delete this timesheet entry?")) return;
+                    const res = await apiFetch(`${API}/timesheets/${t.timesheet_id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                    if (res.ok) onDelete();
+                  }} style={{ fontSize: "11px", color: theme.danger, background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontFamily: font.body, padding: 0 }}>Delete</button>
+                )}
+              </div>
             </div>
           ))}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderTop: `1px solid ${theme.border}`, marginTop: "4px" }}>
@@ -3787,7 +3817,7 @@ function Dashboard({ token, readonly = false }) {
                             byEmp[t.employee_name].total += Number(t.hours_worked || 0);
                           });
                           return Object.entries(byEmp).map(([empName, empData]) => (
-                            <EmpTimesheetGroup key={empName} empName={empName} empData={empData} />
+                            <EmpTimesheetGroup key={empName} empName={empName} empData={empData} token={token} onDelete={() => toggleJob(job.job_id)} />
                           ));
                         })()
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
