@@ -4301,9 +4301,10 @@ function SettingsScreen({ token, role, onLogout }) {
   const h = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
+    const hInner = { Authorization: `Bearer ${token}` };
     Promise.all([
-      apiFetch(`${API}/me`, { headers: h }).then(r => r.json()),
-      apiFetch(`${API}/companies`, { headers: h }).then(r => r.json()).catch(() => []),
+      apiFetch(`${API}/me`, { headers: hInner }).then(r => r.json()),
+      apiFetch(`${API}/companies`, { headers: hInner }).then(r => r.json()).catch(() => []),
     ]).then(([me, companies]) => {
       const company = Array.isArray(companies) ? companies.find(c => c.company_id === me.company_id) : null;
       setForm({
@@ -4627,6 +4628,7 @@ export default function App() {
 
   useEffect(() => {
     setLogoutHandler(handleLogout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleLogin(accessToken, userRole, newUser = false) {

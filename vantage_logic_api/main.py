@@ -1427,6 +1427,23 @@ def update_me(
     db.commit()
     return {"message": "Profile updated"}
 
+@app.patch("/me/update-company")
+def update_company(
+    company_name: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    company = db.query(models.Company).filter(
+        models.Company.company_id == current_user.company_id
+    ).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    company.company_name = company_name
+    db.commit()
+    return {"message": "Company updated"}
+
 @app.post("/me/change-password")
 def change_password(
     current_password: str,
