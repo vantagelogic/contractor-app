@@ -11,14 +11,13 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import secrets
-import google.generativeai as genai
+import os
 import base64
 import json
 import re
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+import google.generativeai as genai
 
-from datetime import datetime, timedelta
-import os
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "")
