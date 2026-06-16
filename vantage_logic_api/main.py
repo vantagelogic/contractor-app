@@ -645,7 +645,7 @@ def get_jobs(current_user: models.User = Depends(get_current_user), db: Session 
 @app.post("/jobs")
 def create_job(
     job_name: str,
-    job_code: str = None
+    job_code: str = None,
     street: str = None,
     city: str = None,
     province: str = None,
