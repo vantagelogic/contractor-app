@@ -400,7 +400,7 @@ function SignUp({ onCheckEmail, onBack }) {
         <div style={{ height: "3px", background: `linear-gradient(90deg, ${theme.gold} 0%, #e0b75e 50%, ${theme.gold} 100%)` }} />
         <div style={{ padding: "34px 32px" }}>
         <h1 style={{ fontSize: "23px", fontWeight: "800", color: theme.primary, fontFamily: font.display, margin: "0 0 6px", letterSpacing: "-0.5px" }}>Start your free trial</h1>
-        <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 24px" }}>30 days free. No credit card required.</p>
+        <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 24px" }}>14 days free. No credit card required.</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Company Name</label>
@@ -1329,15 +1329,21 @@ function MaterialsForm({ token, readonly = false }) {
 
       {matTab === "scan" ? (
         <div style={styles.card}>
-          {!scanResult ? (
+          {scanning ? (
+            <div style={{ textAlign: "center", padding: "40px 20px" }}>
+              <div style={{ marginBottom: "16px" }}><Spinner size={32} color={theme.primary} /></div>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>Reading your receipt</div>
+              <div style={{ fontSize: "13px", color: theme.textSecondary, marginTop: "6px" }}>This takes a few seconds</div>
+            </div>
+          ) : !scanResult ? (
             <>
-              <div style={{ marginBottom: "18px" }}>
-                <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "4px" }}>Scan a Receipt</div>
-                <p style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: 1.5, margin: 0 }}>Point your camera at a receipt and we'll pull out the items automatically.</p>
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ fontSize: "17px", fontWeight: "700", color: theme.primary, fontFamily: font.display, marginBottom: "4px" }}>Scan a Receipt</div>
+                <p style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: 1.55, margin: 0 }}>Take a photo and we'll read the line items for you.</p>
               </div>
 
-              <label style={styles.label}>Job</label>
-              <select style={{ ...styles.input, marginBottom: "20px" }} value={scanJob} onChange={e => { setScanJob(e.target.value); setScanError(""); }}>
+              <label style={styles.label}>Which job is this for?</label>
+              <select style={{ ...styles.input, marginBottom: "20px", fontSize: "15px" }} value={scanJob} onChange={e => { setScanJob(e.target.value); setScanError(""); }}>
                 <option value="">Select a job</option>
                 {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
               </select>
@@ -1351,7 +1357,7 @@ function MaterialsForm({ token, readonly = false }) {
                 onChange={async (e) => {
                   const file = e.target.files[0];
                   if (!file) return;
-                  if (!scanJob) { setScanError("Select a job before taking the photo."); return; }
+                  if (!scanJob) { setScanError("Select a job first."); return; }
                   setScanError("");
                   setScanning(true);
                   setScanResult(null);
@@ -1388,83 +1394,101 @@ function MaterialsForm({ token, readonly = false }) {
                 }}
               />
 
-              {scanError && <p style={{ ...styles.errorMsg, marginBottom: "12px" }}>{scanError}</p>}
-
-              {scanJob ? (
-                <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", padding: "18px", backgroundColor: scanning ? theme.bg : theme.primary, color: scanning ? theme.textSecondary : "white", borderRadius: "12px", cursor: scanning ? "not-allowed" : "pointer", fontSize: "15px", fontWeight: "700", fontFamily: font.body, transition: "background 0.2s" }}>
-                  {scanning ? (
-                    <><Spinner color={theme.primary} size={18} /> Reading receipt...</>
-                  ) : (
-                    <>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                      Take Receipt Photo
-                    </>
-                  )}
-                </label>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", padding: "28px 20px", backgroundColor: theme.bg, borderRadius: "12px", border: `1.5px dashed ${theme.border}` }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  <span style={{ fontSize: "13px", color: theme.textLight, fontFamily: font.body, textAlign: "center" }}>Select a job above to enable the camera</span>
+              {scanError && (
+                <div style={{ backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}`, borderRadius: "8px", padding: "10px 14px", marginBottom: "14px" }}>
+                  <p style={{ fontSize: "13px", color: theme.danger, margin: 0, fontWeight: "600" }}>{scanError}</p>
                 </div>
               )}
-              <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "12px", marginBottom: 0 }}>Works best in good lighting with the receipt flat</p>
+
+              {scanJob ? (
+                <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "18px 20px", backgroundColor: theme.primary, color: "white", borderRadius: "12px", cursor: "pointer", fontSize: "16px", fontWeight: "700", fontFamily: font.body }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Take Receipt Photo
+                </label>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "32px 20px", backgroundColor: theme.bg, borderRadius: "12px", border: `1.5px dashed ${theme.border}` }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <span style={{ fontSize: "13px", color: theme.textLight, fontFamily: font.body, textAlign: "center", lineHeight: 1.5 }}>Select a job above, then tap here to photograph your receipt</span>
+                </div>
+              )}
+
+              <p style={{ fontSize: "12px", color: theme.textLight, textAlign: "center", marginTop: "12px", marginBottom: 0 }}>Best results in good lighting with the receipt flat</p>
             </>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
                 <div>
-                  <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{scanResult.vendor || "Receipt scanned"}</div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{jobs.find(j => String(j.job_id) === scanJob)?.job_name || ""}</div>
+                  <div style={{ fontSize: "17px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>{scanResult.vendor || "Receipt scanned"}</div>
+                  <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px" }}>
+                    {jobs.find(j => String(j.job_id) === scanJob)?.job_name || ""}
+                  </div>
                 </div>
-                <button onClick={() => { setScanResult(null); setScanItems([]); setScanError(""); }} style={{ fontSize: "12px", color: theme.accent, background: "none", border: `1px solid ${theme.accent}`, borderRadius: "7px", padding: "5px 12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Retake</button>
+                <button onClick={() => { setScanResult(null); setScanItems([]); setScanError(""); }} style={{ fontSize: "12px", color: theme.accent, background: "none", border: `1px solid ${theme.accent}`, borderRadius: "8px", padding: "6px 14px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", flexShrink: 0, marginLeft: "12px" }}>Retake</button>
               </div>
 
-              <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "10px", lineHeight: 1.5 }}>Tax, deposits, and payment lines are filtered out. Uncheck anything else you don't want to save.</p>
+              <div style={{ backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, borderRadius: "8px", padding: "10px 14px", marginBottom: "16px" }}>
+                <p style={{ fontSize: "12px", color: theme.accent, margin: 0, fontWeight: "600" }}>Review each item before saving. Uncheck anything that should not be logged as a material.</p>
+              </div>
 
               {scanItems.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px", backgroundColor: theme.bg, borderRadius: "10px", marginBottom: "14px" }}>
-                  <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No material items found. The receipt may only contain tax or payment lines.</p>
-                  <button onClick={() => { setScanResult(null); setScanItems([]); }} style={{ marginTop: "12px", fontSize: "13px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Try Again</button>
+                <div style={{ textAlign: "center", padding: "28px 20px", backgroundColor: theme.bg, borderRadius: "12px", marginBottom: "14px" }}>
+                  <p style={{ fontSize: "14px", color: theme.textSecondary, margin: "0 0 14px", lineHeight: 1.55 }}>No material items found after filtering tax and payment lines.</p>
+                  <button onClick={() => { setScanResult(null); setScanItems([]); }} style={{ fontSize: "13px", color: theme.accent, background: "none", border: `1px solid ${theme.accent}`, borderRadius: "8px", padding: "8px 18px", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Try Again</button>
                 </div>
               ) : (
-                <div style={{ backgroundColor: theme.bg, borderRadius: "10px", border: `1px solid ${theme.border}`, overflow: "hidden", marginBottom: "12px" }}>
+                <div style={{ borderRadius: "10px", border: `1px solid ${theme.border}`, overflow: "hidden", marginBottom: "14px" }}>
                   {scanItems.map((item, i) => (
-                    <div key={item.id} style={{ padding: "12px 14px", borderBottom: i < scanItems.length - 1 ? `1px solid ${theme.border}` : "none", backgroundColor: item.include ? "white" : "#fafafa" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: item.include ? "8px" : 0 }}>
-                        <input type="checkbox" checked={item.include} onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: theme.primary, cursor: "pointer" }} />
-                        <span style={{ flex: 1, fontSize: "13px", color: item.include ? theme.textPrimary : theme.textLight, fontWeight: "500", textDecoration: item.include ? "none" : "line-through" }}>{item.description}</span>
-                        <span style={{ fontSize: "14px", fontWeight: "700", color: item.include ? theme.primary : theme.textLight, flexShrink: 0 }}>${parseFloat(item.line_total || 0).toFixed(2)}</span>
+                    <div key={item.id} style={{ backgroundColor: item.include ? "white" : theme.bg, borderBottom: i < scanItems.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px" }}>
+                        <input
+                          type="checkbox"
+                          checked={item.include}
+                          onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))}
+                          style={{ width: "18px", height: "18px", flexShrink: 0, accentColor: theme.primary, cursor: "pointer" }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "14px", fontWeight: "600", color: item.include ? theme.textPrimary : theme.textLight, textDecoration: item.include ? "none" : "line-through", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.description}</div>
+                          {item.include && (
+                            <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>qty {item.quantity}</div>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "16px", fontWeight: "700", color: item.include ? theme.primary : theme.textLight, flexShrink: 0 }}>${parseFloat(item.line_total || 0).toFixed(2)}</div>
                       </div>
                       {item.include && (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", paddingLeft: "26px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", padding: "0 16px 14px 46px" }}>
                           <input
                             value={item.description}
                             onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
-                            style={{ ...styles.input, marginTop: 0, fontSize: "12px", padding: "5px 8px" }}
-                            placeholder="Description"
+                            style={{ ...styles.input, marginTop: 0, fontSize: "13px" }}
+                            placeholder="Edit description"
                           />
                           <input
                             type="number"
                             step="0.01"
                             value={item.line_total}
                             onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, line_total: e.target.value } : x))}
-                            style={{ ...styles.input, marginTop: 0, fontSize: "12px", padding: "5px 8px", textAlign: "right" }}
-                            placeholder="Amount"
+                            style={{ ...styles.input, marginTop: 0, width: "80px", fontSize: "13px", textAlign: "right" }}
                           />
                         </div>
                       )}
                     </div>
                   ))}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", backgroundColor: "white", borderTop: `1px solid ${theme.border}` }}>
-                    <span style={{ fontSize: "12px", color: theme.textSecondary }}>{scanItems.filter(x => x.include).length} of {scanItems.length} items selected</span>
-                    <span style={{ fontSize: "14px", fontWeight: "800", color: theme.primary }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", backgroundColor: theme.bg, borderTop: `1px solid ${theme.border}` }}>
+                    <span style={{ fontSize: "13px", color: theme.textSecondary, fontWeight: "500" }}>
+                      {scanItems.filter(x => x.include).length} item{scanItems.filter(x => x.include).length !== 1 ? "s" : ""} selected
+                    </span>
+                    <span style={{ fontSize: "16px", fontWeight: "800", color: theme.primary }}>
                       ${scanItems.filter(x => x.include).reduce((s, x) => s + parseFloat(x.line_total || 0), 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
               )}
 
-              {scanError && <p style={{ ...styles.errorMsg, marginBottom: "10px" }}>{scanError}</p>}
+              {scanError && (
+                <div style={{ backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}`, borderRadius: "8px", padding: "10px 14px", marginBottom: "14px" }}>
+                  <p style={{ fontSize: "13px", color: theme.danger, margin: 0, fontWeight: "600" }}>{scanError}</p>
+                </div>
+              )}
 
               {scanItems.filter(x => x.include).length > 0 && (
                 <button
@@ -1496,10 +1520,10 @@ function MaterialsForm({ token, readonly = false }) {
                       setMatTab("store");
                       setSubmitted(true);
                     } else {
-                      setScanError(`${failed} item(s) failed to save. Please try again.`);
+                      setScanError(`${failed} item${failed !== 1 ? "s" : ""} failed to save. Please try again.`);
                     }
                   }}
-                  style={{ ...styles.button, marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: savingItems ? 0.75 : 1 }}
+                  style={{ ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: savingItems ? 0.75 : 1 }}
                 >
                   {savingItems ? <><Spinner /> Saving...</> : `Save ${scanItems.filter(x => x.include).length} Item${scanItems.filter(x => x.include).length !== 1 ? "s" : ""}`}
                 </button>
