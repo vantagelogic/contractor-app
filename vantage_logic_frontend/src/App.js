@@ -172,9 +172,7 @@ function NavBar({ view, setView, role, onLogout }) {
   const tabs = isCrew
     ? [
         { id: "home", label: "Home", Icon: IconHome },
-        { id: "timesheet", label: "Hours", Icon: IconHours },
-        { id: "materials", label: "Materials", Icon: IconMaterials },
-        { id: "mileage", label: "Mileage", Icon: IconMileage },
+        { id: "log", label: "Log", Icon: IconMaterials },
         { id: "crew_requests", label: "Requests", Icon: IconRequests },
         { id: "settings", label: "Settings", Icon: IconAdmin },
       ]
@@ -184,6 +182,7 @@ function NavBar({ view, setView, role, onLogout }) {
         { id: "inventory", label: "Inventory", Icon: IconInventory },
         { id: "requests", label: "Requests", Icon: IconRequests },
         { id: "admin", label: "Setup", Icon: IconAdmin },
+        { id: "settings", label: "Settings", Icon: IconAdmin },
       ];
 
   if (mobile) {
