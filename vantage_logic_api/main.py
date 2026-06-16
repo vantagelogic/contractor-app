@@ -16,9 +16,9 @@ import os
 import base64
 import json
 import re
-import google.generativeai as genai
+import google as genai
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "")
