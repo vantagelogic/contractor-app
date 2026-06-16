@@ -48,6 +48,7 @@ const isMobile = () => window.innerWidth < 768;
 
 const styles = {
   container: { maxWidth: "640px", margin: "0 auto", padding: "24px 18px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
+  containerCrew: { maxWidth: "960px", margin: "0 auto", padding: "24px 18px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
   containerWide: { maxWidth: "1120px", margin: "0 auto", padding: "24px 24px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
   title: { fontSize: "27px", fontWeight: "800", color: theme.primary, marginBottom: "5px", fontFamily: font.display, letterSpacing: "-0.7px", lineHeight: 1.15 },
   subtitle: { fontSize: "14px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.4 },
@@ -775,13 +776,15 @@ function CrewHome({ token, setView, readonly = false }) {
 
 
   return (
-    <div style={styles.container}>
+    <div style={styles.containerCrew} className="vl-screen">
       {/* Greeting */}
       <div style={{ marginBottom: "26px" }}>
         <h1 style={styles.title}>{greeting}{firstName ? `, ${firstName}` : ""}</h1>
         <p style={styles.subtitle}>{today}</p>
       </div>
 
+      <div className="vl-home-grid">
+        <div>
       {/* This Week */}
       <div style={{ marginBottom: "22px" }}>
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>This Week</div>
@@ -972,6 +975,9 @@ function CrewHome({ token, setView, readonly = false }) {
         </div>
       )}
 
+        </div>
+
+        <div>
       {/* This Month + All Time */}
       <div style={{ marginBottom: "28px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
@@ -1079,6 +1085,8 @@ function CrewHome({ token, setView, readonly = false }) {
               <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{stats.all_time.km} km · {stats.all_time.jobs} jobs</div>
             </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
 
@@ -1248,11 +1256,6 @@ function TimesheetForm({ token, readonly = false }) {
   const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
   const [scheduleToLog, setScheduleToLog] = useState([]);
   const [dismissedSchedule, setDismissedSchedule] = useState([]);
-  const [voiceListening, setVoiceListening] = useState(false);
-  const [voiceProcessing, setVoiceProcessing] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState("");
-  const [voiceError, setVoiceError] = useState("");
-  const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -1372,113 +1375,7 @@ function TimesheetForm({ token, readonly = false }) {
           </div>
         </div>
       )}
-      {voiceSupported && (
-        <div style={{ ...styles.card, marginBottom: "14px", background: voiceListening ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)` : "white", transition: "background 0.3s" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <button
-              type="button"
-              onPointerDown={() => {
-                setVoiceError("");
-                setVoiceTranscript("");
-                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SR();
-                recognition.lang = "en-CA";
-                recognition.continuous = false;
-                recognition.interimResults = true;
-                window._voiceRecognition = recognition;
-                recognition.onresult = (e) => {
-                  const t = Array.from(e.results).map(r => r[0].transcript).join("");
-                  setVoiceTranscript(t);
-                  window._voiceTranscript = t;
-                };
-                recognition.onerror = (e) => {
-                  setVoiceListening(false);
-                  setVoiceError(e.error === "not-allowed" ? "Microphone permission denied. Check your browser settings." : "Could not hear clearly. Try again.");
-                };
-                recognition.onend = async () => {
-                  setVoiceListening(false);
-                  const transcript = window._voiceTranscript;
-                  if (!transcript || transcript.trim().length < 3) {
-                    setVoiceError("Nothing was captured. Hold the button and speak clearly.");
-                    return;
-                  }
-                  setVoiceProcessing(true);
-                  try {
-                    const res = await apiFetch(`${API}/voice/parse-timesheet`, {
-                      method: "POST",
-                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                      body: JSON.stringify({ transcript })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                      const matchedJob = jobs.find(j => j.job_name.toLowerCase().includes((data.job_name || "").toLowerCase()) || (data.job_name || "").toLowerCase().includes(j.job_name.toLowerCase()));
-                      const matchedCC = costCodes.find(c => {
-                        const ccStr = `${c.code} ${c.description}`.toLowerCase();
-                        const hint = (data.cost_code || "").toLowerCase();
-                        return hint && (ccStr.includes(hint) || hint.includes(c.code.toLowerCase()) || hint.includes(c.description.toLowerCase()));
-                      });
-                      setFormData(prev => ({
-                        ...prev,
-                        hours_worked: data.hours ? String(data.hours) : prev.hours_worked,
-                        job_id: matchedJob ? String(matchedJob.job_id) : prev.job_id,
-                        cost_code_id: matchedCC ? String(matchedCC.cost_code_id) : prev.cost_code_id,
-                        field_notes: data.notes || prev.field_notes,
-                      }));
-                      setVoiceTranscript("");
-                    } else {
-                      setVoiceError(data.message || "Could not parse. Try again.");
-                    }
-                  } catch {
-                    setVoiceError("Something went wrong. Try again.");
-                  }
-                  setVoiceProcessing(false);
-                };
-                setVoiceListening(true);
-                recognition.start();
-              }}
-              onPointerUp={() => {
-                window._voiceTranscript = voiceTranscript;
-                if (window._voiceRecognition) { window._voiceRecognition.stop(); }
-              }}
-              onPointerLeave={() => {
-                window._voiceTranscript = voiceTranscript;
-                if (window._voiceRecognition && voiceListening) { window._voiceRecognition.stop(); }
-              }}
-              style={{ width: "56px", height: "56px", borderRadius: "50%", border: "none", backgroundColor: voiceListening ? "rgba(255,255,255,0.2)" : theme.accentLight, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", boxShadow: voiceListening ? "0 0 0 8px rgba(255,255,255,0.15)" : "none" }}
-            >
-              {voiceProcessing ? (
-                <Spinner size={22} color={voiceListening ? "white" : theme.primary} />
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={voiceListening ? "white" : theme.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-              )}
-            </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {voiceListening ? (
-                <>
-                  <div style={{ fontSize: "14px", fontWeight: "700", color: "white", marginBottom: "2px" }}>Listening... release when done</div>
-                  {voiceTranscript && <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{voiceTranscript}</div>}
-                </>
-              ) : voiceProcessing ? (
-                <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary }}>Reading your entry...</div>
-              ) : voiceError ? (
-                <div style={{ fontSize: "13px", color: theme.danger, fontWeight: "500" }}>{voiceError}</div>
-              ) : (
-                <>
-                  <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "2px" }}>Log by voice</div>
-                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>Hold and say something like "8 hours on the Johnson job under framing"</div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={styles.card}>
+            <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
             <IdentityBadge name={linkedEmployeeName} />
@@ -3960,7 +3857,34 @@ function Dashboard({ token, readonly = false }) {
             {[1,2,3,4].map(i => <Skeleton key={i} width="100%" height="180px" radius="12px" />)}
           </div>
         ) : sorted.length === 0 ? (
-          <div style={{ textAlign: "center", marginTop: "60px", color: theme.textSecondary }}>No {filter === "all" ? "" : filter} jobs yet.</div>
+          <div style={{ maxWidth: "520px", margin: "0 auto", paddingTop: "12px" }}>
+            <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "32px 28px", border: `1px solid ${theme.border}`, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+              <div style={{ width: "52px", height: "52px", borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "18px" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <h2 style={{ fontSize: "20px", fontWeight: "700", color: theme.primary, fontFamily: font.display, margin: "0 0 8px" }}>You're in. Let's get set up.</h2>
+              <p style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: 1.6, margin: "0 0 24px" }}>Your dashboard shows live job profitability as your crew logs time and materials. To get started, you need three things.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
+                {[
+                  { num: "1", title: "Add a job", desc: "Create your first active job with a budget and contract value." },
+                  { num: "2", title: "Add your crew", desc: "Add employees with their hourly rates so labour costs are accurate." },
+                  { num: "3", title: "Give crew app access", desc: "Create logins so they can log hours and materials from their phones." },
+                ].map(step => (
+                  <div key={step.num} style={{ display: "flex", gap: "14px", alignItems: "flex-start", padding: "14px 16px", backgroundColor: theme.bg, borderRadius: "10px" }}>
+                    <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: theme.primary, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", flexShrink: 0 }}>{step.num}</div>
+                    <div>
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "2px" }}>{step.title}</div>
+                      <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.5 }}>{step.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => window._setView && window._setView("admin")} style={{ ...styles.button, marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px" }}>
+                Go to Setup
+              </button>
+              <p style={{ fontSize: "12px", color: theme.textLight, textAlign: "center", marginTop: "12px", marginBottom: 0 }}>Takes about 5 minutes to get your first job running</p>
+            </div>
+          </div>
         ) : (
         <div className="vl-jobgrid">
         {sorted.map(job => {
@@ -4293,6 +4217,10 @@ function GlobalStyles() {
         .vl-statgrid { grid-template-columns: repeat(6, 1fr); }
       }
       .vl-week { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+      .vl-home-grid { display: grid; grid-template-columns: 1fr; gap: 0; align-items: start; }
+      @media (min-width: 900px) {
+        .vl-home-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+      }
       @media (min-width: 1020px) {
         .vl-week { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
       }
@@ -4406,7 +4334,8 @@ export default function App() {
   const stored = getStoredAuth();
   const [token, setToken] = useState(stored.token);
   const [role, setRole] = useState(stored.role);
-  const [view, setView] = useState(stored.role === "crew" ? "home" : "schedule");
+  const [view, setView] = useState(stored.role === "crew" ? "home" : "dashboard");
+  useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, [setView]);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobile, setMobile] = useState(isMobile());
