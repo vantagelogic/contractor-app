@@ -1123,6 +1123,156 @@ Match job_name and cost_code to the closest option from the lists provided. If n
         print(f"Voice parse error: {e}")
         return {"success": False, "message": "Something went wrong. Please try again."}
     
+@app.post("/voice/parse-entry")
+def parse_voice_entry(
+    body: VoiceRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        jobs = db.query(models.Job).filter(
+            models.Job.company_id == current_user.company_id,
+            models.Job.status == "active"
+        ).all()
+        cost_codes = db.query(models.CostCode).filter(
+            models.CostCode.company_id == current_user.company_id
+        ).all()
+
+        job_names = [j.job_name for j in jobs]
+        cc_list = [{"id": c.cost_code_id, "label": f"{c.code} {c.description}"} for c in cost_codes]
+        cc_names = [c["label"] for c in cc_list]
+
+        prompt = f"""You are a field entry assistant for a trades contractor app.
+Analyze this voice note and extract a structured entry: "{body.transcript}"
+
+Available jobs: {job_names}
+Available cost codes: {cc_names}
+
+Determine the entry type based on what was said:
+- "timesheet": if they mention hours worked, time on a job, or a shift
+- "material": if they mention buying something, a purchase, a supply, or a cost
+- "mileage": if they mention driving, km, distance, or travel
+- "request": if they mention needing something, reporting an issue, a safety concern, or asking for approval
+
+Return ONLY a JSON object with this exact structure, no other text:
+{{
+  "type": "timesheet|material|mileage|request",
+  "hours": 0.0,
+  "job_name": "closest matching job name from the list or empty string",
+  "cost_code": "closest matching cost code label from the list or empty string",
+  "cost_code_confidence": "high|low",
+  "amount": 0.0,
+  "description": "what was bought or description of request",
+  "km": 0.0,
+  "request_type": "Additional Materials|Equipment Issue|Safety Concern|Scope Change|Other",
+  "notes": "brief 1-sentence summary of any extra context. Empty string if nothing extra."
+}}
+
+Rules:
+- Only fill fields relevant to the detected type
+- cost_code_confidence is "high" if you are confident in the match, "low" if uncertain
+- For materials, amount is the dollar value if mentioned
+- Convert phrases like "half a day" to 4.0, "six and a half hours" to 6.5
+- Match job_name to the closest option from the list"""
+
+        from google.genai import types
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt]
+        )
+
+        raw = response.text.strip()
+        raw = re.sub(r"```json\s*", "", raw)
+        raw = re.sub(r"```\s*", "", raw)
+        raw = raw.strip()
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+
+        parsed = json.loads(raw)
+        return {"success": True, **parsed}
+
+    except json.JSONDecodeError:
+        return {"success": False, "message": "Could not parse. Please try again."}
+    except Exception as e:
+        print(f"Voice parse error: {e}")
+        return {"success": False, "message": "Something went wrong. Please try again."}
+    
+@app.post("/voice/parse-entry")
+def parse_voice_entry(
+    body: VoiceRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        jobs = db.query(models.Job).filter(
+            models.Job.company_id == current_user.company_id,
+            models.Job.status == "active"
+        ).all()
+        cost_codes = db.query(models.CostCode).filter(
+            models.CostCode.company_id == current_user.company_id
+        ).all()
+
+        job_names = [j.job_name for j in jobs]
+        cc_list = [{"id": c.cost_code_id, "label": f"{c.code} {c.description}"} for c in cost_codes]
+        cc_names = [c["label"] for c in cc_list]
+
+        prompt = f"""You are a field entry assistant for a trades contractor app.
+Analyze this voice note and extract a structured entry: "{body.transcript}"
+
+Available jobs: {job_names}
+Available cost codes: {cc_names}
+
+Determine the entry type based on what was said:
+- "timesheet": if they mention hours worked, time on a job, or a shift
+- "material": if they mention buying something, a purchase, a supply, or a cost
+- "mileage": if they mention driving, km, distance, or travel
+- "request": if they mention needing something, reporting an issue, a safety concern, or asking for approval
+
+Return ONLY a JSON object with this exact structure, no other text:
+{{
+  "type": "timesheet|material|mileage|request",
+  "hours": 0.0,
+  "job_name": "closest matching job name from the list or empty string",
+  "cost_code": "closest matching cost code label from the list or empty string",
+  "cost_code_confidence": "high|low",
+  "amount": 0.0,
+  "description": "what was bought or description of request",
+  "km": 0.0,
+  "request_type": "Additional Materials|Equipment Issue|Safety Concern|Scope Change|Other",
+  "notes": "brief 1-sentence summary of any extra context. Empty string if nothing extra."
+}}
+
+Rules:
+- Only fill fields relevant to the detected type
+- cost_code_confidence is "high" if you are confident in the match, "low" if uncertain
+- For materials, amount is the dollar value if mentioned
+- Convert phrases like "half a day" to 4.0, "six and a half hours" to 6.5
+- Match job_name to the closest option from the list"""
+
+        from google.genai import types
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt]
+        )
+
+        raw = response.text.strip()
+        raw = re.sub(r"```json\s*", "", raw)
+        raw = re.sub(r"```\s*", "", raw)
+        raw = raw.strip()
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+
+        parsed = json.loads(raw)
+        return {"success": True, **parsed}
+
+    except json.JSONDecodeError:
+        return {"success": False, "message": "Could not parse. Please try again."}
+    except Exception as e:
+        print(f"Voice parse error: {e}")
+        return {"success": False, "message": "Something went wrong. Please try again."}
+    
 @app.delete("/materials/{material_id}")
 def delete_material(
     material_id: int,
