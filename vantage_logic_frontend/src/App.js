@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 
-const API = "https://contractor-api-pi7o.onrender.com";
+const API =
+  process.env.REACT_APP_API_URL ??
+  (process.env.NODE_ENV === "development" ? "" : "https://contractor-api-pi7o.onrender.com");
 
 let _logoutFn = null;
 function setLogoutHandler(fn) { _logoutFn = fn; }
@@ -169,6 +171,9 @@ function NavBar({ view, setView, role, onLogout }) {
 
   const isCrew = role === "crew";
 
+  const logViews = ["log", "timesheet", "materials", "mileage"];
+  const isTabActive = (tabId) => tabId === "log" ? logViews.includes(view) : view === tabId;
+
   const tabs = isCrew
     ? [
         { id: "home", label: "Home", Icon: IconHome },
@@ -182,7 +187,6 @@ function NavBar({ view, setView, role, onLogout }) {
         { id: "inventory", label: "Inventory", Icon: IconInventory },
         { id: "requests", label: "Requests", Icon: IconRequests },
         { id: "admin", label: "Setup", Icon: IconAdmin },
-        { id: "settings", label: "Settings", Icon: IconAdmin },
       ];
 
   if (mobile) {
@@ -190,9 +194,9 @@ function NavBar({ view, setView, role, onLogout }) {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "12px 0 14px", boxShadow: "0 -1px 0 rgba(255,255,255,0.08), 0 -8px 28px rgba(0,0,0,0.28)", paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "6px 10px", borderRadius: "8px", minWidth: "48px", minHeight: "48px" }}>
-            <span style={{ color: view === tab.id ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
-            <span style={{ fontSize: "10px", color: view === tab.id ? "white" : "rgba(255,255,255,0.4)", fontWeight: view === tab.id ? "600" : "400", letterSpacing: "0.3px" }}>{tab.label}</span>
-            {view === tab.id && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
+            <span style={{ color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
+            <span style={{ fontSize: "10px", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", fontWeight: isTabActive(tab.id) ? "600" : "400", letterSpacing: "0.3px" }}>{tab.label}</span>
+            {isTabActive(tab.id) && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
           </button>
         ))}
       </div>
@@ -206,10 +210,10 @@ function NavBar({ view, setView, role, onLogout }) {
       </div>
       <div style={{ flex: 1, padding: "18px 12px" }}>
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: view === tab.id ? "rgba(255,255,255,0.12)" : "transparent", color: view === tab.id ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: view === tab.id ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
+          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: isTabActive(tab.id) ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
             <span style={{ display: "flex", flexShrink: 0 }}><tab.Icon /></span>
             <span>{tab.label}</span>
-            {view === tab.id && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
+            {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
           </button>
         ))}
       </div>
@@ -1260,7 +1264,17 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
 }
 
 // ─── TIMESHEET ────────────────────────────────────────────────
-function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
+function LogBackButton({ setView }) {
+  if (!setView) return null;
+  return (
+    <button type="button" onClick={() => setView("log")} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: theme.textSecondary, background: "none", border: "none", cursor: "pointer", padding: "0 0 12px", fontWeight: "600", fontFamily: font.body }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Log
+    </button>
+  );
+}
+
+function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1377,6 +1391,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   return (
     <div style={styles.container}>
+      <LogBackButton setView={setView} />
       <h1 style={styles.title}>Log Hours</h1>
       <p style={styles.subtitle}>Record your time on a job</p>
       {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
@@ -1473,7 +1488,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 }
 
 // ─── MATERIALS ────────────────────────────────────────────────
-function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
+function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: new Date().toISOString().split("T")[0], notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1585,6 +1600,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   return (
     <div style={styles.container}>
+      <LogBackButton setView={setView} />
       <h1 style={styles.title}>Log Materials</h1>
       <p style={styles.subtitle}>Record a material purchase or inventory pull</p>
 
@@ -1893,7 +1909,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 }
 
 // ─── MILEAGE ──────────────────────────────────────────────────
-function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
+function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
   const [formData, setFormData] = useState({ job_id: "", trip_date: new Date().toISOString().split("T")[0], km_driven: "", purpose: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1995,6 +2011,7 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
 
   return (
     <div style={styles.container}>
+      <LogBackButton setView={setView} />
       <h1 style={styles.title}>Log Mileage</h1>
       <p style={styles.subtitle}>Record a trip for a job</p>
       <div style={styles.card}>
@@ -3518,6 +3535,16 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
         />
       ) : (
         <>
+          {/* ── YOUR ACCOUNT ── */}
+          <SetupSection
+            number="★"
+            title="Your Account"
+            subtitle="Update your name, company name, and password."
+            complete={false}
+          >
+            <ProfileSettingsForm token={token} showCompany={true} />
+          </SetupSection>
+
           {/* ── STEP 1: JOBS ── */}
           <SetupSection
             number="1"
@@ -4288,7 +4315,7 @@ function LogHub({ setView }) {
 }
 
 
-function SettingsScreen({ token, role, onLogout }) {
+function ProfileSettingsForm({ token, role, showCompany = false }) {
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", company_name: "" });
   const [pwForm, setPwForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
   const [loading, setLoading] = useState(true);
@@ -4303,7 +4330,7 @@ function SettingsScreen({ token, role, onLogout }) {
     const hInner = { Authorization: `Bearer ${token}` };
     Promise.all([
       apiFetch(`${API}/me`, { headers: hInner }).then(r => r.json()),
-      apiFetch(`${API}/companies`, { headers: hInner }).then(r => r.json()).catch(() => []),
+      showCompany ? apiFetch(`${API}/companies`, { headers: hInner }).then(r => r.json()).catch(() => []) : Promise.resolve([]),
     ]).then(([me, companies]) => {
       const company = Array.isArray(companies) ? companies.find(c => c.company_id === me.company_id) : null;
       setForm({
@@ -4314,15 +4341,14 @@ function SettingsScreen({ token, role, onLogout }) {
       });
       setLoading(false);
     });
-  }, [token]);
+  }, [token, showCompany]);
 
   async function saveProfile() {
     setSaving(true);
     setMessage("");
     const params = new URLSearchParams({ first_name: form.first_name, last_name: form.last_name });
     const res = await apiFetch(`${API}/me/update?${params}`, { method: "PATCH", headers: h });
-    // Also update company name if owner/admin
-    if ((role === "owner" || role === "admin") && form.company_name) {
+    if (showCompany && form.company_name) {
       await apiFetch(`${API}/me/update-company?${new URLSearchParams({ company_name: form.company_name })}`, { method: "PATCH", headers: h }).catch(() => {});
     }
     setSaving(false);
@@ -4349,42 +4375,36 @@ function SettingsScreen({ token, role, onLogout }) {
     }
   }
 
-  if (loading) return <div style={styles.container}><Skeleton width="100%" height="300px" radius="12px" /></div>;
+  if (loading) return <Skeleton width="100%" height="220px" radius="12px" />;
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Settings</h1>
-      <p style={styles.subtitle}>Manage your account and preferences</p>
-
-      <div style={styles.card}>
-        <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "16px", fontFamily: font.display }}>Your Profile</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-          <div>
-            <label style={styles.label}>First Name</label>
-            <input style={styles.input} value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} placeholder="First name" />
-          </div>
-          <div>
-            <label style={styles.label}>Last Name</label>
-            <input style={styles.input} value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} placeholder="Last name" />
-          </div>
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+        <div>
+          <label style={styles.label}>First Name</label>
+          <input style={styles.input} value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} placeholder="First name" />
         </div>
-        <label style={styles.label}>Email</label>
-        <input style={{...styles.input, backgroundColor: theme.bg, color: theme.textSecondary}} value={form.email} disabled placeholder="Email" />
-        <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>Email cannot be changed. Contact support if needed.</p>
-        {(role === "owner" || role === "admin") && (
-          <>
-            <label style={styles.label}>Company Name</label>
-            <input style={styles.input} value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} placeholder="Your company name" />
-          </>
-        )}
-        {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "8px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
-        <button onClick={saveProfile} disabled={saving} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-          {saving ? <><Spinner /> Saving...</> : "Save Profile"}
-        </button>
+        <div>
+          <label style={styles.label}>Last Name</label>
+          <input style={styles.input} value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} placeholder="Last name" />
+        </div>
       </div>
+      <label style={styles.label}>Email</label>
+      <input style={{...styles.input, backgroundColor: theme.bg, color: theme.textSecondary}} value={form.email} disabled placeholder="Email" />
+      <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>Email cannot be changed. Contact support if needed.</p>
+      {showCompany && (
+        <>
+          <label style={styles.label}>Company Name</label>
+          <input style={styles.input} value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} placeholder="Your company name" />
+        </>
+      )}
+      {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "8px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
+      <button onClick={saveProfile} disabled={saving} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+        {saving ? <><Spinner /> Saving...</> : "Save Profile"}
+      </button>
 
-      <div style={{...styles.card, marginTop: "14px"}}>
-        <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "16px", fontFamily: font.display }}>Change Password</div>
+      <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "12px", fontFamily: font.display }}>Change Password</div>
         <label style={styles.label}>Current Password</label>
         <PasswordInput value={pwForm.current_password} onChange={e => setPwForm({...pwForm, current_password: e.target.value})} placeholder="Your current password" />
         <label style={styles.label}>New Password</label>
@@ -4396,6 +4416,20 @@ function SettingsScreen({ token, role, onLogout }) {
         <button onClick={savePassword} disabled={savingPw} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
           {savingPw ? <><Spinner /> Saving...</> : "Change Password"}
         </button>
+      </div>
+    </>
+  );
+}
+
+function SettingsScreen({ token, role, onLogout }) {
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Settings</h1>
+      <p style={styles.subtitle}>Manage your account and preferences</p>
+
+      <div style={styles.card}>
+        <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "16px", fontFamily: font.display }}>Your Profile</div>
+        <ProfileSettingsForm token={token} showCompany={false} />
       </div>
 
       <div style={{...styles.card, marginTop: "14px"}}>
@@ -4558,11 +4592,12 @@ export default function App() {
   const [token, setToken] = useState(stored.token);
   const [role, setRole] = useState(stored.role);
   const [view, setViewRaw] = useState(() => {
-    const saved = localStorage.getItem("vl_view");
+    let saved = localStorage.getItem("vl_view");
+    if (stored.role !== "crew" && saved === "settings") saved = "admin";
     const defaultView = stored.role === "crew" ? "home" : "dashboard";
     if (!saved) return defaultView;
     const crewViews = ["home", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
-    const ownerViews = ["dashboard", "schedule", "inventory", "requests", "admin", "settings"];
+    const ownerViews = ["schedule", "dashboard", "inventory", "requests", "admin"];
     const valid = stored.role === "crew" ? crewViews : ownerViews;
     return valid.includes(saved) ? saved : defaultView;
   });
@@ -4610,12 +4645,12 @@ export default function App() {
 
   // Keep the view valid for the current role (prevents owners landing on crew pages after refresh)
   useEffect(() => {
-    const crewViews = ["home", "timesheet", "materials", "mileage", "crew_requests"];
+    const crewViews = ["home", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
     const ownerViews = ["schedule", "dashboard", "inventory", "requests", "admin"];
     if (role === "crew" && !crewViews.includes(view)) {
       setView("home");
     } else if ((role === "owner" || role === "admin") && !ownerViews.includes(view)) {
-      setView("schedule");
+      setView("dashboard");
     }
   }, [role, view]);
 
@@ -4722,7 +4757,6 @@ export default function App() {
         )}
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
         {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
-        {view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
         <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
           {showOnboarding && (role === "owner" || role === "admin") && view === "schedule" && (
@@ -4733,10 +4767,11 @@ export default function App() {
           <div key={view} className="vl-screen">
           {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "log" && <LogHub setView={setView} />}
-          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
-          {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
-          {role === "crew" && view === "mileage" && <MileageForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
+          {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
+          {role === "crew" && view === "mileage" && <MileageForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
           {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} readonly={subStatus === "expired"} />}

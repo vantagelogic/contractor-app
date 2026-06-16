@@ -51,9 +51,18 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 app = FastAPI(title="Vantage Logic API", version="2.0")
+CORS_ORIGINS = [
+    "https://app.vantagelogic.ca",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+_extra = os.environ.get("CORS_ORIGINS", "")
+if _extra:
+    CORS_ORIGINS.extend(o.strip() for o in _extra.split(",") if o.strip())
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://app.vantagelogic.ca"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
