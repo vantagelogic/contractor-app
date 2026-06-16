@@ -4272,7 +4272,8 @@ function SettingsScreen({ token, role, onLogout }) {
   const [pwError, setPwError] = useState("");
   const h = { Authorization: `Bearer ${token}` };
 
-  useEffect(() => {
+useEffect(() => {
+    const h = { Authorization: `Bearer ${token}` };
     Promise.all([
       apiFetch(`${API}/me`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/companies`, { headers: h }).then(r => r.json()).catch(() => []),
