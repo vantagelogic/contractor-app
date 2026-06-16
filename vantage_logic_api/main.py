@@ -994,7 +994,7 @@ def parse_receipt(
         image_bytes = base64.b64decode(body.image_base64)
 
         # Set up Gemini vision model
-        model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        model = genai.GenerativeModel("gemini-1.5-flash-lite")
 
         # Build the prompt and image part
         prompt = """You are a receipt parser. Extract all line items from this receipt image.
