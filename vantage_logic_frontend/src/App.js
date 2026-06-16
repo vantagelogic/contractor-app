@@ -1234,9 +1234,7 @@ function MaterialsForm({ token, readonly = false }) {
   const [invForm, setInvForm] = useState({ job_id: "", inventory_id: "", quantity_requested: "", description: "" });
   const [invErrors, setInvErrors] = useState({});
   const [invSubmitting, setInvSubmitting] = useState(false);
-  const [costCodes, setCostCodes] = useState([]);
   const [scanJob, setScanJob] = useState("");
-  const [scanCostCode, setScanCostCode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanError, setScanError] = useState("");
@@ -1250,8 +1248,7 @@ function MaterialsForm({ token, readonly = false }) {
       apiFetch(`${API}/my-jobs`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/inventory`, { headers: h }).then(r => r.json()).catch(() => []),
-      apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).catch(() => []),
-    ]).then(([me, jobList, emps, inv, ccs]) => {
+    ]).then(([me, jobList, emps, inv]) => {
       if (me.employee_id) {
         setLinkedEmployeeId(me.employee_id);
         setFormData(prev => ({ ...prev, employee_id: me.employee_id }));
@@ -1259,7 +1256,6 @@ function MaterialsForm({ token, readonly = false }) {
       setJobs(jobList.filter(j => j.status === "active"));
       setEmployees(emps);
       setInventory(Array.isArray(inv) ? inv : []);
-      setCostCodes(Array.isArray(ccs) ? ccs : []);
       setLoading(false);
     });
   }, [token]);
