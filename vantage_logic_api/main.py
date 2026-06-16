@@ -16,9 +16,8 @@ import os
 import base64
 import json
 import re
-import google as genai
-
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+from google import genai as google_genai
+gemini_client = google_genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "")
@@ -993,10 +992,7 @@ def parse_receipt(
         # Decode base64 to raw bytes
         image_bytes = base64.b64decode(body.image_base64)
 
-        # Set up Gemini vision model
-        model = genai.GenerativeModel("gemini-1.5-flash-lite")
-
-        # Build the prompt and image part
+# Build the prompt
         prompt = """You are a receipt parser. Extract all line items from this receipt image.
 Return ONLY a JSON object with this exact structure, no other text:
 {
@@ -1009,10 +1005,14 @@ Return ONLY a JSON object with this exact structure, no other text:
 If you cannot read the receipt clearly, return {"error": "could not parse receipt"}."""
 
         # Send to Gemini
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": image_bytes}
-        ])
+        from google.genai import types
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+            ]
+        )
 
         raw = response.text.strip()
 
@@ -1043,7 +1043,7 @@ If you cannot read the receipt clearly, return {"error": "could not parse receip
     except Exception as e:
         print(f"Receipt parse error: {e}")
         return {"success": False, "message": "Something went wrong. Please try again."}
-
+    
 # =============================================
 # MILEAGE
 # =============================================
