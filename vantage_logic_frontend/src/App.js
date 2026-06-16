@@ -1390,16 +1390,23 @@ function MaterialsForm({ token, readonly = false }) {
 
               {scanError && <p style={{ ...styles.errorMsg, marginBottom: "12px" }}>{scanError}</p>}
 
-              <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "20px", backgroundColor: scanning ? theme.bg : (scanJob ? theme.primary : theme.textLight), color: "white", borderRadius: "12px", cursor: scanning || !scanJob ? "not-allowed" : "pointer", fontSize: "15px", fontWeight: "700", fontFamily: font.body, transition: "background 0.2s", pointerEvents: scanning ? "none" : "auto" }}>
-                {scanning ? (
-                  <><Spinner color="white" size={18} /> Reading receipt...</>
-                ) : (
-                  <>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    {scanJob ? "Take Receipt Photo" : "Select a job first"}
-                  </>
-                )}
-              </label>
+              {scanJob ? (
+                <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "20px", backgroundColor: scanning ? theme.bg : theme.primary, color: scanning ? theme.textSecondary : "white", borderRadius: "12px", cursor: scanning ? "not-allowed" : "pointer", fontSize: "15px", fontWeight: "700", fontFamily: font.body, transition: "background 0.2s", border: "none" }}>
+                  {scanning ? (
+                    <><Spinner color={theme.primary} size={18} /> Reading receipt...</>
+                  ) : (
+                    <>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      Take Receipt Photo
+                    </>
+                  )}
+                </label>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%", padding: "20px", backgroundColor: theme.bg, borderRadius: "12px", border: `1.5px dashed ${theme.border}`, fontSize: "14px", color: theme.textLight, fontFamily: font.body }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Select a job to enable the camera
+                </div>
+              )}
               <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "10px" }}>Works best in good lighting with the receipt flat</p>
             </>
           ) : (
