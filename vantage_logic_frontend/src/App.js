@@ -2895,7 +2895,7 @@ function CrewRequestsScreen({ token, readonly = false }) {
 
 // ─── SCHEDULE SCREEN ──────────────────────────────────────────
 function ScheduleScreen({ token, readonly = false }) {
-  const [tab, setTab] = useState("view");
+  const [tab, setTab] = useState("calendar");
   const [employees, setEmployees] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [costCodes, setCostCodes] = useState([]);
@@ -2911,6 +2911,38 @@ function ScheduleScreen({ token, readonly = false }) {
   });
   const [errors, setErrors] = useState({});
   const [jobFilter, setJobFilter] = useState("all");
+
+  // ── Drag & drop
+  const [dragItem, setDragItem] = useState(null);
+  const [dragOverCell, setDragOverCell] = useState(null);
+
+  // ── Shift templates (persisted to localStorage)
+  const TEMPLATE_COLORS = ["#1a3d2b", "#2d6a4f", "#c8973a", "#b83232", "#2563eb", "#7c3aed", "#0891b2", "#059669"];
+  const [templates, setTemplates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("vl_shift_templates") || "[]"); }
+    catch { return []; }
+  });
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [templateForm, setTemplateForm] = useState({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" });
+
+  function saveTemplates(t) { setTemplates(t); localStorage.setItem("vl_shift_templates", JSON.stringify(t)); }
+  function deleteTemplate(id) { saveTemplates(templates.filter(t => t.id !== id)); }
+  function startEditTemplate(tpl) {
+    setEditingTemplate(tpl.id);
+    setTemplateForm({ name: tpl.name, job_id: tpl.job_id, cost_code_id: tpl.cost_code_id, hours: tpl.hours, color: tpl.color, notes: tpl.notes || "" });
+    setShowTemplateForm(true);
+  }
+  function handleSaveTemplate() {
+    if (!templateForm.name || !templateForm.job_id || !templateForm.cost_code_id) return;
+    if (editingTemplate) {
+      saveTemplates(templates.map(t => t.id === editingTemplate ? { ...templateForm, id: editingTemplate } : t));
+    } else {
+      saveTemplates([...templates, { ...templateForm, id: Date.now().toString() }]);
+    }
+    setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" });
+    setShowTemplateForm(false); setEditingTemplate(null);
+  }
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
@@ -3018,12 +3050,39 @@ function ScheduleScreen({ token, readonly = false }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function quickAdd(dateStr) {
-    setForm(f => ({ ...f, scheduled_date: dateStr }));
+  function quickAdd(dateStr, empId = "") {
+    setForm(f => ({ ...f, scheduled_date: dateStr, employee_id: empId !== "" ? empId : f.employee_id }));
     setErrors({});
     setTab("add");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  async function dropOnCell(employeeId, dateStr) {
+    if (!dragItem || readonly) return;
+    const h = { Authorization: `Bearer ${token}` };
+    if (dragItem.type === "template") {
+      const tpl = dragItem.data;
+      if (!tpl.job_id || !tpl.cost_code_id) { showMsg("Template is missing job or cost code."); return; }
+      const params = new URLSearchParams({ employee_id: employeeId, job_id: tpl.job_id, cost_code_id: tpl.cost_code_id, scheduled_date: dateStr, scheduled_hours: tpl.hours });
+      if (tpl.notes) params.append("notes", tpl.notes);
+      const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: h });
+      if (res.ok) { showMsg("Shift added."); loadData(); } else showMsg("Failed to add shift.");
+    } else if (dragItem.type === "assignment") {
+      const s = dragItem.data;
+      if (String(s.employee_id) === String(employeeId) && s.scheduled_date === dateStr) return;
+      const params = new URLSearchParams({ employee_id: employeeId, job_id: s.job_id, cost_code_id: s.cost_code_id, scheduled_date: dateStr, scheduled_hours: s.scheduled_hours });
+      if (s.notes) params.append("notes", s.notes);
+      await apiFetch(`${API}/schedules/${s.schedule_id}`, { method: "DELETE", headers: h });
+      const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: h });
+      if (res.ok) { showMsg("Shift moved."); loadData(); } else showMsg("Failed to move shift.");
+    }
+    setDragItem(null); setDragOverCell(null);
+  }
+
+  // Job → color mapping
+  const JOB_PALETTE = ["#1a3d2b", "#c8973a", "#2563eb", "#b83232", "#7c3aed", "#0891b2", "#059669", "#ea580c"];
+  const jobColors = {};
+  jobs.forEach((j, i) => { jobColors[j.job_id] = JOB_PALETTE[i % JOB_PALETTE.length]; });
 
   const filteredSchedules = jobFilter === "all" ? schedules : schedules.filter(s => String(s.job_id) === jobFilter);
   const byDate = {};
@@ -3032,159 +3091,191 @@ function ScheduleScreen({ token, readonly = false }) {
     byDate[s.scheduled_date].push(s);
   });
   const weekHours = filteredSchedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
-
-  const tabBtnStyle = (id) => ({ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "14px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" });
+  const tabBtnStyle = (id) => ({ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" });
 
   return (
     <div style={styles.containerWide}>
       <h1 style={styles.title}>Schedule</h1>
-      <p style={styles.subtitle}>Plan and view your crew assignments</p>
+      <p style={styles.subtitle}>Drag shift templates onto your crew to schedule the week</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
-      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}`, maxWidth: "420px" }}>
-        <button onClick={() => setTab("view")} style={tabBtnStyle("view")}>View Schedule</button>
-        <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Assignment</button>
+      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}`, maxWidth: "460px" }}>
+        <button onClick={() => setTab("calendar")} style={tabBtnStyle("calendar")}>Calendar</button>
+        <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Shift</button>
+        <button onClick={() => setTab("templates")} style={tabBtnStyle("templates")}>Templates</button>
       </div>
 
-      {tab === "view" && (
+      {/* ── CALENDAR TAB ── */}
+      {tab === "calendar" && (
         <>
-          <div style={{ display: "flex", gap: "6px", marginBottom: "14px", flexWrap: "wrap" }}>
-            <button onClick={() => setJobFilter("all")} style={{ padding: "5px 12px", borderRadius: "16px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>All Jobs</button>
-            {jobs.map(j => (
-              <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "5px 12px", borderRadius: "16px", border: `1.5px solid ${jobFilter === String(j.job_id) ? theme.primary : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? theme.primary : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>{j.job_name}</button>
-            ))}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", gap: "8px" }}>
-            <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8249;</button>
-            <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
-              <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>
-                {weekHours > 0 ? `${weekHours}h scheduled` : "Nothing scheduled yet"}
-                {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", marginLeft: "8px", padding: 0 }}>This week</button>}
+          {/* Week nav */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "15px", color: theme.textPrimary, fontWeight: "600", minHeight: "38px" }}>‹</button>
+              <div style={{ textAlign: "center", minWidth: "160px" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
+                <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "1px" }}>
+                  {weekHours > 0 ? `${weekHours}h scheduled` : "Nothing scheduled"}
+                  {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", marginLeft: "6px", padding: 0 }}>Today</button>}
+                </div>
               </div>
+              <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "15px", color: theme.textPrimary, fontWeight: "600", minHeight: "38px" }}>›</button>
             </div>
-            <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "9px 16px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "14px", color: theme.textPrimary, fontWeight: "600", minHeight: "42px" }}>&#8250;</button>
+            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+              <button onClick={() => setJobFilter("all")} style={{ padding: "4px 10px", borderRadius: "12px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>All</button>
+              {jobs.map(j => <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "4px 10px", borderRadius: "12px", border: `1.5px solid ${jobFilter === String(j.job_id) ? jobColors[j.job_id] : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? jobColors[j.job_id] : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>{j.job_name}</button>)}
+            </div>
           </div>
 
-          {editingId && (
-            <div style={{ ...styles.card, marginBottom: "18px", border: `1.5px solid ${theme.gold}`, boxShadow: theme.shadowMd }}>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "10px", fontFamily: font.display }}>Edit Assignment</div>
-              <div className="vl-grid2">
-                <div>
-                  <label style={styles.label}>Employee</label>
-                  <select style={{...styles.input, marginTop: "4px"}} value={editForm.employee_id} onChange={e => setEditForm({...editForm, employee_id: e.target.value})}>
-                    {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>Job</label>
-                  <select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>
-                    {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>Cost Code</label>
-                  <select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>
-                    <option value="">Select cost code</option>
-                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
-                  </select>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                  <div>
-                    <label style={styles.label}>Date</label>
-                    <input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.scheduled_date} onChange={e => setEditForm({...editForm, scheduled_date: e.target.value})} />
-                  </div>
-                  <div>
-                    <label style={styles.label}>Hours</label>
-                    <input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.scheduled_hours} onChange={e => setEditForm({...editForm, scheduled_hours: e.target.value})} />
-                  </div>
-                </div>
-              </div>
-              <label style={styles.label}>Notes</label>
-              <input style={{...styles.input, marginTop: "4px"}} placeholder="Optional" value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
-              <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
-                <button onClick={() => handleEditSave(editingId)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "12px" }}>Save Changes</button>
-                <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "12px", backgroundColor: "#888" }}>Cancel</button>
-              </div>
+          {templates.length > 0 && (
+            <div style={{ fontSize: "12px", color: theme.textLight, marginBottom: "10px" }}>
+              💡 Drag a template onto a cell to schedule a shift. Drag an existing shift chip to move it.
             </div>
           )}
 
-          {loading ? (
-            <div className="vl-week">
-              {[1,2,3,4,5,6,7].map(i => <Skeleton key={i} width="100%" height="120px" radius="10px" />)}
-            </div>
-          ) : (
-            <div className="vl-week">
-              {days.map(day => {
-                const dateStr = day.toISOString().split("T")[0];
-                const daySchedules = byDate[dateStr] || [];
-                const isToday = dateStr === todayStr;
-                const dayTotal = daySchedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
-                const dow = day.toLocaleDateString("en-CA", { weekday: "short" }).toUpperCase();
-                const dayNum = day.getDate();
-                return (
-                  <div key={dateStr}>
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "8px", padding: "0 2px" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                        <span style={{ fontSize: "10.5px", fontWeight: "700", color: isToday ? theme.gold : theme.textLight, letterSpacing: "0.8px" }}>{dow}</span>
-                        <span style={{ fontSize: "16px", fontWeight: "700", color: isToday ? theme.gold : theme.primary }}>{dayNum}</span>
-                        {isToday && <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: theme.gold, alignSelf: "center" }} />}
-                      </div>
-                      {dayTotal > 0 && <span style={{ fontSize: "10.5px", fontWeight: "700", color: theme.textSecondary }}>{dayTotal}h</span>}
-                    </div>
+          {loading ? <div style={{ textAlign: "center", padding: "40px", color: theme.textLight }}>Loading…</div> : (
+            <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
 
-                    {daySchedules.map(s => (
-                      <div key={s.schedule_id} style={{ backgroundColor: "white", borderRadius: "10px", padding: "10px 12px", marginBottom: "8px", border: `1.5px solid ${editingId === s.schedule_id ? theme.gold : theme.border}`, boxShadow: theme.shadowSm }}>
-                        <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary, lineHeight: 1.3 }}>{s.employee_name}</div>
-                        <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.job_name}</div>
-                        {s.notes && <div style={{ fontSize: "10.5px", color: theme.textLight, marginTop: "3px", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.notes}</div>}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
-                          <span style={{ fontSize: "11px", fontWeight: "700", color: theme.accent, backgroundColor: theme.accentLight, padding: "2px 8px", borderRadius: "8px" }}>{s.scheduled_hours}h</span>
-                          <div style={{ display: "flex", gap: "10px" }}>
-                            <button onClick={() => startEdit(s)} style={{ fontSize: "11px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Edit</button>
-                            <button onClick={() => handleDelete(s.schedule_id)} style={{ fontSize: "11px", color: theme.danger, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Remove</button>
+              {/* Template sidebar */}
+              {templates.length > 0 && (
+                <div style={{ width: "154px", flexShrink: 0 }}>
+                  <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "8px" }}>Templates</div>
+                  {templates.map(tpl => {
+                    const job = jobs.find(j => String(j.job_id) === String(tpl.job_id));
+                    const cc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
+                    return (
+                      <div
+                        key={tpl.id}
+                        draggable={!readonly}
+                        onDragStart={() => setDragItem({ type: "template", data: tpl })}
+                        onDragEnd={() => { setDragItem(null); setDragOverCell(null); }}
+                        style={{ backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "8px", padding: "9px 10px", marginBottom: "6px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.id === tpl.id ? 0.45 : 1, boxShadow: theme.shadowSm }}
+                      >
+                        <div style={{ fontWeight: "700", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</div>
+                        <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job?.job_name || "?"}</div>
+                        <div style={{ fontSize: "10px", opacity: 0.75 }}>{cc?.code || "?"} · {tpl.hours}h</div>
+                      </div>
+                    );
+                  })}
+                  {!readonly && <button onClick={() => { setTab("templates"); setShowTemplateForm(true); setEditingTemplate(null); setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" }); }} style={{ width: "100%", padding: "7px", borderRadius: "8px", border: `1.5px dashed ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontSize: "11px", fontWeight: "600", fontFamily: font.body }}>+ Template</button>}
+                </div>
+              )}
+
+              {/* Calendar grid */}
+              <div style={{ flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                <div style={{ minWidth: "560px" }}>
+                  {/* Day header row */}
+                  <div style={{ display: "grid", gridTemplateColumns: "130px repeat(7, 1fr)", gap: "3px", marginBottom: "3px" }}>
+                    <div />
+                    {days.map(d => {
+                      const ds = d.toISOString().split("T")[0];
+                      const isToday = ds === todayStr;
+                      return (
+                        <div key={ds} style={{ textAlign: "center", padding: "3px 2px" }}>
+                          <div style={{ fontSize: "9px", fontWeight: "700", color: isToday ? theme.accent : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            {d.toLocaleDateString("en-CA", { weekday: "short" })}
+                          </div>
+                          <div style={{ fontSize: "14px", fontWeight: isToday ? "800" : "600", color: isToday ? "white" : theme.textPrimary, width: "26px", height: "26px", borderRadius: "50%", backgroundColor: isToday ? theme.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", margin: "2px auto 0" }}>
+                            {d.getDate()}
                           </div>
                         </div>
-                      </div>
-                    ))}
-
-                    <button onClick={() => quickAdd(dateStr)} style={{ width: "100%", padding: daySchedules.length === 0 ? "18px 8px" : "8px", borderRadius: "10px", border: `1.5px dashed ${theme.borderStrong}`, backgroundColor: "transparent", color: theme.textLight, cursor: "pointer", fontFamily: font.body, fontSize: "12px", fontWeight: "600", transition: "all 0.15s" }}>
-                      + Add
-                    </button>
+                      );
+                    })}
                   </div>
-                );
-              })}
+
+                  {/* Employee rows */}
+                  {employees.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px", color: theme.textLight, fontSize: "13px" }}>No active crew. Add employees in Setup first.</div>
+                  ) : employees.map(emp => {
+                    const empHours = filteredSchedules.filter(s => s.employee_id === emp.employee_id).reduce((sum, s) => sum + Number(s.scheduled_hours || 0), 0);
+                    return (
+                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "130px repeat(7, 1fr)", gap: "3px", marginBottom: "3px" }}>
+                        <div style={{ padding: "4px 8px 4px 0", display: "flex", flexDirection: "column", justifyContent: "center", minHeight: "58px", borderRight: `1px solid ${theme.border}`, paddingRight: "8px" }}>
+                          <div style={{ fontSize: "12px", fontWeight: "700", color: theme.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.first_name} {emp.last_name}</div>
+                          <div style={{ fontSize: "10px", color: theme.textLight, marginTop: "1px" }}>{emp.role || "Crew"}{empHours > 0 ? ` · ${empHours}h` : ""}</div>
+                        </div>
+                        {days.map(d => {
+                          const ds = d.toISOString().split("T")[0];
+                          const cellKey = `${emp.employee_id}-${ds}`;
+                          const isDragOver = dragOverCell === cellKey;
+                          const isToday = ds === todayStr;
+                          const cellShifts = (byDate[ds] || []).filter(s => s.employee_id === emp.employee_id);
+                          return (
+                            <div
+                              key={ds}
+                              onDragOver={e => { e.preventDefault(); if (dragItem) setDragOverCell(cellKey); }}
+                              onDragEnter={e => { e.preventDefault(); if (dragItem) setDragOverCell(cellKey); }}
+                              onDragLeave={() => setDragOverCell(prev => prev === cellKey ? null : prev)}
+                              onDrop={e => { e.preventDefault(); dropOnCell(emp.employee_id, ds); }}
+                              style={{ minHeight: "58px", borderRadius: "6px", padding: "3px", backgroundColor: isDragOver ? theme.accentLight : isToday ? "#f7fdf8" : "#fafaf9", border: isDragOver ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`, transition: "background-color 0.1s, border-color 0.1s", position: "relative" }}
+                            >
+                              {cellShifts.map(s => {
+                                const color = jobColors[s.job_id] || theme.primary;
+                                const job = jobs.find(j => j.job_id === s.job_id);
+                                return (
+                                  <div
+                                    key={s.schedule_id}
+                                    draggable={!readonly}
+                                    onDragStart={e => { e.stopPropagation(); setDragItem({ type: "assignment", data: s }); }}
+                                    onDragEnd={() => { setDragItem(null); setDragOverCell(null); }}
+                                    title={`${emp.first_name} · ${job?.job_name} · ${s.scheduled_hours}h${s.notes ? "\n" + s.notes : ""}`}
+                                    style={{ backgroundColor: color, color: "white", borderRadius: "4px", padding: "3px 5px", marginBottom: "2px", fontSize: "10px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.schedule_id === s.schedule_id ? 0.4 : 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "2px" }}
+                                  >
+                                    <div>
+                                      <div style={{ fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "9.5px", maxWidth: "70px" }}>{job?.job_name || "?"}</div>
+                                      <div style={{ opacity: 0.9, fontSize: "9px" }}>{s.scheduled_hours}h</div>
+                                    </div>
+                                    {!readonly && <button onClick={e => { e.stopPropagation(); handleDelete(s.schedule_id); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.75)", cursor: "pointer", fontSize: "12px", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>}
+                                  </div>
+                                );
+                              })}
+                              {!readonly && (
+                                <button onClick={() => quickAdd(ds, String(emp.employee_id))} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", background: "none", border: "none", cursor: "pointer", color: theme.textLight, fontSize: "14px", padding: "2px 0", opacity: cellShifts.length === 0 ? 0.4 : 0.2, lineHeight: 1 }}>+</button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* No-template hint */}
+                  {templates.length === 0 && !readonly && employees.length > 0 && (
+                    <div style={{ textAlign: "center", padding: "12px 16px", marginTop: "14px", borderRadius: "10px", backgroundColor: theme.goldLight, border: `1px solid ${theme.gold}`, fontSize: "12px", color: theme.warning }}>
+                      <strong>Tip:</strong> Create a Shift Template to enable drag-and-drop.{" "}
+                      <button onClick={() => setTab("templates")} style={{ color: theme.accent, fontWeight: "700", background: "none", border: "none", cursor: "pointer", fontSize: "12px", fontFamily: font.body, textDecoration: "underline", padding: 0 }}>Create your first template →</button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </>
       )}
 
+      {/* ── ADD SHIFT TAB ── */}
       {tab === "add" && (
         <div style={{ ...styles.card, maxWidth: "640px" }}>
-          <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary, marginBottom: "14px", fontFamily: font.display }}>New Assignment</div>
-
+          <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary, marginBottom: "14px", fontFamily: font.display }}>New Shift</div>
           <label style={styles.label}>Employee</label>
           <select style={errors.employee_id ? styles.inputError : styles.input} value={form.employee_id} onChange={e => { setForm({...form, employee_id: e.target.value}); setErrors({...errors, employee_id: ""}); }}>
             <option value="">Select employee</option>
             {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
           </select>
           {errors.employee_id && <p style={styles.errorMsg}>{errors.employee_id}</p>}
-
           <label style={styles.label}>Job</label>
           <select style={errors.job_id ? styles.inputError : styles.input} value={form.job_id} onChange={e => { setForm({...form, job_id: e.target.value}); setErrors({...errors, job_id: ""}); }}>
             <option value="">Select job</option>
             {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
           </select>
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
-
           <label style={styles.label}>Cost Code</label>
           <select style={errors.cost_code_id ? styles.inputError : styles.input} value={form.cost_code_id} onChange={e => { setForm({...form, cost_code_id: e.target.value}); setErrors({...errors, cost_code_id: ""}); }}>
             <option value="">Select cost code</option>
             {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
-
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
             <div>
               <label style={styles.label}>Date</label>
@@ -3197,17 +3288,114 @@ function ScheduleScreen({ token, readonly = false }) {
               {errors.scheduled_hours && <p style={styles.errorMsg}>{errors.scheduled_hours}</p>}
             </div>
           </div>
-
           <label style={styles.label}>Notes (optional)</label>
           <textarea style={styles.textarea} placeholder="Any details for the crew member" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-
-          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting}>
-            {submitting ? <><Spinner /> Adding...</> : "Add Assignment"}
+          <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting || readonly}>
+            {submitting ? <><Spinner /> Adding...</> : "Add Shift"}
           </button>
-
-          <button onClick={() => setTab("view")} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "500" }}>
-            View Schedule
+          <button onClick={() => setTab("calendar")} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "500" }}>
+            ← Back to Calendar
           </button>
+        </div>
+      )}
+
+      {/* ── TEMPLATES TAB ── */}
+      {tab === "templates" && (
+        <div style={{ maxWidth: "720px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+            <div>
+              <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>Shift Templates</div>
+              <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>Drag these from the Calendar view onto any crew member to schedule a shift.</div>
+            </div>
+            {!showTemplateForm && !readonly && (
+              <button onClick={() => { setShowTemplateForm(true); setEditingTemplate(null); setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" }); }} style={{ ...styles.button, marginTop: 0, padding: "10px 16px", fontSize: "13px" }}>+ New Template</button>
+            )}
+          </div>
+
+          {showTemplateForm && (
+            <div style={{ ...styles.card, marginBottom: "16px", border: `1.5px solid ${theme.gold}` }}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>{editingTemplate ? "Edit Template" : "New Template"}</div>
+              <label style={styles.label}>Template Name</label>
+              <input style={styles.input} value={templateForm.name} onChange={e => setTemplateForm({...templateForm, name: e.target.value})} placeholder='e.g. "8h Framing – Smith House"' />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={styles.label}>Job</label>
+                  <select style={styles.input} value={templateForm.job_id} onChange={e => setTemplateForm({...templateForm, job_id: e.target.value})}>
+                    <option value="">Select job</option>
+                    {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Cost Code</label>
+                  <select style={styles.input} value={templateForm.cost_code_id} onChange={e => setTemplateForm({...templateForm, cost_code_id: e.target.value})}>
+                    <option value="">Select cost code</option>
+                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.label}>Default Hours</label>
+                  <input style={styles.input} type="number" min="0.5" max="24" step="0.5" value={templateForm.hours} onChange={e => setTemplateForm({...templateForm, hours: e.target.value})} />
+                </div>
+                <div>
+                  <label style={styles.label}>Notes (optional)</label>
+                  <input style={styles.input} value={templateForm.notes} onChange={e => setTemplateForm({...templateForm, notes: e.target.value})} placeholder="e.g. Bring scaffold tools" />
+                </div>
+              </div>
+              <div style={{ marginTop: "12px" }}>
+                <label style={styles.label}>Color</label>
+                <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+                  {TEMPLATE_COLORS.map(c => (
+                    <button key={c} onClick={() => setTemplateForm({...templateForm, color: c})} style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: c, border: templateForm.color === c ? "3px solid white" : "none", boxShadow: templateForm.color === c ? `0 0 0 2.5px ${c}` : "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                  ))}
+                </div>
+              </div>
+              {templateForm.name && (
+                <div style={{ marginTop: "14px" }}>
+                  <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Preview</div>
+                  <div style={{ display: "inline-block", backgroundColor: templateForm.color, color: "white", borderRadius: "8px", padding: "9px 12px", minWidth: "130px" }}>
+                    <div style={{ fontWeight: "700", fontSize: "12px" }}>{templateForm.name}</div>
+                    <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px" }}>{jobs.find(j => String(j.job_id) === String(templateForm.job_id))?.job_name || "Job"}</div>
+                    <div style={{ fontSize: "10px", opacity: 0.75 }}>{costCodes.find(c => String(c.cost_code_id) === String(templateForm.cost_code_id))?.code || "CC"} · {templateForm.hours}h</div>
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+                <button onClick={handleSaveTemplate} disabled={!templateForm.name || !templateForm.job_id || !templateForm.cost_code_id} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "12px" }}>{editingTemplate ? "Save Changes" : "Save Template"}</button>
+                <button onClick={() => { setShowTemplateForm(false); setEditingTemplate(null); }} style={{ flex: 1, padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "500" }}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {templates.length === 0 && !showTemplateForm && (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: theme.textLight, backgroundColor: "white", borderRadius: "12px", border: `1px dashed ${theme.border}` }}>
+              <div style={{ fontSize: "32px", marginBottom: "12px" }}>📋</div>
+              <div style={{ fontWeight: "600", color: theme.textPrimary, marginBottom: "6px" }}>No templates yet</div>
+              <div style={{ fontSize: "13px" }}>Create a template for a common shift — like "8h Framing on Smith Job" — then drag it onto the calendar grid.</div>
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+            {templates.map(tpl => {
+              const job = jobs.find(j => String(j.job_id) === String(tpl.job_id));
+              const cc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
+              return (
+                <div key={tpl.id} style={{ backgroundColor: "white", borderRadius: "12px", border: `1px solid ${theme.border}`, overflow: "hidden", boxShadow: theme.shadowSm }}>
+                  <div style={{ backgroundColor: tpl.color || theme.primary, color: "white", padding: "14px 16px" }}>
+                    <div style={{ fontWeight: "700", fontSize: "14px" }}>{tpl.name}</div>
+                    <div style={{ fontSize: "11px", opacity: 0.88, marginTop: "2px" }}>{job?.job_name || "Unknown job"}</div>
+                    <div style={{ fontSize: "11px", opacity: 0.75 }}>{cc ? `${cc.code} ${cc.description}` : "Unknown cost code"} · {tpl.hours}h</div>
+                    {tpl.notes && <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "2px", fontStyle: "italic" }}>{tpl.notes}</div>}
+                  </div>
+                  {!readonly && (
+                    <div style={{ display: "flex", padding: "8px 14px", gap: "14px" }}>
+                      <button onClick={() => startEditTemplate(tpl)} style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Edit</button>
+                      <button onClick={() => deleteTemplate(tpl.id)} style={{ fontSize: "12px", color: theme.danger, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Delete</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
