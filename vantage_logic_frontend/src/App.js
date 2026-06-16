@@ -1067,6 +1067,11 @@ function TimesheetForm({ token, readonly = false }) {
   const [linkedEmployeeName, setLinkedEmployeeName] = useState("");
   const [scheduleToLog, setScheduleToLog] = useState([]);
   const [dismissedSchedule, setDismissedSchedule] = useState([]);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceProcessing, setVoiceProcessing] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -1186,6 +1191,112 @@ function TimesheetForm({ token, readonly = false }) {
           </div>
         </div>
       )}
+      {voiceSupported && (
+        <div style={{ ...styles.card, marginBottom: "14px", background: voiceListening ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)` : "white", transition: "background 0.3s" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <button
+              type="button"
+              onPointerDown={() => {
+                setVoiceError("");
+                setVoiceTranscript("");
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SR();
+                recognition.lang = "en-CA";
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                window._voiceRecognition = recognition;
+                recognition.onresult = (e) => {
+                  const t = Array.from(e.results).map(r => r[0].transcript).join("");
+                  setVoiceTranscript(t);
+                  window._voiceTranscript = t;
+                };
+                recognition.onerror = (e) => {
+                  setVoiceListening(false);
+                  setVoiceError(e.error === "not-allowed" ? "Microphone permission denied. Check your browser settings." : "Could not hear clearly. Try again.");
+                };
+                recognition.onend = async () => {
+                  setVoiceListening(false);
+                  const transcript = window._voiceTranscript;
+                  if (!transcript || transcript.trim().length < 3) {
+                    setVoiceError("Nothing was captured. Hold the button and speak clearly.");
+                    return;
+                  }
+                  setVoiceProcessing(true);
+                  try {
+                    const res = await apiFetch(`${API}/voice/parse-timesheet`, {
+                      method: "POST",
+                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                      body: JSON.stringify({ transcript })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      const matchedJob = jobs.find(j => j.job_name.toLowerCase().includes((data.job_name || "").toLowerCase()) || (data.job_name || "").toLowerCase().includes(j.job_name.toLowerCase()));
+                      const matchedCC = costCodes.find(c => {
+                        const ccStr = `${c.code} ${c.description}`.toLowerCase();
+                        const hint = (data.cost_code || "").toLowerCase();
+                        return hint && (ccStr.includes(hint) || hint.includes(c.code.toLowerCase()) || hint.includes(c.description.toLowerCase()));
+                      });
+                      setFormData(prev => ({
+                        ...prev,
+                        hours_worked: data.hours ? String(data.hours) : prev.hours_worked,
+                        job_id: matchedJob ? String(matchedJob.job_id) : prev.job_id,
+                        cost_code_id: matchedCC ? String(matchedCC.cost_code_id) : prev.cost_code_id,
+                        field_notes: data.notes || prev.field_notes,
+                      }));
+                      setVoiceTranscript("");
+                    } else {
+                      setVoiceError(data.message || "Could not parse. Try again.");
+                    }
+                  } catch {
+                    setVoiceError("Something went wrong. Try again.");
+                  }
+                  setVoiceProcessing(false);
+                };
+                setVoiceListening(true);
+                recognition.start();
+              }}
+              onPointerUp={() => {
+                window._voiceTranscript = voiceTranscript;
+                if (window._voiceRecognition) { window._voiceRecognition.stop(); }
+              }}
+              onPointerLeave={() => {
+                window._voiceTranscript = voiceTranscript;
+                if (window._voiceRecognition && voiceListening) { window._voiceRecognition.stop(); }
+              }}
+              style={{ width: "56px", height: "56px", borderRadius: "50%", border: "none", backgroundColor: voiceListening ? "rgba(255,255,255,0.2)" : theme.accentLight, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", boxShadow: voiceListening ? "0 0 0 8px rgba(255,255,255,0.15)" : "none" }}
+            >
+              {voiceProcessing ? (
+                <Spinner size={22} color={voiceListening ? "white" : theme.primary} />
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={voiceListening ? "white" : theme.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              )}
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {voiceListening ? (
+                <>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: "white", marginBottom: "2px" }}>Listening... release when done</div>
+                  {voiceTranscript && <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{voiceTranscript}</div>}
+                </>
+              ) : voiceProcessing ? (
+                <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary }}>Reading your entry...</div>
+              ) : voiceError ? (
+                <div style={{ fontSize: "13px", color: theme.danger, fontWeight: "500" }}>{voiceError}</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "2px" }}>Log by voice</div>
+                  <div style={{ fontSize: "12px", color: theme.textSecondary }}>Hold and say something like "8 hours on the Johnson job under framing"</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -3494,7 +3605,7 @@ function EmpTimesheetGroup({ empName, empData, token, onDelete }) {
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked}h</div>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked} h</div>
                 {token && onDelete && (
                   <button onClick={async (e) => {
                     e.stopPropagation();
