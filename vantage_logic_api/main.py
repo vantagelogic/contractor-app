@@ -79,11 +79,11 @@ def send_welcome_email(to_email: str, company_name: str):
                 <p style="font-size: 15px; color: #5c5c5c; line-height: 1.6; margin: 0 0 24px;">
                     Your account is ready. Start by adding your jobs, employees, and cost codes from the Admin panel.
                 </p>
-                <a href="https://contractor-app-rose.vercel.app" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                <a href="https://app.vantagelogic.ca" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
                     Open Vantage Logic
                 </a>
                 <p style="font-size: 13px; color: #9a9a9a; margin-top: 32px;">
-                    30-day free trial. No credit card required.
+                    14-day free trial. No credit card required.
                 </p>
             </div>
             """
@@ -108,7 +108,7 @@ def send_crew_welcome_email(to_email: str, company_name: str):
                 <p style="font-size: 15px; color: #5c5c5c; line-height: 1.6; margin: 0 0 24px;">
                     {company_name} has added you to Vantage Logic. Log in to track your hours, mileage, and materials.
                 </p>
-                <a href="https://contractor-app-rose.vercel.app" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                <a href="https://app.vantagelogic.ca" style="display: inline-block; padding: 13px 28px; background: #1a3d2b; color: white; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">
                     Log In Now
                 </a>
                 <p style="font-size: 13px; color: #9a9a9a; margin-top: 32px;">
@@ -284,9 +284,11 @@ def signup(
         raise HTTPException(status_code=400, detail="An account with this email already exists")
 
     company = models.Company(
-        company_name=company_name,
-        trial_status="trial"
-    )
+    company_name=company_name,
+    trial_status="trial",
+    subscription_status="trial",
+    trial_end_date=datetime.utcnow() + timedelta(days=14)
+)
     db.add(company)
     db.commit()
     db.refresh(company)
@@ -309,22 +311,6 @@ def signup(
     return {
         "message": "Account created. Check your email to verify your account before signing in.",
         "email": email
-    }
-
-    token = create_access_token({
-        "user_id": user.user_id,
-        "company_id": company.company_id,
-        "role": user.role
-    })
-
-    send_welcome_email(email, company_name)
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "role": user.role,
-        "company_id": company.company_id,
-        "company_name": company.company_name,
-        "trial_status": company.trial_status
     }
 
 @app.get("/verify-email")
