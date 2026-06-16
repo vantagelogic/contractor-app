@@ -4260,7 +4260,35 @@ function PlanPicker({ token, currentTier, crewCount, onClose, onSuccess }) {
 }
 
 
-// ─── SETTINGS SCREEN ──────────────────────────────────────────
+// ─── LOG HUB ──────────────────────────────────────────────────
+function LogHub({ setView }) {
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Log Entry</h1>
+      <p style={styles.subtitle}>What do you want to record?</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
+        {[
+          { id: "timesheet", label: "Hours", desc: "Log time worked on a job", icon: IconHours, color: theme.primary },
+          { id: "materials", label: "Materials", desc: "Record a purchase or receipt scan", icon: IconMaterials, color: theme.gold },
+          { id: "mileage", label: "Mileage", desc: "Log kilometres driven for a job", icon: IconMileage, color: theme.accent },
+        ].map(item => (
+          <button key={item.id} onClick={() => setView(item.id)} style={{ display: "flex", alignItems: "center", gap: "16px", padding: "18px 20px", backgroundColor: "white", border: `1px solid ${theme.border}`, borderRadius: "14px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: font.body, transition: "all 0.15s" }}>
+            <div style={{ width: "48px", height: "48px", borderRadius: "12px", backgroundColor: `${item.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ color: item.color }}><item.icon /></span>
+            </div>
+            <div>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: theme.primary }}>{item.label}</div>
+              <div style={{ fontSize: "13px", color: theme.textSecondary, marginTop: "2px" }}>{item.desc}</div>
+            </div>
+            <svg style={{ marginLeft: "auto", flexShrink: 0 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 function SettingsScreen({ token, role, onLogout }) {
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", company_name: "" });
   const [pwForm, setPwForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
@@ -4272,8 +4300,7 @@ function SettingsScreen({ token, role, onLogout }) {
   const [pwError, setPwError] = useState("");
   const h = { Authorization: `Bearer ${token}` };
 
-useEffect(() => {
-    const h = { Authorization: `Bearer ${token}` };
+  useEffect(() => {
     Promise.all([
       apiFetch(`${API}/me`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/companies`, { headers: h }).then(r => r.json()).catch(() => []),
@@ -4292,11 +4319,12 @@ useEffect(() => {
   async function saveProfile() {
     setSaving(true);
     setMessage("");
-    const params = new URLSearchParams({
-      first_name: form.first_name,
-      last_name: form.last_name,
-    });
+    const params = new URLSearchParams({ first_name: form.first_name, last_name: form.last_name });
     const res = await apiFetch(`${API}/me/update?${params}`, { method: "PATCH", headers: h });
+    // Also update company name if owner/admin
+    if ((role === "owner" || role === "admin") && form.company_name) {
+      await apiFetch(`${API}/me/update-company?${new URLSearchParams({ company_name: form.company_name })}`, { method: "PATCH", headers: h }).catch(() => {});
+    }
     setSaving(false);
     if (res.ok) { setMessage("Profile updated."); setTimeout(() => setMessage(""), 3000); }
     else setMessage("Could not save. Please try again.");
@@ -4346,8 +4374,7 @@ useEffect(() => {
         {(role === "owner" || role === "admin") && (
           <>
             <label style={styles.label}>Company Name</label>
-            <input style={{...styles.input, backgroundColor: theme.bg, color: theme.textSecondary}} value={form.company_name} disabled />
-            <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>To change your company name contact support.</p>
+            <input style={styles.input} value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} placeholder="Your company name" />
           </>
         )}
         {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "8px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
@@ -4530,8 +4557,17 @@ export default function App() {
   const stored = getStoredAuth();
   const [token, setToken] = useState(stored.token);
   const [role, setRole] = useState(stored.role);
-  const [view, setView] = useState(stored.role === "crew" ? "home" : "dashboard");
-  useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, [setView]);
+  const [view, setViewRaw] = useState(() => {
+    const saved = localStorage.getItem("vl_view");
+    const defaultView = stored.role === "crew" ? "home" : "dashboard";
+    if (!saved) return defaultView;
+    const crewViews = ["home", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
+    const ownerViews = ["dashboard", "schedule", "inventory", "requests", "admin", "settings"];
+    const valid = stored.role === "crew" ? crewViews : ownerViews;
+    return valid.includes(saved) ? saved : defaultView;
+  });
+  function setView(v) { setViewRaw(v); localStorage.setItem("vl_view", v); }
+  useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, []);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobile, setMobile] = useState(isMobile());
@@ -4695,6 +4731,7 @@ export default function App() {
           )}
           <div key={view} className="vl-screen">
           {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "log" && <LogHub setView={setView} />}
           {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "mileage" && <MileageForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
