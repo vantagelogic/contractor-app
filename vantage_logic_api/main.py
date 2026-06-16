@@ -645,6 +645,7 @@ def get_jobs(current_user: models.User = Depends(get_current_user), db: Session 
 @app.post("/jobs")
 def create_job(
     job_name: str,
+    job_code: str = None
     street: str = None,
     city: str = None,
     province: str = None,
@@ -659,6 +660,7 @@ def create_job(
     job = models.Job(
         company_id=current_user.company_id,
         job_name=job_name,
+        job_code=job_code,
         street=street,
         city=city,
         province=province,
@@ -710,6 +712,7 @@ def deactivate_job(
 def update_job(
     job_id: int,
     job_name: str = None,
+    job_code: str = None,
     city: str = None,
     province: str = None,
     street: str = None,
@@ -728,6 +731,7 @@ def update_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job_name is not None: job.job_name = job_name
+    if job_code is not None: job.job_code = job_code
     if city is not None: job.city = city
     if province is not None: job.province = province
     if street is not None: job.street = street

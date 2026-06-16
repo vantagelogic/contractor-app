@@ -75,6 +75,7 @@ class Job(Base):
     budgeted_materials_cost = Column(Numeric(12, 2))
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+    job_code = Column(String(50), nullable=True)
 
 class JobBudget(Base):
     __tablename__ = "job_budgets"
