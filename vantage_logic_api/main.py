@@ -276,6 +276,8 @@ def signup(
     company_name: str,
     email: str,
     password: str,
+    first_name: str = None, 
+    last_name: str = None,
     db: Session = Depends(get_db)
 ):
     existing = db.query(models.User).filter(models.User.email == email).first()
@@ -300,7 +302,9 @@ def signup(
         hashed_password=hash_password(password),
         role="owner",
         is_verified=False,
-        verification_token=verification_token
+        verification_token=verification_token,
+        first_name=first_name,
+        last_name=last_name,
     )
     db.add(user)
     db.commit()
@@ -478,7 +482,15 @@ def create_user(
 
 @app.get("/me")
 def get_me(current_user: models.User = Depends(get_current_user)):
-    return {"user_id": current_user.user_id, "email": current_user.email, "role": current_user.role, "company_id": current_user.company_id, "employee_id": current_user.employee_id}
+    return {
+    "user_id": current_user.user_id,
+    "email": current_user.email,
+    "role": current_user.role,
+    "company_id": current_user.company_id,
+    "employee_id": current_user.employee_id,
+    "first_name": current_user.first_name,
+    "last_name": current_user.last_name,
+}
 
 @app.get("/users")
 def get_users(current_user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
@@ -1402,6 +1414,33 @@ def get_my_stats(current_user: models.User = Depends(get_current_user), db: Sess
         "all_time": calc(timesheets, mileage),
         "recent_entries": recent_entries
     }
+
+@app.patch("/me/update")
+def update_me(
+    first_name: str = None,
+    last_name: str = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if first_name is not None: current_user.first_name = first_name
+    if last_name is not None: current_user.last_name = last_name
+    db.commit()
+    return {"message": "Profile updated"}
+
+@app.post("/me/change-password")
+def change_password(
+    current_password: str,
+    new_password: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not verify_password(current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    current_user.hashed_password = hash_password(new_password)
+    db.commit()
+    return {"message": "Password changed"}
 
 @app.patch("/timesheets/{timesheet_id}")
 def update_timesheet(

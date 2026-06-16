@@ -176,13 +176,14 @@ function NavBar({ view, setView, role, onLogout }) {
         { id: "materials", label: "Materials", Icon: IconMaterials },
         { id: "mileage", label: "Mileage", Icon: IconMileage },
         { id: "crew_requests", label: "Requests", Icon: IconRequests },
+        { id: "settings", label: "Settings", Icon: IconAdmin },
       ]
     : [
         { id: "schedule", label: "Schedule", Icon: IconSchedule },
         { id: "dashboard", label: "Dashboard", Icon: IconDashboard },
         { id: "inventory", label: "Inventory", Icon: IconInventory },
         { id: "requests", label: "Requests", Icon: IconRequests },
-        { id: "admin", label: "Admin", Icon: IconAdmin },
+        { id: "admin", label: "Setup", Icon: IconAdmin },
       ];
 
   if (mobile) {
@@ -357,13 +358,15 @@ function Login({ onLogin, onSignUp, onForgot }) {
 
 // ─── SIGN UP ──────────────────────────────────────────────────
 function SignUp({ onCheckEmail, onBack }) {
-  const [form, setForm] = useState({ company_name: "", email: "", password: "", confirm_password: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", company_name: "", email: "", password: "", confirm_password: "" });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
 
   function validate() {
     const e = {};
+    if (!form.first_name.trim()) e.first_name = "First name is required";
+    if (!form.last_name.trim()) e.last_name = "Last name is required";
     if (!form.company_name.trim()) e.company_name = "Company name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Please enter a valid email";
@@ -379,7 +382,7 @@ function SignUp({ onCheckEmail, onBack }) {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    const params = new URLSearchParams({ company_name: form.company_name, email: form.email, password: form.password });
+    const params = new URLSearchParams({ first_name: form.first_name, last_name: form.last_name, company_name: form.company_name, email: form.email, password: form.password });
     const response = await fetch(`${API}/signup?${params}`, { method: "POST" });
     setLoading(false);
     if (response.ok) {
@@ -404,6 +407,19 @@ function SignUp({ onCheckEmail, onBack }) {
         <p style={{ fontSize: "13px", color: theme.textSecondary, margin: "0 0 24px" }}>14 days free. No credit card required.</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={styles.label}>First Name</label>
+              <input style={errors.first_name ? styles.inputError : styles.input} placeholder="John" value={form.first_name} onChange={e => { setForm({...form, first_name: e.target.value}); setErrors({...errors, first_name: ""}); }} />
+              {errors.first_name && <p style={styles.errorMsg}>{errors.first_name}</p>}
+            </div>
+            <div>
+              <label style={styles.label}>Last Name</label>
+              <input style={errors.last_name ? styles.inputError : styles.input} placeholder="Smith" value={form.last_name} onChange={e => { setForm({...form, last_name: e.target.value}); setErrors({...errors, last_name: ""}); }} />
+              {errors.last_name && <p style={styles.errorMsg}>{errors.last_name}</p>}
+            </div>
+          </div>
+
           <label style={styles.label}>Company Name</label>
           <input style={errors.company_name ? styles.inputError : styles.input} placeholder="e.g. Johnson Electrical" value={form.company_name} onChange={e => { setForm({...form, company_name: e.target.value}); setErrors({...errors, company_name: ""}); }} />
           {errors.company_name && <p style={styles.errorMsg}>{errors.company_name}</p>}
@@ -1292,6 +1308,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
       shift_date: today,
     }));
     if (onPrefillConsumed) onPrefillConsumed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voicePrefill]);
 
   useEffect(() => {
@@ -1311,6 +1328,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
       field_notes: voicePrefill.notes || prev.field_notes,
     }));
     if (onPrefillConsumed) onPrefillConsumed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voicePrefill]);
 
   function handleChange(e) {
@@ -1509,6 +1527,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
       notes: voicePrefill.notes || prev.notes,
     }));
     if (onPrefillConsumed) onPrefillConsumed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voicePrefill]);
 
   useEffect(() => {
@@ -1912,6 +1931,7 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
       purpose: voicePrefill.notes || prev.purpose,
     }));
     if (onPrefillConsumed) onPrefillConsumed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voicePrefill]);
 
   useEffect(() => {
@@ -4239,6 +4259,126 @@ function PlanPicker({ token, currentTier, crewCount, onClose, onSuccess }) {
   );
 }
 
+
+// ─── SETTINGS SCREEN ──────────────────────────────────────────
+function SettingsScreen({ token, role, onLogout }) {
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", company_name: "" });
+  const [pwForm, setPwForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
+  const [message, setMessage] = useState("");
+  const [pwMessage, setPwMessage] = useState("");
+  const [pwError, setPwError] = useState("");
+  const h = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch(`${API}/me`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/companies`, { headers: h }).then(r => r.json()).catch(() => []),
+    ]).then(([me, companies]) => {
+      const company = Array.isArray(companies) ? companies.find(c => c.company_id === me.company_id) : null;
+      setForm({
+        first_name: me.first_name || "",
+        last_name: me.last_name || "",
+        email: me.email || "",
+        company_name: company?.company_name || "",
+      });
+      setLoading(false);
+    });
+  }, [token]);
+
+  async function saveProfile() {
+    setSaving(true);
+    setMessage("");
+    const params = new URLSearchParams({
+      first_name: form.first_name,
+      last_name: form.last_name,
+    });
+    const res = await apiFetch(`${API}/me/update?${params}`, { method: "PATCH", headers: h });
+    setSaving(false);
+    if (res.ok) { setMessage("Profile updated."); setTimeout(() => setMessage(""), 3000); }
+    else setMessage("Could not save. Please try again.");
+  }
+
+  async function savePassword() {
+    setPwError(""); setPwMessage("");
+    if (!pwForm.current_password) { setPwError("Enter your current password."); return; }
+    if (pwForm.new_password.length < 8) { setPwError("New password must be at least 8 characters."); return; }
+    if (pwForm.new_password !== pwForm.confirm_password) { setPwError("Passwords do not match."); return; }
+    setSavingPw(true);
+    const params = new URLSearchParams({ current_password: pwForm.current_password, new_password: pwForm.new_password });
+    const res = await apiFetch(`${API}/me/change-password?${params}`, { method: "POST", headers: h });
+    setSavingPw(false);
+    if (res.ok) {
+      setPwMessage("Password changed.");
+      setPwForm({ current_password: "", new_password: "", confirm_password: "" });
+      setTimeout(() => setPwMessage(""), 3000);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setPwError(d.detail || "Could not change password.");
+    }
+  }
+
+  if (loading) return <div style={styles.container}><Skeleton width="100%" height="300px" radius="12px" /></div>;
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Settings</h1>
+      <p style={styles.subtitle}>Manage your account and preferences</p>
+
+      <div style={styles.card}>
+        <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "16px", fontFamily: font.display }}>Your Profile</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div>
+            <label style={styles.label}>First Name</label>
+            <input style={styles.input} value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} placeholder="First name" />
+          </div>
+          <div>
+            <label style={styles.label}>Last Name</label>
+            <input style={styles.input} value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} placeholder="Last name" />
+          </div>
+        </div>
+        <label style={styles.label}>Email</label>
+        <input style={{...styles.input, backgroundColor: theme.bg, color: theme.textSecondary}} value={form.email} disabled placeholder="Email" />
+        <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>Email cannot be changed. Contact support if needed.</p>
+        {(role === "owner" || role === "admin") && (
+          <>
+            <label style={styles.label}>Company Name</label>
+            <input style={{...styles.input, backgroundColor: theme.bg, color: theme.textSecondary}} value={form.company_name} disabled />
+            <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>To change your company name contact support.</p>
+          </>
+        )}
+        {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "8px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
+        <button onClick={saveProfile} disabled={saving} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+          {saving ? <><Spinner /> Saving...</> : "Save Profile"}
+        </button>
+      </div>
+
+      <div style={{...styles.card, marginTop: "14px"}}>
+        <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "16px", fontFamily: font.display }}>Change Password</div>
+        <label style={styles.label}>Current Password</label>
+        <PasswordInput value={pwForm.current_password} onChange={e => setPwForm({...pwForm, current_password: e.target.value})} placeholder="Your current password" />
+        <label style={styles.label}>New Password</label>
+        <PasswordInput value={pwForm.new_password} onChange={e => setPwForm({...pwForm, new_password: e.target.value})} placeholder="At least 8 characters" />
+        <label style={styles.label}>Confirm New Password</label>
+        <PasswordInput value={pwForm.confirm_password} onChange={e => setPwForm({...pwForm, confirm_password: e.target.value})} placeholder="Confirm new password" />
+        {pwError && <p style={styles.errorMsg}>{pwError}</p>}
+        {pwMessage && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "8px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{pwMessage}</div>}
+        <button onClick={savePassword} disabled={savingPw} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+          {savingPw ? <><Spinner /> Saving...</> : "Change Password"}
+        </button>
+      </div>
+
+      <div style={{...styles.card, marginTop: "14px"}}>
+        <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "8px", fontFamily: font.display }}>Account</div>
+        <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px" }}>Sign out of your account on this device.</p>
+        <button onClick={onLogout} style={{ ...styles.button, backgroundColor: theme.danger, marginTop: 0 }}>Sign Out</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── GLOBAL STYLES INJECTION ──────────────────────────────────
 function GlobalStyles() {
   useEffect(() => {
@@ -4391,7 +4531,6 @@ export default function App() {
   const [role, setRole] = useState(stored.role);
   const [view, setView] = useState(stored.role === "crew" ? "home" : "dashboard");
   useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, [setView]);
-  useEffect(() => { window._setVoicePrefill = setVoicePrefill; return () => { delete window._setVoicePrefill; }; }, [setVoicePrefill]);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobile, setMobile] = useState(isMobile());
@@ -4413,6 +4552,7 @@ export default function App() {
   const [tierLimit, setTierLimit] = useState(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [voicePrefill, setVoicePrefill] = useState(null);
+  useEffect(() => { window._setVoicePrefill = setVoicePrefill; return () => { delete window._setVoicePrefill; }; }, [setVoicePrefill]);
   const [paymentMsg, setPaymentMsg] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -4544,6 +4684,7 @@ export default function App() {
         )}
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
         {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
+        {view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
         <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
           {showOnboarding && (role === "owner" || role === "admin") && view === "schedule" && (
