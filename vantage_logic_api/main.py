@@ -926,6 +926,22 @@ def create_timesheet(
     db.refresh(timesheet)
     return timesheet
 
+@app.delete("/timesheets/{timesheet_id}")
+def delete_timesheet(
+    timesheet_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    ts = db.query(models.Timesheet).filter(
+        models.Timesheet.timesheet_id == timesheet_id,
+        models.Timesheet.company_id == current_user.company_id
+    ).first()
+    if not ts:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(ts)
+    db.commit()
+    return {"deleted": True}
+
 # =============================================
 # MATERIALS
 # =============================================
@@ -1043,6 +1059,22 @@ If you cannot read the receipt clearly, return {"error": "could not parse receip
     except Exception as e:
         print(f"Receipt parse error: {e}")
         return {"success": False, "message": "Something went wrong. Please try again."}
+    
+@app.delete("/materials/{material_id}")
+def delete_material(
+    material_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    mat = db.query(models.Material).filter(
+        models.Material.material_id == material_id,
+        models.Material.company_id == current_user.company_id
+    ).first()
+    if not mat:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    db.delete(mat)
+    db.commit()
+    return {"deleted": True}
     
 # =============================================
 # MILEAGE
