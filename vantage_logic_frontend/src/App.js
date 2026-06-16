@@ -699,7 +699,7 @@ function Row({ main, sub, actions }) {
 }
 
 // ─── CREW HOME (personalized stats) ───────────────────────────
-function CrewHome({ token, setView, readonly = false }) {
+function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [schedule, setSchedule] = useState([]);
@@ -857,13 +857,15 @@ function CrewHome({ token, setView, readonly = false }) {
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button onClick={() => {
                     const type = voiceResult.type;
+                    if (setVoicePrefill) setVoicePrefill(voiceResult);
                     if (type === "timesheet") setView("timesheet");
                     else if (type === "material") setView("materials");
                     else if (type === "mileage") setView("mileage");
                     else if (type === "request") setView("requests");
+                    if (window._setVoicePrefill) window._setVoicePrefill(voiceResult);
                     setVoiceResult(null);
                   }} style={{ flex: 1, ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                    Edit and Submit
+                    Review and Submit
                   </button>
                 </div>
                 <p style={{ fontSize: "11px", color: theme.textSecondary, textAlign: "center", marginTop: "10px", marginBottom: 0 }}>Review the entry on the next screen before it saves</p>
@@ -1243,7 +1245,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
 }
 
 // ─── TIMESHEET ────────────────────────────────────────────────
-function TimesheetForm({ token, readonly = false }) {
+function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", field_notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1279,11 +1281,37 @@ function TimesheetForm({ token, readonly = false }) {
   }, [token]);
 
   useEffect(() => {
+    if (!voicePrefill || voicePrefill.type !== "timesheet") return;
+    const today = new Date().toISOString().split("T")[0];
+    setFormData(prev => ({
+      ...prev,
+      hours_worked: voicePrefill.hours ? String(voicePrefill.hours) : prev.hours_worked,
+      job_id: voicePrefill._matchedJobId || prev.job_id,
+      cost_code_id: voicePrefill._matchedCCId || prev.cost_code_id,
+      field_notes: voicePrefill.notes || prev.field_notes,
+      shift_date: today,
+    }));
+    if (onPrefillConsumed) onPrefillConsumed();
+  }, [voicePrefill]);
+
+  useEffect(() => {
     if (linkedEmployeeId && employees.length > 0) {
       const emp = employees.find(e => e.employee_id === linkedEmployeeId);
       if (emp) setLinkedEmployeeName(`${emp.first_name} ${emp.last_name}`);
     }
   }, [linkedEmployeeId, employees]);
+
+  useEffect(() => {
+    if (!voicePrefill || voicePrefill.type !== "timesheet") return;
+    setFormData(prev => ({
+      ...prev,
+      hours_worked: voicePrefill.hours ? String(voicePrefill.hours) : prev.hours_worked,
+      job_id: voicePrefill._matchedJobId || prev.job_id,
+      cost_code_id: voicePrefill._matchedCCId || prev.cost_code_id,
+      field_notes: voicePrefill.notes || prev.field_notes,
+    }));
+    if (onPrefillConsumed) onPrefillConsumed();
+  }, [voicePrefill]);
 
   function handleChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -1428,7 +1456,7 @@ function TimesheetForm({ token, readonly = false }) {
 }
 
 // ─── MATERIALS ────────────────────────────────────────────────
-function MaterialsForm({ token, readonly = false }) {
+function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: new Date().toISOString().split("T")[0], notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1468,6 +1496,20 @@ function MaterialsForm({ token, readonly = false }) {
       setLoading(false);
     });
   }, [token]);
+
+  useEffect(() => {
+    if (!voicePrefill || voicePrefill.type !== "material") return;
+    const today = new Date().toISOString().split("T")[0];
+    setFormData(prev => ({
+      ...prev,
+      job_id: voicePrefill._matchedJobId || prev.job_id,
+      description: voicePrefill.description || prev.description,
+      total_cost: voicePrefill.amount ? String(voicePrefill.amount) : prev.total_cost,
+      purchase_date: today,
+      notes: voicePrefill.notes || prev.notes,
+    }));
+    if (onPrefillConsumed) onPrefillConsumed();
+  }, [voicePrefill]);
 
   useEffect(() => {
     if (linkedEmployeeId && employees.length > 0) {
@@ -1833,7 +1875,7 @@ function MaterialsForm({ token, readonly = false }) {
 }
 
 // ─── MILEAGE ──────────────────────────────────────────────────
-function MileageForm({ token, readonly = false }) {
+function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
   const [formData, setFormData] = useState({ job_id: "", trip_date: new Date().toISOString().split("T")[0], km_driven: "", purpose: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1858,6 +1900,19 @@ function MileageForm({ token, readonly = false }) {
       setLoading(false);
     });
   }, [token]);
+
+  useEffect(() => {
+    if (!voicePrefill || voicePrefill.type !== "mileage") return;
+    const today = new Date().toISOString().split("T")[0];
+    setFormData(prev => ({
+      ...prev,
+      job_id: voicePrefill._matchedJobId || prev.job_id,
+      km_driven: voicePrefill.km ? String(voicePrefill.km) : prev.km_driven,
+      trip_date: today,
+      purpose: voicePrefill.notes || prev.purpose,
+    }));
+    if (onPrefillConsumed) onPrefillConsumed();
+  }, [voicePrefill]);
 
   useEffect(() => {
     if (linkedEmployeeId && employees.length > 0) {
@@ -4336,6 +4391,7 @@ export default function App() {
   const [role, setRole] = useState(stored.role);
   const [view, setView] = useState(stored.role === "crew" ? "home" : "dashboard");
   useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, [setView]);
+  useEffect(() => { window._setVoicePrefill = setVoicePrefill; return () => { delete window._setVoicePrefill; }; }, [setVoicePrefill]);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [mobile, setMobile] = useState(isMobile());
@@ -4356,6 +4412,7 @@ export default function App() {
   const [crewCount, setCrewCount] = useState(null);
   const [tierLimit, setTierLimit] = useState(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [voicePrefill, setVoicePrefill] = useState(null);
   const [paymentMsg, setPaymentMsg] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -4399,7 +4456,7 @@ export default function App() {
     setStoredAuth(accessToken, userRole);
     setToken(accessToken);
     setRole(userRole);
-    setView(userRole === "crew" ? "home" : "schedule");
+    setView(userRole === "crew" ? "home" : "dashboard");
     if (newUser) setShowOnboarding(true);
     apiFetch(`${API}/subscription-status`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(r => r.json()).then(data => {
@@ -4495,10 +4552,10 @@ export default function App() {
             </div>
           )}
           <div key={view} className="vl-screen">
-          {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} readonly={subStatus === "expired"} />}
-          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} readonly={subStatus === "expired"} />}
-          {role === "crew" && view === "materials" && <MaterialsForm token={token} readonly={subStatus === "expired"} />}
-          {role === "crew" && view === "mileage" && <MileageForm token={token} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "mileage" && <MileageForm token={token} voicePrefill={voicePrefill} onVoicePrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} readonly={subStatus === "expired"} />}
