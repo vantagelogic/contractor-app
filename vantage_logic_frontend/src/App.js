@@ -1333,23 +1333,19 @@ function MaterialsForm({ token, readonly = false }) {
 
       {matTab === "scan" ? (
         <div style={styles.card}>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "4px" }}>Scan a Receipt</div>
-          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px", lineHeight: 1.5 }}>Take a photo of a receipt. We'll read the line items automatically and pre-fill the form for you to review.</p>
+          {!scanResult ? (
+            <>
+              <div style={{ marginBottom: "18px" }}>
+                <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "4px" }}>Scan a Receipt</div>
+                <p style={{ fontSize: "13px", color: theme.textSecondary, lineHeight: 1.5, margin: 0 }}>Point your camera at a receipt and we'll pull out the items automatically.</p>
+              </div>
 
-          <label style={styles.label}>Job</label>
-          <select style={styles.input} value={scanJob} onChange={e => setScanJob(e.target.value)}>
-            <option value="">Select job first</option>
-            {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
-          </select>
+              <label style={styles.label}>Job</label>
+              <select style={{ ...styles.input, marginBottom: "16px" }} value={scanJob} onChange={e => { setScanJob(e.target.value); setScanError(""); }}>
+                <option value="">Select a job</option>
+                {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+              </select>
 
-          <label style={styles.label}>Cost Code</label>
-          <select style={styles.input} value={scanCostCode} onChange={e => setScanCostCode(e.target.value)}>
-            <option value="">Select cost code</option>
-            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
-          </select>
-
-          {!scanResult && (
-            <div style={{ marginTop: "8px" }}>
               <input
                 type="file"
                 accept="image/*"
@@ -1359,7 +1355,7 @@ function MaterialsForm({ token, readonly = false }) {
                 onChange={async (e) => {
                   const file = e.target.files[0];
                   if (!file) return;
-                  if (!scanJob) { setScanError("Please select a job first."); return; }
+                  if (!scanJob) { setScanError("Select a job before taking the photo."); return; }
                   setScanError("");
                   setScanning(true);
                   setScanResult(null);
@@ -1371,7 +1367,6 @@ function MaterialsForm({ token, readonly = false }) {
                       reader.readAsDataURL(file);
                     });
                     const params = new URLSearchParams({ job_id: scanJob });
-                    if (scanCostCode) params.append("cost_code_id", scanCostCode);
                     const res = await apiFetch(`${API}/receipts/parse?${params}`, {
                       method: "POST",
                       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -1380,9 +1375,14 @@ function MaterialsForm({ token, readonly = false }) {
                     const data = await res.json();
                     if (data.success) {
                       setScanResult(data);
-                      setScanItems(data.items.map((item, i) => ({ ...item, id: i, include: true })));
+                      const skipWords = ["deposit", "tax", "hst", "gst", "pst", "subtotal", "total", "change", "cash", "visa", "mastercard", "debit", "credit", "fee", "surcharge", "tip", "gratuity", "balance", "payment", "tender", "refund", "return"];
+                      const filtered = data.items.filter(item => {
+                        const desc = (item.description || "").toLowerCase();
+                        return !skipWords.some(w => desc.includes(w));
+                      });
+                      setScanItems(filtered.map((item, i) => ({ ...item, id: i, include: true })));
                     } else {
-                      setScanError(data.message || "Could not read the receipt. Please try again or enter manually.");
+                      setScanError(data.message || "Could not read the receipt. Try again in better lighting.");
                     }
                   } catch {
                     setScanError("Something went wrong. Please try again.");
@@ -1391,110 +1391,117 @@ function MaterialsForm({ token, readonly = false }) {
                   e.target.value = "";
                 }}
               />
-              <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "18px", backgroundColor: scanning ? theme.bg : theme.primary, color: "white", borderRadius: "10px", cursor: scanning ? "not-allowed" : "pointer", fontSize: "15px", fontWeight: "700", fontFamily: font.body, transition: "background 0.2s" }}>
+
+              {scanError && <p style={{ ...styles.errorMsg, marginBottom: "12px" }}>{scanError}</p>}
+
+              <label htmlFor="receipt-input" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "20px", backgroundColor: scanning ? theme.bg : (scanJob ? theme.primary : theme.textLight), color: "white", borderRadius: "12px", cursor: scanning || !scanJob ? "not-allowed" : "pointer", fontSize: "15px", fontWeight: "700", fontFamily: font.body, transition: "background 0.2s", pointerEvents: scanning ? "none" : "auto" }}>
                 {scanning ? (
                   <><Spinner color="white" size={18} /> Reading receipt...</>
                 ) : (
                   <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                    Take Receipt Photo
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    {scanJob ? "Take Receipt Photo" : "Select a job first"}
                   </>
                 )}
               </label>
-              {scanError && <p style={{ ...styles.errorMsg, marginTop: "12px" }}>{scanError}</p>}
-            </div>
-          )}
-
-          {scanResult && (
-            <div style={{ marginTop: "16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>
-                  {scanResult.vendor ? `From: ${scanResult.vendor}` : "Receipt parsed"}
+              <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "10px" }}>Works best in good lighting with the receipt flat</p>
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <div>
+                  <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{scanResult.vendor || "Receipt scanned"}</div>
+                  <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{jobs.find(j => String(j.job_id) === scanJob)?.job_name || ""}</div>
                 </div>
-                <button onClick={() => { setScanResult(null); setScanItems([]); setScanError(""); }} style={{ fontSize: "12px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Retake</button>
+                <button onClick={() => { setScanResult(null); setScanItems([]); setScanError(""); }} style={{ fontSize: "12px", color: theme.accent, background: "none", border: `1px solid ${theme.accent}`, borderRadius: "7px", padding: "5px 12px", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Retake</button>
               </div>
 
-              <div style={{ backgroundColor: theme.bg, borderRadius: "10px", border: `1px solid ${theme.border}`, overflow: "hidden", marginBottom: "14px" }}>
-                {scanItems.map((item, i) => (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px", borderBottom: i < scanItems.length - 1 ? `1px solid ${theme.border}` : "none" }}>
-                    <input type="checkbox" checked={item.include} onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: theme.primary, cursor: "pointer" }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <input
-                        value={item.description}
-                        onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
-                        style={{ ...styles.input, marginTop: 0, fontSize: "13px", padding: "6px 10px" }}
-                      />
+              <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "10px", lineHeight: 1.5 }}>Tax, deposits, and payment lines are filtered out. Uncheck anything else you don't want to save.</p>
+
+              {scanItems.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px", backgroundColor: theme.bg, borderRadius: "10px", marginBottom: "14px" }}>
+                  <p style={{ fontSize: "13px", color: theme.textSecondary, margin: 0 }}>No material items found. The receipt may only contain tax or payment lines.</p>
+                  <button onClick={() => { setScanResult(null); setScanItems([]); }} style={{ marginTop: "12px", fontSize: "13px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", fontFamily: font.body }}>Try Again</button>
+                </div>
+              ) : (
+                <div style={{ backgroundColor: theme.bg, borderRadius: "10px", border: `1px solid ${theme.border}`, overflow: "hidden", marginBottom: "12px" }}>
+                  {scanItems.map((item, i) => (
+                    <div key={item.id} style={{ padding: "12px 14px", borderBottom: i < scanItems.length - 1 ? `1px solid ${theme.border}` : "none", backgroundColor: item.include ? "white" : "#fafafa" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: item.include ? "8px" : 0 }}>
+                        <input type="checkbox" checked={item.include} onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))} style={{ width: "16px", height: "16px", flexShrink: 0, accentColor: theme.primary, cursor: "pointer" }} />
+                        <span style={{ flex: 1, fontSize: "13px", color: item.include ? theme.textPrimary : theme.textLight, fontWeight: "500", textDecoration: item.include ? "none" : "line-through" }}>{item.description}</span>
+                        <span style={{ fontSize: "14px", fontWeight: "700", color: item.include ? theme.primary : theme.textLight, flexShrink: 0 }}>${parseFloat(item.line_total || 0).toFixed(2)}</span>
+                      </div>
+                      {item.include && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", paddingLeft: "26px" }}>
+                          <input
+                            value={item.description}
+                            onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
+                            style={{ ...styles.input, marginTop: 0, fontSize: "12px", padding: "5px 8px" }}
+                            placeholder="Description"
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.line_total}
+                            onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, line_total: e.target.value } : x))}
+                            style={{ ...styles.input, marginTop: 0, fontSize: "12px", padding: "5px 8px", textAlign: "right" }}
+                            placeholder="Amount"
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                      <span style={{ fontSize: "11px", color: theme.textSecondary }}>qty</span>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))}
-                        style={{ ...styles.input, marginTop: 0, width: "52px", fontSize: "13px", padding: "6px 8px", textAlign: "center" }}
-                      />
-                    </div>
-                    <div style={{ flexShrink: 0, minWidth: "60px", textAlign: "right" }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.line_total}
-                        onChange={e => setScanItems(prev => prev.map((x, j) => j === i ? { ...x, line_total: e.target.value } : x))}
-                        style={{ ...styles.input, marginTop: 0, width: "72px", fontSize: "13px", padding: "6px 8px", textAlign: "right" }}
-                      />
-                    </div>
+                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", backgroundColor: "white", borderTop: `1px solid ${theme.border}` }}>
+                    <span style={{ fontSize: "12px", color: theme.textSecondary }}>{scanItems.filter(x => x.include).length} of {scanItems.length} items selected</span>
+                    <span style={{ fontSize: "14px", fontWeight: "800", color: theme.primary }}>
+                      ${scanItems.filter(x => x.include).reduce((s, x) => s + parseFloat(x.line_total || 0), 0).toFixed(2)}
+                    </span>
                   </div>
-                ))}
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 14px", backgroundColor: "white", borderTop: `1px solid ${theme.border}` }}>
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>Total</span>
-                  <span style={{ fontSize: "14px", fontWeight: "800", color: theme.primary }}>${parseFloat(scanResult.total || 0).toFixed(2)}</span>
                 </div>
-              </div>
-
-              <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "14px", lineHeight: 1.5 }}>Uncheck any items you don't want to save. Edit descriptions or amounts directly. Each checked item saves as a separate material entry.</p>
+              )}
 
               {scanError && <p style={{ ...styles.errorMsg, marginBottom: "10px" }}>{scanError}</p>}
 
-              <button
-                disabled={savingItems || scanItems.filter(x => x.include).length === 0}
-                onClick={async () => {
-                  const toSave = scanItems.filter(x => x.include);
-                  if (toSave.length === 0) return;
-                  setSavingItems(true);
-                  setScanError("");
-                  const h = { Authorization: `Bearer ${token}` };
-                  const today = new Date().toISOString().split("T")[0];
-                  let failed = 0;
-                  for (const item of toSave) {
-                    const params = new URLSearchParams({
-                      job_id: scanJob,
-                      description: item.description,
-                      total_cost: item.line_total,
-                      purchase_date: today,
-                    });
-                    if (scanResult.vendor) params.append("supplier", scanResult.vendor);
-                    if (linkedEmployeeId) params.append("purchased_by", linkedEmployeeId);
-                    if (scanCostCode) params.append("cost_code_id", scanCostCode);
-                    const res = await apiFetch(`${API}/materials?${params}`, { method: "POST", headers: h });
-                    if (!res.ok) failed++;
-                  }
-                  setSavingItems(false);
-                  if (failed === 0) {
-                    setScanResult(null);
-                    setScanItems([]);
-                    setScanJob("");
-                    setScanCostCode("");
-                    setMatTab("store");
-                    setSubmitted(true);
-                  } else {
-                    setScanError(`${failed} item(s) failed to save. Please try again.`);
-                  }
-                }}
-                style={{ ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: savingItems ? 0.75 : 1 }}
-              >
-                {savingItems ? <><Spinner /> Saving...</> : `Save ${scanItems.filter(x => x.include).length} Item${scanItems.filter(x => x.include).length !== 1 ? "s" : ""}`}
-              </button>
-            </div>
+              {scanItems.filter(x => x.include).length > 0 && (
+                <button
+                  disabled={savingItems}
+                  onClick={async () => {
+                    const toSave = scanItems.filter(x => x.include);
+                    setSavingItems(true);
+                    setScanError("");
+                    const h = { Authorization: `Bearer ${token}` };
+                    const today = new Date().toISOString().split("T")[0];
+                    let failed = 0;
+                    for (const item of toSave) {
+                      const params = new URLSearchParams({
+                        job_id: scanJob,
+                        description: item.description,
+                        total_cost: item.line_total,
+                        purchase_date: today,
+                      });
+                      if (scanResult.vendor) params.append("supplier", scanResult.vendor);
+                      if (linkedEmployeeId) params.append("purchased_by", linkedEmployeeId);
+                      const res = await apiFetch(`${API}/materials?${params}`, { method: "POST", headers: h });
+                      if (!res.ok) failed++;
+                    }
+                    setSavingItems(false);
+                    if (failed === 0) {
+                      setScanResult(null);
+                      setScanItems([]);
+                      setScanJob("");
+                      setMatTab("store");
+                      setSubmitted(true);
+                    } else {
+                      setScanError(`${failed} item(s) failed to save. Please try again.`);
+                    }
+                  }}
+                  style={{ ...styles.button, marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: savingItems ? 0.75 : 1 }}
+                >
+                  {savingItems ? <><Spinner /> Saving...</> : `Save ${scanItems.filter(x => x.include).length} Item${scanItems.filter(x => x.include).length !== 1 ? "s" : ""}`}
+                </button>
+              )}
+            </>
           )}
         </div>
       ) : matTab === "inventory" ? (
