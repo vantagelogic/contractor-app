@@ -54,7 +54,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 app = FastAPI(title="Vantage Logic API", version="2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://app.vantagelogic.ca"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1005,7 +1005,7 @@ def parse_receipt(
 
     try:
         # Decode base64 to raw bytes
-        image_bytes = base64.b64decode(image_base64)
+        image_bytes = base64.b64decode(body.image_base64)
 
         # Set up Gemini vision model
         model = genai.GenerativeModel("gemini-1.5-flash")
