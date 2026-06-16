@@ -1337,7 +1337,7 @@ function MaterialsForm({ token, readonly = false }) {
               </div>
 
               <label style={styles.label}>Job</label>
-              <select style={{ ...styles.input, marginBottom: "16px" }} value={scanJob} onChange={e => { setScanJob(e.target.value); setScanError(""); }}>
+              <select style={{ ...styles.input, marginBottom: "20px" }} value={scanJob} onChange={e => { setScanJob(e.target.value); setScanError(""); }}>
                 <option value="">Select a job</option>
                 {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
               </select>
@@ -1402,12 +1402,12 @@ function MaterialsForm({ token, readonly = false }) {
                   )}
                 </label>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%", padding: "20px", backgroundColor: theme.bg, borderRadius: "12px", border: `1.5px dashed ${theme.border}`, fontSize: "14px", color: theme.textLight, fontFamily: font.body }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  Select a job to enable the camera
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "28px 20px", backgroundColor: theme.bg, borderRadius: "12px", border: `1.5px dashed ${theme.border}` }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <span style={{ fontSize: "13px", color: theme.textLight, fontFamily: font.body, textAlign: "center" }}>Select a job above to enable the camera</span>
                 </div>
               )}
-              <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "10px" }}>Works best in good lighting with the receipt flat</p>
+              <p style={{ fontSize: "11px", color: theme.textLight, textAlign: "center", marginTop: "12px", marginBottom: 0 }}>Works best in good lighting with the receipt flat</p>
             </>
           ) : (
             <>
