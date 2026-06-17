@@ -1811,6 +1811,7 @@ def create_schedule(
     scheduled_hours: float = None,
     cost_code_id: int = None,
     notes: str = None,
+    color: str = None,
     current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
 ):
@@ -1821,7 +1822,8 @@ def create_schedule(
         scheduled_date=scheduled_date,
         scheduled_hours=scheduled_hours,
         cost_code_id=cost_code_id,
-        notes=notes
+        notes=notes,
+        color=color
     )
     db.add(schedule)
     db.commit()
@@ -1854,7 +1856,8 @@ def get_schedules(
             "job_name": job.job_name if job else "Unknown",
             "scheduled_date": str(s.scheduled_date),
             "scheduled_hours": float(s.scheduled_hours) if s.scheduled_hours else None,
-            "notes": s.notes
+            "notes": s.notes,
+            "color": s.color
         })
     return result
 

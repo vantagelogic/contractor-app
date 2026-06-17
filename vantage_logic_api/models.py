@@ -144,6 +144,7 @@ class Schedule(Base):
     scheduled_hours = Column(Numeric(5, 2))
     cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"), nullable=True)
     notes = Column(Text)
+    color = Column(String(20), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Inventory(Base):

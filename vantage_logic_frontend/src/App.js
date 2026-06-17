@@ -3083,7 +3083,7 @@ function ScheduleScreen({ token, readonly = false }) {
   const [message, setMessage] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
   const [form, setForm] = useState({
-    employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: ""
+    employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: "", color: ""
   });
   const [errors, setErrors] = useState({});
   const [jobFilter, setJobFilter] = useState("all");
@@ -3200,11 +3200,12 @@ function ScheduleScreen({ token, readonly = false }) {
       scheduled_hours: form.scheduled_hours,
     });
     if (form.notes) params.append("notes", form.notes);
+    if (form.color) params.append("color", form.color);
     const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     setSubmitting(false);
     if (res.ok) {
       showMsg("Assignment added.");
-      setForm(f => ({ ...f, employee_id: "", job_id: "", cost_code_id: "", notes: "" }));
+      setForm(f => ({ ...f, employee_id: "", job_id: "", cost_code_id: "", notes: "", color: "" }));
       setErrors({});
       setTab("view");
       loadData();
@@ -3234,6 +3235,7 @@ function ScheduleScreen({ token, readonly = false }) {
       if (!tpl.job_id || !tpl.cost_code_id) { showMsg("Template is missing job or cost code."); return; }
       const params = new URLSearchParams({ employee_id: employeeId, job_id: tpl.job_id, cost_code_id: tpl.cost_code_id, scheduled_date: dateStr, scheduled_hours: tpl.hours });
       if (tpl.notes) params.append("notes", tpl.notes);
+      if (tpl.color) params.append("color", tpl.color);
       const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: h });
       if (res.ok) { showMsg("Shift added."); loadData(); } else showMsg("Failed to add shift.");
     } else if (dragItem.type === "assignment") {
@@ -3241,6 +3243,7 @@ function ScheduleScreen({ token, readonly = false }) {
       if (String(s.employee_id) === String(employeeId) && s.scheduled_date === dateStr) return;
       const params = new URLSearchParams({ employee_id: employeeId, job_id: s.job_id, cost_code_id: s.cost_code_id, scheduled_date: dateStr, scheduled_hours: s.scheduled_hours });
       if (s.notes) params.append("notes", s.notes);
+      if (s.color) params.append("color", s.color);
       await apiFetch(`${API}/schedules/${s.schedule_id}`, { method: "DELETE", headers: h });
       const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: h });
       if (res.ok) { showMsg("Shift moved."); loadData(); } else showMsg("Failed to move shift.");
@@ -3322,7 +3325,7 @@ function ScheduleScreen({ token, readonly = false }) {
                       {dayTotal > 0 && <span style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary }}>{dayTotal}h</span>}
                     </div>
                     {dayShifts.map(s => {
-                      const color = jobColors[s.job_id] || theme.primary;
+                      const color = s.color || jobColors[s.job_id] || theme.primary;
                       return (
                         <div key={s.schedule_id} style={{ backgroundColor: "white", borderRadius: "10px", padding: "10px 12px", marginBottom: "6px", border: `1.5px solid ${theme.border}`, boxShadow: theme.shadowSm, borderLeft: `4px solid ${color}` }}>
                           <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{s.employee_name}</div>
@@ -3420,7 +3423,7 @@ function ScheduleScreen({ token, readonly = false }) {
                               style={{ minHeight: "58px", borderRadius: "6px", padding: "3px", backgroundColor: isDragOver ? theme.accentLight : isToday ? "#f7fdf8" : "#fafaf9", border: isDragOver ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`, transition: "background-color 0.1s, border-color 0.1s", position: "relative" }}
                             >
                               {cellShifts.map(s => {
-                                const color = jobColors[s.job_id] || theme.primary;
+                                const color = s.color || jobColors[s.job_id] || theme.primary;
                                 const job = jobs.find(j => j.job_id === s.job_id);
                                 return (
                                   <div
@@ -3477,7 +3480,7 @@ function ScheduleScreen({ token, readonly = false }) {
                   return (
                     <button
                       key={tpl.template_id}
-                      onClick={() => setForm(f => ({ ...f, job_id: String(tpl.job_id), cost_code_id: String(tpl.cost_code_id), scheduled_hours: String(tpl.hours), notes: tpl.notes || f.notes }))}
+                      onClick={() => setForm(f => ({ ...f, job_id: String(tpl.job_id), cost_code_id: String(tpl.cost_code_id), scheduled_hours: String(tpl.hours), notes: tpl.notes || f.notes, color: tpl.color || "" }))}
                       style={{ flexShrink: 0, backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "10px", padding: "10px 14px", border: "none", cursor: "pointer", textAlign: "left", minWidth: "130px", maxWidth: "160px" }}
                     >
                       <div style={{ fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tpl.name}</div>
