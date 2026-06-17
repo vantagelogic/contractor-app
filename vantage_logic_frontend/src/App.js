@@ -251,45 +251,213 @@ function CollapsibleSection({ title, children, defaultOpen = false }) {
 }
 
 // ─── ONBOARDING ───────────────────────────────────────────────
-function OnboardingChecklist({ token, onDismiss }) {
+// ─── ONBOARDING WELCOME MODAL ──────────────────────────────────
+function OnboardingModal({ onClose }) {
+  const [step, setStep] = useState(0);
+
+  const steps = [
+    {
+      bg: "linear-gradient(145deg, #0f2818 0%, #1a3d2b 100%)",
+      icon: <VantageLogo size={52} dark={true} centered={true} />,
+      label: null,
+      title: "Welcome to VantageLogic",
+      body: "Your job costing and crew tracking platform is ready. This quick guide covers the 3 things you need to start tracking your first job.",
+      tip: null,
+    },
+    {
+      bg: "linear-gradient(145deg, #1a3d2b 0%, #2d6a4f 100%)",
+      icon: (
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      ),
+      label: "Step 1 of 3",
+      title: "Create Your First Job",
+      body: "Jobs are the foundation of everything. Every hour logged, material purchased, and mile driven is tracked against a job. Add a contract value and budget to see your profitability in real time.",
+      tip: "Even if you don't have a final contract value yet — add an estimate. You can update it anytime.",
+    },
+    {
+      bg: "linear-gradient(145deg, #7c5518 0%, #c8973a 100%)",
+      icon: (
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      ),
+      label: "Step 2 of 3",
+      title: "Add Your Crew",
+      body: "Add each employee with their hourly rate. This is what makes your labour cost calculations accurate. You can also add subcontractors — they show up in schedules and timesheets.",
+      tip: "Add at least one employee before scheduling shifts or tracking hours.",
+    },
+    {
+      bg: "linear-gradient(145deg, #1e3565 0%, #2563eb 100%)",
+      icon: (
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+          <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="3"/>
+        </svg>
+      ),
+      label: "Step 3 of 3",
+      title: "Get Your Crew In the App",
+      body: "Create logins for your crew so they can log hours, materials, and mileage from their phones. They only see their own assignments — nothing sensitive.",
+      tip: `Share this link with your crew:\n${window.location.origin}\nThey sign up, and you approve their access from Setup → Crew Access.`,
+    },
+  ];
+
+  const cur = steps[step];
+  const isFirst = step === 0;
+  const isLast = step === steps.length - 1;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(8,18,12,0.88)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(6px)" }}>
+      <div style={{ backgroundColor: "white", borderRadius: "22px", maxWidth: "460px", width: "100%", overflow: "hidden", boxShadow: "0 32px 100px rgba(0,0,0,0.55)", animation: "vlFadeUp 0.35s cubic-bezier(0.4,0,0.2,1) both" }}>
+
+        {/* Coloured header */}
+        <div style={{ background: cur.bg, padding: "36px 28px 28px", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", transition: "background 0.4s ease" }}>
+          <button onClick={onClose} style={{ position: "absolute", top: "14px", right: "14px", background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: "30px", height: "30px", color: "white", cursor: "pointer", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, backdropFilter: "blur(4px)" }}>×</button>
+
+          <div style={{ width: "84px", height: "84px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "18px" }}>
+            {cur.icon}
+          </div>
+
+          {cur.label && (
+            <div style={{ fontSize: "11px", fontWeight: "700", color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>{cur.label}</div>
+          )}
+
+          {/* Progress dots */}
+          <div style={{ display: "flex", gap: "6px", marginTop: cur.label ? 0 : "8px" }}>
+            {steps.map((_, i) => (
+              <div key={i} style={{ height: "6px", borderRadius: "3px", backgroundColor: i === step ? "white" : "rgba(255,255,255,0.32)", width: i === step ? "22px" : "6px", transition: "all 0.35s ease", cursor: "pointer" }} onClick={() => setStep(i)} />
+            ))}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "26px 28px 28px" }}>
+          <h2 style={{ margin: "0 0 10px", fontSize: "21px", fontWeight: "800", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.4px", lineHeight: 1.2 }}>{cur.title}</h2>
+          <p style={{ margin: "0 0 16px", fontSize: "14px", color: theme.textSecondary, lineHeight: 1.68 }}>{cur.body}</p>
+
+          {cur.tip && (
+            <div style={{ backgroundColor: "#fefce8", border: "1.5px solid #fde68a", borderRadius: "10px", padding: "12px 14px", marginBottom: "20px" }}>
+              {cur.tip.split("\n").map((line, i) => (
+                <p key={i} style={{ margin: i === 0 ? 0 : "5px 0 0", fontSize: "12.5px", color: "#92400e", lineHeight: 1.55, fontWeight: "500" }}>{line}</p>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => { if (isLast) { onClose(); } else { setStep(s => s + 1); } }}
+            style={{ ...styles.button, marginTop: 0, width: "100%", padding: "14px", fontSize: "15px", borderRadius: "12px", fontWeight: "700" }}
+          >
+            {isFirst ? "Get Started →" : isLast ? "Got it — Let's go!" : "Next →"}
+          </button>
+
+          <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "12px" }}>
+            {!isFirst && (
+              <button onClick={() => setStep(s => s - 1)} style={{ fontSize: "13px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", fontFamily: font.body, padding: "4px 8px" }}>← Back</button>
+            )}
+            {!isLast && (
+              <button onClick={onClose} style={{ fontSize: "13px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", fontFamily: font.body, padding: "4px 8px" }}>Skip for now</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ONBOARDING CHECKLIST ──────────────────────────────────────
+function OnboardingChecklist({ token, onDismiss, onNavigate }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
-    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(data.length > 0));
-    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(data => setHasEmployee(data.length > 0));
-  }, [token]);
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(Array.isArray(data) && data.length > 0)).catch(() => {});
+    apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(data => setHasEmployee(Array.isArray(data) && data.length > 0)).catch(() => {});
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = [
-    { label: "Add your first job", done: hasJob, hint: "Go to Admin → Jobs" },
-    { label: "Add your first employee", done: hasEmployee, hint: "Go to Admin → Employees" },
-    { label: "Share the app link with your crew", done: false, hint: window.location.origin, copyable: true },
+    {
+      label: "Create your first job",
+      desc: "Add a job with a budget and contract value",
+      done: hasJob,
+      view: "admin",
+      color: "#2d6a4f",
+    },
+    {
+      label: "Add crew members",
+      desc: "Add employees with hourly rates for accurate job costing",
+      done: hasEmployee,
+      view: "admin",
+      color: "#c8973a",
+    },
+    {
+      label: "Give crew app access",
+      desc: "Share your app link so crew can log time from their phones",
+      done: false,
+      copyLink: window.location.origin,
+      color: "#2563eb",
+    },
   ];
 
+  const doneCount = steps.filter(s => s.done).length;
+  const pct = Math.round((doneCount / steps.length) * 100);
+
   return (
-    <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", border: `2px solid ${theme.accent}`, boxShadow: "0 2px 12px rgba(45,106,79,0.12)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+    <div style={{ backgroundColor: "white", borderRadius: "14px", padding: "20px 22px 16px", marginBottom: "20px", border: `1.5px solid ${theme.accent}`, boxShadow: "0 2px 16px rgba(45,106,79,0.1)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
         <div>
-          <div style={{ fontWeight: "700", fontSize: "16px", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.3px" }}>Get started</div>
-          <div style={{ fontSize: "13px", color: theme.textSecondary, marginTop: "3px" }}>Three steps to get your team running</div>
+          <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.2px" }}>Getting started</div>
+          <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>
+            {doneCount === steps.length ? "You're all set! 🎉" : `${doneCount} of ${steps.length} steps complete`}
+          </div>
         </div>
-        <button onClick={onDismiss} style={{ fontSize: "22px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", lineHeight: 1, padding: "0 0 0 12px", fontWeight: "300" }}>×</button>
+        <button onClick={onDismiss} style={{ fontSize: "22px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", padding: "0 0 2px 14px", lineHeight: 1, fontWeight: "300" }}>×</button>
       </div>
+
+      {/* Progress bar */}
+      <div style={{ backgroundColor: theme.border, borderRadius: "4px", height: "5px", marginBottom: "16px", overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: "4px", backgroundColor: theme.accent, width: `${pct}%`, transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)" }} />
+      </div>
+
       {steps.map((step, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "11px 0", borderBottom: i < steps.length - 1 ? `1px solid ${theme.border}` : "none" }}>
-          <div style={{ width: "26px", height: "26px", borderRadius: "50%", backgroundColor: step.done ? theme.accent : theme.border, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>
-            <span style={{ fontSize: "12px", color: "white", fontWeight: "700" }}>{step.done ? "✓" : i + 1}</span>
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 0", borderBottom: i < steps.length - 1 ? `1px solid ${theme.border}` : "none" }}>
+          <div style={{ width: "26px", height: "26px", borderRadius: "50%", backgroundColor: step.done ? step.color : "transparent", border: step.done ? "none" : `2px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {step.done && (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            )}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "13px", fontWeight: "600", color: step.done ? theme.textSecondary : theme.textPrimary, textDecoration: step.done ? "line-through" : "none" }}>{step.label}</div>
-            <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>{step.hint}</span>
-              {step.copyable && (
-                <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(step.hint); }} style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "4px", border: "none", cursor: "pointer", backgroundColor: theme.accent, color: "white", fontWeight: "600" }}>Copy</button>
-              )}
-            </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "13px", fontWeight: step.done ? "500" : "600", color: step.done ? theme.textSecondary : theme.textPrimary, textDecoration: step.done ? "line-through" : "none" }}>{step.label}</div>
+            <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.desc}</div>
           </div>
+          {!step.done && (
+            step.copyLink ? (
+              <button
+                onClick={() => { navigator.clipboard.writeText(step.copyLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", flexShrink: 0, fontFamily: font.body, whiteSpace: "nowrap" }}
+              >
+                {copied ? "Copied!" : "Copy link"}
+              </button>
+            ) : (
+              <button
+                onClick={() => onNavigate && onNavigate(step.view)}
+                style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", flexShrink: 0, fontFamily: font.body, whiteSpace: "nowrap" }}
+              >
+                Go →
+              </button>
+            )
+          )}
+          {step.done && (
+            <span style={{ fontSize: "11px", color: step.color, fontWeight: "700", flexShrink: 0 }}>Done</span>
+          )}
         </div>
       ))}
     </div>
@@ -4870,6 +5038,9 @@ export default function App() {
   useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, []);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  // Checklist persists in dashboard until explicitly dismissed (per browser)
+  const [showChecklist, setShowChecklist] = useState(() => !localStorage.getItem("vl_checklist_done"));
+  function dismissChecklist() { localStorage.setItem("vl_checklist_done", "1"); setShowChecklist(false); }
   const [mobile, setMobile] = useState(isMobile());
 
   // Parse one-time auth URL params (?verify=... or ?reset=...) once on load
@@ -5023,12 +5194,13 @@ export default function App() {
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
         {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
         <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
+
+        {/* Full-screen onboarding walkthrough — shown once on first login */}
+        {showOnboarding && (role === "owner" || role === "admin") && (
+          <OnboardingModal onClose={() => setShowOnboarding(false)} />
+        )}
+
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
-          {showOnboarding && (role === "owner" || role === "admin") && view === "schedule" && (
-            <div style={{ maxWidth: "640px", margin: "0 auto", padding: "18px 18px 0" }}>
-              <OnboardingChecklist token={token} onDismiss={() => setShowOnboarding(false)} />
-            </div>
-          )}
           <div key={view} className="vl-screen">
           {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "log" && <LogHub setView={setView} />}
@@ -5038,7 +5210,16 @@ export default function App() {
           {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}
-          {(role === "owner" || role === "admin") && view === "dashboard" && <Dashboard token={token} readonly={subStatus === "expired"} />}
+          {(role === "owner" || role === "admin") && view === "dashboard" && (
+            <>
+              {showChecklist && (
+                <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "18px 18px 0" }}>
+                  <OnboardingChecklist token={token} onDismiss={dismissChecklist} onNavigate={(v) => { setView(v); }} />
+                </div>
+              )}
+              <Dashboard token={token} readonly={subStatus === "expired"} />
+            </>
+          )}
           {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "requests" && <RequestsScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "admin" && <AdminScreen token={token} readonly={subStatus === "expired"} subTier={subTier} crewCount={crewCount} tierLimit={tierLimit} onPlanPicker={() => setShowPlanPicker(true)} onSubRefresh={() => { apiFetch(`${API}/subscription-status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(data => { setSubStatus(data.status); setSubTier(data.tier); setCrewCount(data.crew_count); setTierLimit(data.tier_limit); }); }} />}
