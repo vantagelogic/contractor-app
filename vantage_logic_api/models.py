@@ -214,3 +214,17 @@ class Notification(Base):
     related_type = Column(String(50))
     read = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class ShiftTemplate(Base):
+    __tablename__ = "shift_templates"
+
+    template_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    job_id = Column(Integer, nullable=False)
+    cost_code_id = Column(Integer, nullable=False)
+    hours = Column(Numeric(5, 2), default=8.0)
+    color = Column(String(20), default="#1a3d2b")
+    notes = Column(Text, default="")
+    created_at = Column(DateTime, server_default=func.now())

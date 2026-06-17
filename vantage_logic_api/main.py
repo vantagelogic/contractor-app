@@ -1874,6 +1874,83 @@ def delete_schedule(
     db.commit()
     return {"message": "Schedule deleted"}
 
+@app.get("/shift-templates")
+def get_shift_templates(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(models.ShiftTemplate).filter(
+        models.ShiftTemplate.company_id == current_user.company_id
+    ).order_by(models.ShiftTemplate.created_at).all()
+
+
+@app.post("/shift-templates")
+def create_shift_template(
+    name: str,
+    job_id: int,
+    cost_code_id: int,
+    hours: float = 8.0,
+    color: str = "#1a3d2b",
+    notes: str = "",
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    tpl = models.ShiftTemplate(
+        company_id=current_user.company_id,
+        name=name, job_id=job_id, cost_code_id=cost_code_id,
+        hours=hours, color=color, notes=notes
+    )
+    db.add(tpl)
+    db.commit()
+    db.refresh(tpl)
+    return tpl
+
+
+@app.patch("/shift-templates/{template_id}")
+def update_shift_template(
+    template_id: int,
+    name: str = None,
+    job_id: int = None,
+    cost_code_id: int = None,
+    hours: float = None,
+    color: str = None,
+    notes: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    tpl = db.query(models.ShiftTemplate).filter(
+        models.ShiftTemplate.template_id == template_id,
+        models.ShiftTemplate.company_id == current_user.company_id
+    ).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if name is not None: tpl.name = name
+    if job_id is not None: tpl.job_id = job_id
+    if cost_code_id is not None: tpl.cost_code_id = cost_code_id
+    if hours is not None: tpl.hours = hours
+    if color is not None: tpl.color = color
+    if notes is not None: tpl.notes = notes
+    db.commit()
+    db.refresh(tpl)
+    return tpl
+
+
+@app.delete("/shift-templates/{template_id}")
+def delete_shift_template(
+    template_id: int,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    tpl = db.query(models.ShiftTemplate).filter(
+        models.ShiftTemplate.template_id == template_id,
+        models.ShiftTemplate.company_id == current_user.company_id
+    ).first()
+    if tpl:
+        db.delete(tpl)
+        db.commit()
+    return {"ok": True}
+
+
 @app.get("/my-jobs")
 def get_my_jobs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     from datetime import date, timedelta

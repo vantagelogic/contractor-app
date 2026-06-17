@@ -189,14 +189,24 @@ function NavBar({ view, setView, role, onLogout }) {
         { id: "admin", label: "Setup", Icon: IconAdmin },
       ];
 
+  // When crew is inside a log sub-view, show a context-aware nav
+  const logContextTabs = [
+    { id: "home",      label: "Home",      Icon: IconHome },
+    { id: "timesheet", label: "Hours",     Icon: IconHours },
+    { id: "materials", label: "Materials", Icon: IconMaterials },
+    { id: "mileage",   label: "Mileage",   Icon: IconMileage },
+  ];
+
   if (mobile) {
+    const mobileTabs = (isCrew && logViews.includes(view)) ? logContextTabs : tabs;
+    const mobileIsActive = (tabId) => view === tabId;
     return (
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "12px 0 14px", boxShadow: "0 -1px 0 rgba(255,255,255,0.08), 0 -8px 28px rgba(0,0,0,0.28)", paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
-        {tabs.map(tab => (
+        {mobileTabs.map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "6px 10px", borderRadius: "8px", minWidth: "48px", minHeight: "48px" }}>
-            <span style={{ color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
-            <span style={{ fontSize: "10px", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", fontWeight: isTabActive(tab.id) ? "600" : "400", letterSpacing: "0.3px" }}>{tab.label}</span>
-            {isTabActive(tab.id) && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
+            <span style={{ color: mobileIsActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
+            <span style={{ fontSize: "10px", color: mobileIsActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", fontWeight: mobileIsActive(tab.id) ? "600" : "400", letterSpacing: "0.3px" }}>{tab.label}</span>
+            {mobileIsActive(tab.id) && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
           </button>
         ))}
       </div>
@@ -2914,29 +2924,45 @@ function ScheduleScreen({ token, readonly = false }) {
   const [dragItem, setDragItem] = useState(null);
   const [dragOverCell, setDragOverCell] = useState(null);
 
-  // ── Shift templates (persisted to localStorage)
+  // ── Shift templates (stored on the API so they sync across all devices)
   const TEMPLATE_COLORS = ["#1a3d2b", "#2d6a4f", "#c8973a", "#b83232", "#2563eb", "#7c3aed", "#0891b2", "#059669"];
-  const [templates, setTemplates] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("vl_shift_templates") || "[]"); }
-    catch { return []; }
-  });
+  const [templates, setTemplates] = useState([]);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [templateForm, setTemplateForm] = useState({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" });
 
-  function saveTemplates(t) { setTemplates(t); localStorage.setItem("vl_shift_templates", JSON.stringify(t)); }
-  function deleteTemplate(id) { saveTemplates(templates.filter(t => t.id !== id)); }
+  useEffect(() => {
+    apiFetch(`${API}/shift-templates`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (Array.isArray(data)) setTemplates(data); })
+      .catch(() => {});
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function deleteTemplate(templateId) {
+    await apiFetch(`${API}/shift-templates/${templateId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setTemplates(prev => prev.filter(t => t.template_id !== templateId));
+  }
   function startEditTemplate(tpl) {
-    setEditingTemplate(tpl.id);
-    setTemplateForm({ name: tpl.name, job_id: tpl.job_id, cost_code_id: tpl.cost_code_id, hours: tpl.hours, color: tpl.color, notes: tpl.notes || "" });
+    setEditingTemplate(tpl.template_id);
+    setTemplateForm({ name: tpl.name, job_id: String(tpl.job_id), cost_code_id: String(tpl.cost_code_id), hours: String(tpl.hours), color: tpl.color || "#1a3d2b", notes: tpl.notes || "" });
     setShowTemplateForm(true);
   }
-  function handleSaveTemplate() {
+  async function handleSaveTemplate() {
     if (!templateForm.name || !templateForm.job_id || !templateForm.cost_code_id) return;
+    const h = { Authorization: `Bearer ${token}` };
+    const params = new URLSearchParams({ name: templateForm.name, job_id: templateForm.job_id, cost_code_id: templateForm.cost_code_id, hours: templateForm.hours, color: templateForm.color, notes: templateForm.notes || "" });
     if (editingTemplate) {
-      saveTemplates(templates.map(t => t.id === editingTemplate ? { ...templateForm, id: editingTemplate } : t));
+      const res = await apiFetch(`${API}/shift-templates/${editingTemplate}?${params}`, { method: "PATCH", headers: h });
+      if (res.ok) {
+        const updated = await res.json();
+        setTemplates(prev => prev.map(t => t.template_id === editingTemplate ? updated : t));
+      }
     } else {
-      saveTemplates([...templates, { ...templateForm, id: Date.now().toString() }]);
+      const res = await apiFetch(`${API}/shift-templates?${params}`, { method: "POST", headers: h });
+      if (res.ok) {
+        const created = await res.json();
+        setTemplates(prev => [...prev, created]);
+      }
     }
     setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" });
     setShowTemplateForm(false); setEditingTemplate(null);
@@ -3161,11 +3187,11 @@ function ScheduleScreen({ token, readonly = false }) {
                     const cc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
                     return (
                       <div
-                        key={tpl.id}
+                        key={tpl.template_id}
                         draggable={!readonly}
                         onDragStart={() => setDragItem({ type: "template", data: tpl })}
                         onDragEnd={() => { setDragItem(null); setDragOverCell(null); }}
-                        style={{ backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "8px", padding: "9px 10px", marginBottom: "6px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.id === tpl.id ? 0.45 : 1, boxShadow: theme.shadowSm }}
+                        style={{ backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "8px", padding: "9px 10px", marginBottom: "6px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.template_id === tpl.template_id ? 0.45 : 1, boxShadow: theme.shadowSm }}
                       >
                         <div style={{ fontWeight: "700", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</div>
                         <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job?.job_name || "?"}</div>
@@ -3271,7 +3297,32 @@ function ScheduleScreen({ token, readonly = false }) {
 
       {/* ── ADD SHIFT TAB ── */}
       {tab === "add" && (
-        <div style={{ ...styles.card, maxWidth: "640px" }}>
+        <div style={{ maxWidth: "640px" }}>
+          {/* Template quick-fill picker */}
+          {templates.length > 0 && (
+            <div style={{ ...styles.card, marginBottom: "14px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary, marginBottom: "10px" }}>Use a template</div>
+              <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px" }}>
+                {templates.map(tpl => {
+                  const tplJob = jobs.find(j => String(j.job_id) === String(tpl.job_id));
+                  const tplCc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
+                  return (
+                    <button
+                      key={tpl.template_id}
+                      onClick={() => setForm(f => ({ ...f, job_id: String(tpl.job_id), cost_code_id: String(tpl.cost_code_id), scheduled_hours: String(tpl.hours), notes: tpl.notes || f.notes }))}
+                      style={{ flexShrink: 0, backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "10px", padding: "10px 14px", border: "none", cursor: "pointer", textAlign: "left", minWidth: "130px", maxWidth: "160px" }}
+                    >
+                      <div style={{ fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tpl.name}</div>
+                      <div style={{ fontSize: "10px", opacity: 0.9, marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tplJob?.job_name || "?"}</div>
+                      <div style={{ fontSize: "10px", opacity: 0.75 }}>{tplCc?.code || "?"} · {tpl.hours}h</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "8px" }}>Tap a template to pre-fill the form below</div>
+            </div>
+          )}
+          <div style={styles.card}>
           <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary, marginBottom: "14px", fontFamily: font.display }}>New Shift</div>
           <label style={styles.label}>Employee</label>
           <select style={errors.employee_id ? styles.inputError : styles.input} value={form.employee_id} onChange={e => { setForm({...form, employee_id: e.target.value}); setErrors({...errors, employee_id: ""}); }}>
@@ -3311,6 +3362,7 @@ function ScheduleScreen({ token, readonly = false }) {
           <button onClick={() => setTab("calendar")} style={{ width: "100%", marginTop: "10px", padding: "12px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "500" }}>
             ← Back to Calendar
           </button>
+          </div>
         </div>
       )}
 
@@ -3394,7 +3446,7 @@ function ScheduleScreen({ token, readonly = false }) {
               const job = jobs.find(j => String(j.job_id) === String(tpl.job_id));
               const cc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
               return (
-                <div key={tpl.id} style={{ backgroundColor: "white", borderRadius: "12px", border: `1px solid ${theme.border}`, overflow: "hidden", boxShadow: theme.shadowSm }}>
+                <div key={tpl.template_id} style={{ backgroundColor: "white", borderRadius: "12px", border: `1px solid ${theme.border}`, overflow: "hidden", boxShadow: theme.shadowSm }}>
                   <div style={{ backgroundColor: tpl.color || theme.primary, color: "white", padding: "14px 16px" }}>
                     <div style={{ fontWeight: "700", fontSize: "14px" }}>{tpl.name}</div>
                     <div style={{ fontSize: "11px", opacity: 0.88, marginTop: "2px" }}>{job?.job_name || "Unknown job"}</div>
@@ -3404,7 +3456,7 @@ function ScheduleScreen({ token, readonly = false }) {
                   {!readonly && (
                     <div style={{ display: "flex", padding: "8px 14px", gap: "14px" }}>
                       <button onClick={() => startEditTemplate(tpl)} style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Edit</button>
-                      <button onClick={() => deleteTemplate(tpl.id)} style={{ fontSize: "12px", color: theme.danger, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Delete</button>
+                      <button onClick={() => deleteTemplate(tpl.template_id)} style={{ fontSize: "12px", color: theme.danger, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Delete</button>
                     </div>
                   )}
                 </div>
@@ -4085,8 +4137,18 @@ function Dashboard({ token, readonly = false }) {
     }
   }
 
+  function fmtHours(h) {
+    const n = Number(h || 0);
+    if (n === 0) return "0h";
+    const whole = Math.floor(n);
+    const frac = n - whole;
+    if (frac === 0) return `${whole}h`;
+    if (frac === 0.5) return `${whole}.5h`;
+    return `${n.toFixed(1)}h`;
+  }
+
   const statCards = [
-    { label: "Hours", value: totals.hours.toFixed(1) },
+    { label: "Total Hours", value: fmtHours(totals.hours) },
     { label: "Labour", value: `$${fmt(totals.labour)}` },
     { label: "Materials", value: `$${fmt(totals.materials)}` },
     { label: "Contract", value: `$${fmt(totals.revenue)}` },
@@ -4266,7 +4328,7 @@ function Dashboard({ token, readonly = false }) {
                     <div style={{ flex: 1, backgroundColor: theme.border, borderRadius: "2px", height: "4px" }}>
                       <div style={{ width: `${Math.min(hoursPct, 100)}%`, height: "4px", borderRadius: "2px", backgroundColor: overHours ? theme.danger : hoursPct > 90 ? theme.warning : theme.accent, transition: "width 0.3s" }} />
                     </div>
-                    <span style={{ fontSize: "11px", color: overHours ? theme.danger : theme.textSecondary, fontWeight: "600", whiteSpace: "nowrap" }}>{job.total_hours}h of {job.budgeted_hours}h</span>
+                    <span style={{ fontSize: "11px", color: overHours ? theme.danger : theme.textSecondary, fontWeight: "600", whiteSpace: "nowrap" }}>{fmtHours(job.total_hours)} of {fmtHours(job.budgeted_hours)}</span>
                   </div>
                 )}
 
