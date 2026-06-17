@@ -2904,8 +2904,6 @@ function ScheduleScreen({ token, readonly = false }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({
     employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: ""
   });
@@ -3022,32 +3020,9 @@ function ScheduleScreen({ token, readonly = false }) {
   }
 
   async function handleDelete(scheduleId) {
-    if (!window.confirm("Remove this assignment?")) return;
+    if (!window.confirm("Remove this shift?")) return;
     const res = await apiFetch(`${API}/schedules/${scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) { showMsg("Removed."); if (editingId === scheduleId) setEditingId(null); loadData(); }
-  }
-
-  async function handleEditSave(scheduleId) {
-    if (!editForm.cost_code_id) { showMsg("Pick a cost code to save."); return; }
-    const params = new URLSearchParams({
-      employee_id: editForm.employee_id,
-      job_id: editForm.job_id,
-      cost_code_id: editForm.cost_code_id,
-      scheduled_date: editForm.scheduled_date,
-      scheduled_hours: editForm.scheduled_hours,
-    });
-    if (editForm.notes) params.append("notes", editForm.notes);
-    await apiFetch(`${API}/schedules/${scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-    showMsg("Assignment updated.");
-    setEditingId(null);
-    loadData();
-  }
-
-  function startEdit(s) {
-    setEditingId(s.schedule_id);
-    setEditForm({ employee_id: s.employee_id, job_id: s.job_id, cost_code_id: s.cost_code_id || "", scheduled_date: s.scheduled_date, scheduled_hours: s.scheduled_hours || 8, notes: s.notes || "" });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (res.ok) { showMsg("Removed."); loadData(); }
   }
 
   function quickAdd(dateStr, empId = "") {
@@ -3128,13 +3103,53 @@ function ScheduleScreen({ token, readonly = false }) {
             </div>
           </div>
 
-          {templates.length > 0 && (
+          {!isMobile() && templates.length > 0 && (
             <div style={{ fontSize: "12px", color: theme.textLight, marginBottom: "10px" }}>
               💡 Drag a template onto a cell to schedule a shift. Drag an existing shift chip to move it.
             </div>
           )}
 
-          {loading ? <div style={{ textAlign: "center", padding: "40px", color: theme.textLight }}>Loading…</div> : (
+          {loading ? <div style={{ textAlign: "center", padding: "40px", color: theme.textLight }}>Loading…</div> : isMobile() ? (
+            /* ── MOBILE: vertical day cards ── */
+            <div>
+              {days.map(day => {
+                const ds = day.toISOString().split("T")[0];
+                const dayShifts = byDate[ds] || [];
+                const isToday = ds === todayStr;
+                const dayTotal = dayShifts.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
+                return (
+                  <div key={ds} style={{ marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "6px", padding: "0 2px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                        <span style={{ fontSize: "10px", fontWeight: "700", color: isToday ? theme.gold : theme.textLight, letterSpacing: "0.8px", textTransform: "uppercase" }}>{day.toLocaleDateString("en-CA", { weekday: "short" })}</span>
+                        <span style={{ fontSize: "16px", fontWeight: "700", color: isToday ? theme.gold : theme.primary }}>{day.getDate()}</span>
+                        {isToday && <span style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: theme.gold, alignSelf: "center" }} />}
+                      </div>
+                      {dayTotal > 0 && <span style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary }}>{dayTotal}h</span>}
+                    </div>
+                    {dayShifts.map(s => {
+                      const color = jobColors[s.job_id] || theme.primary;
+                      return (
+                        <div key={s.schedule_id} style={{ backgroundColor: "white", borderRadius: "10px", padding: "10px 12px", marginBottom: "6px", border: `1.5px solid ${theme.border}`, boxShadow: theme.shadowSm, borderLeft: `4px solid ${color}` }}>
+                          <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{s.employee_name}</div>
+                          <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{s.job_name}</div>
+                          {s.notes && <div style={{ fontSize: "10px", color: theme.textLight, marginTop: "2px", fontStyle: "italic" }}>{s.notes}</div>}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "7px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: "700", color: theme.accent, backgroundColor: theme.accentLight, padding: "2px 8px", borderRadius: "8px" }}>{s.scheduled_hours}h</span>
+                            {!readonly && <button onClick={() => handleDelete(s.schedule_id)} style={{ fontSize: "11px", color: theme.danger, fontWeight: "600", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>Remove</button>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {!readonly && (
+                      <button onClick={() => quickAdd(ds)} style={{ width: "100%", padding: dayShifts.length === 0 ? "16px 8px" : "7px", borderRadius: "10px", border: `1.5px dashed ${theme.borderStrong}`, backgroundColor: "transparent", color: theme.textLight, cursor: "pointer", fontFamily: font.body, fontSize: "12px", fontWeight: "600" }}>+ Add</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ── DESKTOP: drag-and-drop grid ── */
             <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
 
               {/* Template sidebar */}
