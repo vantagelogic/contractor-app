@@ -41,6 +41,23 @@ limiter = Limiter(key_func=get_remote_address)
 
 models.Base.metadata.create_all(bind=engine)
 
+# ── Column migrations (safe to run on every startup) ──────────
+with engine.connect() as _conn:
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS color VARCHAR(20)"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS color VARCHAR(20)"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key")
