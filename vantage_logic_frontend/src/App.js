@@ -3475,9 +3475,9 @@ function ScheduleScreen({ token, readonly = false }) {
 
               {/* Calendar grid */}
               <div style={{ flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                <div style={{ minWidth: "600px" }}>
+                <div style={{ minWidth: "1100px" }}>
                   {/* Day header row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 130px)", gap: "4px", marginBottom: "4px" }}>
                     <div />
                     {days.map(d => {
                       const ds = d.toISOString().split("T")[0];
@@ -3501,8 +3501,8 @@ function ScheduleScreen({ token, readonly = false }) {
                   ) : employees.map(emp => {
                     const empHours = filteredSchedules.filter(s => s.employee_id === emp.employee_id).reduce((sum, s) => sum + Number(s.scheduled_hours || 0), 0);
                     return (
-                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
-                        <div style={{ padding: "6px 10px 6px 4px", display: "flex", flexDirection: "column", justifyContent: "center", minHeight: "80px", borderRight: `1px solid ${theme.border}` }}>
+                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 130px)", gap: "4px", marginBottom: "4px" }}>
+                          <div style={{ padding: "6px 10px 6px 4px", display: "flex", flexDirection: "column", justifyContent: "center", height: "90px", borderRight: `1px solid ${theme.border}` }}>
                           <div style={{ fontSize: "12px", fontWeight: "700", color: theme.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.first_name} {emp.last_name}</div>
                           <div style={{ fontSize: "10px", color: empHours > 0 ? theme.accent : theme.textLight, marginTop: "2px", fontWeight: empHours > 0 ? "600" : "400" }}>{emp.role || "Crew"}{empHours > 0 ? ` · ${empHours}h` : ""}</div>
                         </div>
@@ -3519,7 +3519,7 @@ function ScheduleScreen({ token, readonly = false }) {
                               onDragEnter={e => { e.preventDefault(); if (dragItem) setDragOverCell(cellKey); }}
                               onDragLeave={() => setDragOverCell(prev => prev === cellKey ? null : prev)}
                               onDrop={e => { e.preventDefault(); dropOnCell(emp.employee_id, ds); }}
-                              style={{ minHeight: "80px", borderRadius: "6px", padding: "4px", backgroundColor: isDragOver ? theme.accentLight : isToday ? "#f0faf3" : "#fafaf8", border: isDragOver ? `2px solid ${theme.accent}` : isToday ? `1.5px solid rgba(45,106,79,0.2)` : `1px solid ${theme.border}`, transition: "background-color 0.1s, border-color 0.1s", position: "relative" }}
+                              style={{ height: "90px", overflow: "hidden", borderRadius: "6px", padding: "4px", backgroundColor: isDragOver ? theme.accentLight : isToday ? "#f0faf3" : "#fafaf8", border: isDragOver ? `2px solid ${theme.accent}` : isToday ? `1.5px solid rgba(45,106,79,0.2)` : `1px solid ${theme.border}`, transition: "background-color 0.1s, border-color 0.1s", position: "relative" }}
                             >
                               {cellShifts.map(s => {
                                 const color = s.color || jobColors[s.job_id] || theme.primary;
