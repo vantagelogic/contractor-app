@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const API =
   process.env.REACT_APP_API_URL ??
@@ -157,6 +157,101 @@ function Spinner({ size = 16, color = "white" }) {
 // ─── SKELETON ─────────────────────────────────────────────────
 function Skeleton({ width = "100%", height = "16px", radius = "4px" }) {
   return <div style={{ width, height, borderRadius: radius, background: `linear-gradient(90deg, ${theme.border} 0%, ${theme.bg} 50%, ${theme.border} 100%)`, backgroundSize: "200% 100%", animation: "vlskeleton 1.5s ease-in-out infinite" }} />;
+}
+
+// ─── HELP CHAT WIDGET ─────────────────────────────────────────
+function HelpChat({ token, role }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    { from: "bot", text: "Hi! I'm your VantageLogic assistant. Ask me anything about using the app." }
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    if (bottomRef.current) bottomRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [messages, open]);
+
+  async function send() {
+    const msg = input.trim();
+    if (!msg || loading) return;
+    setInput("");
+    setMessages(prev => [...prev, { from: "user", text: msg }]);
+    setLoading(true);
+    try {
+      const res = await apiFetch(`${API}/help-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: msg, role: role || "crew" })
+      });
+      const data = await res.json();
+      setMessages(prev => [...prev, { from: "bot", text: data.reply || "Sorry, something went wrong." }]);
+    } catch {
+      setMessages(prev => [...prev, { from: "bot", text: "Sorry, I couldn't reach the server. Try again." }]);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <>
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ position: "fixed", bottom: "80px", right: "16px", zIndex: 1100, width: "50px", height: "50px", borderRadius: "50%", backgroundColor: theme.primary, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(26,61,43,0.35)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "22px" }}
+        title="Help"
+      >
+        {open ? "×" : "?"}
+      </button>
+
+      {/* Chat panel */}
+      {open && (
+        <div style={{ position: "fixed", bottom: "140px", right: "16px", zIndex: 1100, width: "320px", maxWidth: "calc(100vw - 32px)", backgroundColor: "white", borderRadius: "16px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", overflow: "hidden", border: `1px solid ${theme.border}`, animation: "vlFadeUp 0.25s ease both" }}>
+          {/* Header */}
+          <div style={{ backgroundColor: theme.primary, padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>?</div>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "white" }}>VantageLogic Help</div>
+              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)" }}>Ask me anything about the app</div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "320px", minHeight: "160px" }}>
+            {messages.map((m, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: m.from === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{ maxWidth: "80%", backgroundColor: m.from === "user" ? theme.primary : theme.bg, color: m.from === "user" ? "white" : theme.textPrimary, borderRadius: m.from === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", padding: "9px 13px", fontSize: "13px", lineHeight: 1.55, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div style={{ backgroundColor: theme.bg, borderRadius: "14px 14px 14px 4px", padding: "10px 14px", display: "flex", gap: "4px", alignItems: "center" }}>
+                  {[0,1,2].map(i => <div key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: theme.textLight, animation: `vlPulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />)}
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: "10px 12px", borderTop: `1px solid ${theme.border}`, display: "flex", gap: "8px" }}>
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && send()}
+              placeholder="Ask a question..."
+              style={{ flex: 1, padding: "9px 12px", borderRadius: "8px", border: `1.5px solid ${theme.border}`, fontSize: "13px", fontFamily: font.body, outline: "none" }}
+            />
+            <button onClick={send} disabled={!input.trim() || loading} style={{ padding: "9px 14px", borderRadius: "8px", border: "none", backgroundColor: theme.primary, color: "white", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: font.body, opacity: !input.trim() || loading ? 0.5 : 1 }}>
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────
@@ -4899,6 +4994,10 @@ function GlobalStyles() {
       @keyframes vlFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes vlFadeIn { from { opacity: 0; } to { opacity: 1; } }
       @keyframes vlScaleIn { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+      @keyframes vlPulse {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
       .vl-screen { animation: vlFadeUp 0.34s cubic-bezier(0.22,1,0.36,1) both; }
       .vl-pop { animation: vlScaleIn 0.22s cubic-bezier(0.22,1,0.36,1) both; }
       .vl-grid2 { display: grid; grid-template-columns: 1fr; gap: 10px; align-items: start; }
@@ -5197,6 +5296,7 @@ export default function App() {
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
         {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
         <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
+        {token && <HelpChat token={token} role={role} />}
 
         {/* Full-screen onboarding walkthrough — shown once on first login */}
         {showOnboarding && (role === "owner" || role === "admin") && (
