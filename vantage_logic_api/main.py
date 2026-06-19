@@ -55,6 +55,33 @@ with engine.connect() as _conn:
             "ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS color VARCHAR(20)"
         ))
         _conn.commit()
+
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS start_time VARCHAR(5)"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS start_time VARCHAR(5)"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)"
+        ))
+        _conn.commit()
     except Exception:
         pass
 
@@ -2043,6 +2070,8 @@ def create_schedule(
     scheduled_date: str,
     scheduled_hours: float = None,
     cost_code_id: int = None,
+    start_time: str = None,
+    end_time: str = None,
     notes: str = None,
     color: str = None,
     current_user: models.User = Depends(require_owner),
@@ -2055,6 +2084,8 @@ def create_schedule(
         scheduled_date=scheduled_date,
         scheduled_hours=scheduled_hours,
         cost_code_id=cost_code_id,
+        start_time=start_time or None,
+        end_time=end_time or None,
         notes=notes,
         color=color
     )
@@ -2089,6 +2120,8 @@ def get_schedules(
             "job_name": job.job_name if job else "Unknown",
             "scheduled_date": str(s.scheduled_date),
             "scheduled_hours": float(s.scheduled_hours) if s.scheduled_hours else None,
+            "start_time": s.start_time,
+            "end_time": s.end_time,
             "notes": s.notes,
             "color": s.color
         })
@@ -2110,6 +2143,36 @@ def delete_schedule(
     db.commit()
     return {"message": "Schedule deleted"}
 
+@app.patch("/schedules/{schedule_id}")
+def update_schedule(
+    schedule_id: int,
+    job_id: int = None,
+    cost_code_id: int = None,
+    scheduled_hours: float = None,
+    start_time: str = None,
+    end_time: str = None,
+    notes: str = None,
+    color: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db)
+):
+    s = db.query(models.Schedule).filter(
+        models.Schedule.schedule_id == schedule_id,
+        models.Schedule.company_id == current_user.company_id
+    ).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    if job_id is not None: s.job_id = job_id
+    if cost_code_id is not None: s.cost_code_id = cost_code_id
+    if scheduled_hours is not None: s.scheduled_hours = scheduled_hours
+    s.start_time = start_time or None
+    s.end_time = end_time or None
+    s.notes = notes or None
+    s.color = color or None
+    db.commit()
+    db.refresh(s)
+    return {"schedule_id": s.schedule_id, "message": "updated"}
+
 @app.get("/shift-templates")
 def get_shift_templates(
     current_user: models.User = Depends(get_current_user),
@@ -2126,6 +2189,8 @@ def create_shift_template(
     job_id: int,
     cost_code_id: int,
     hours: float = 8.0,
+    start_time: str = None,
+    end_time: str = None,
     color: str = "#1a3d2b",
     notes: str = "",
     current_user: models.User = Depends(require_owner),
@@ -2134,7 +2199,8 @@ def create_shift_template(
     tpl = models.ShiftTemplate(
         company_id=current_user.company_id,
         name=name, job_id=job_id, cost_code_id=cost_code_id,
-        hours=hours, color=color, notes=notes
+        hours=hours, start_time=start_time or None, end_time=end_time or None,
+        color=color, notes=notes
     )
     db.add(tpl)
     db.commit()
@@ -2149,6 +2215,8 @@ def update_shift_template(
     job_id: int = None,
     cost_code_id: int = None,
     hours: float = None,
+    start_time: str = None,
+    end_time: str = None,
     color: str = None,
     notes: str = None,
     current_user: models.User = Depends(require_owner),
@@ -2166,6 +2234,8 @@ def update_shift_template(
     if hours is not None: tpl.hours = hours
     if color is not None: tpl.color = color
     if notes is not None: tpl.notes = notes
+    if start_time is not None: tpl.start_time = start_time or None
+    if end_time is not None: tpl.end_time = end_time or None
     db.commit()
     db.refresh(tpl)
     return tpl

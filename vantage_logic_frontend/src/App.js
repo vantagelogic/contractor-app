@@ -68,6 +68,23 @@ function fmt(n) {
   return Number(n || 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function calcHours(start, end) {
+  if (!start || !end) return null;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) return null;
+  return String(Math.round((diff / 60) * 2) / 2);
+}
+
+function fmtTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 || 12;
+  return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, "0")}${ampm}`;
+}
+
 function getStoredAuth() {
   try { return { token: localStorage.getItem("vl_token"), role: localStorage.getItem("vl_role") }; }
   catch { return { token: null, role: null }; }
@@ -3178,7 +3195,7 @@ function ScheduleScreen({ token, readonly = false }) {
   const [message, setMessage] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
   const [form, setForm] = useState({
-    employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", notes: "", color: ""
+    employee_id: "", job_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8", start_time: "", end_time: "", notes: "", color: ""
   });
   const [errors, setErrors] = useState({});
   const [jobFilter, setJobFilter] = useState("all");
@@ -3186,13 +3203,16 @@ function ScheduleScreen({ token, readonly = false }) {
   // ── Drag & drop
   const [dragItem, setDragItem] = useState(null);
   const [dragOverCell, setDragOverCell] = useState(null);
+  const dragInProgress = useRef(false);
+  const [editingShift, setEditingShift] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   // ── Shift templates (stored on the API so they sync across all devices)
   const TEMPLATE_COLORS = ["#1a3d2b", "#2d6a4f", "#c8973a", "#b83232", "#2563eb", "#7c3aed", "#0891b2", "#059669"];
   const [templates, setTemplates] = useState([]);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
-  const [templateForm, setTemplateForm] = useState({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" });
+  const [templateForm, setTemplateForm] = useState({ name: "", job_id: "", cost_code_id: "", hours: "8", start_time: "", end_time: "", color: "#1a3d2b", notes: "" });
 
   useEffect(() => {
     apiFetch(`${API}/shift-templates`, { headers: { Authorization: `Bearer ${token}` } })
@@ -3207,13 +3227,13 @@ function ScheduleScreen({ token, readonly = false }) {
   }
   function startEditTemplate(tpl) {
     setEditingTemplate(tpl.template_id);
-    setTemplateForm({ name: tpl.name, job_id: String(tpl.job_id), cost_code_id: String(tpl.cost_code_id), hours: String(tpl.hours), color: tpl.color || "#1a3d2b", notes: tpl.notes || "" });
+    setTemplateForm({ name: tpl.name, job_id: String(tpl.job_id), cost_code_id: String(tpl.cost_code_id), hours: String(tpl.hours), start_time: tpl.start_time || "", end_time: tpl.end_time || "", color: tpl.color || "#1a3d2b", notes: tpl.notes || "" });
     setShowTemplateForm(true);
   }
   async function handleSaveTemplate() {
     if (!templateForm.name || !templateForm.job_id || !templateForm.cost_code_id) return;
     const h = { Authorization: `Bearer ${token}` };
-    const params = new URLSearchParams({ name: templateForm.name, job_id: templateForm.job_id, cost_code_id: templateForm.cost_code_id, hours: templateForm.hours, color: templateForm.color, notes: templateForm.notes || "" });
+    const params = new URLSearchParams({ name: templateForm.name, job_id: templateForm.job_id, cost_code_id: templateForm.cost_code_id, hours: templateForm.hours, start_time: templateForm.start_time || "", end_time: templateForm.end_time || "", color: templateForm.color, notes: templateForm.notes || "" });
     if (editingTemplate) {
       const res = await apiFetch(`${API}/shift-templates/${editingTemplate}?${params}`, { method: "PATCH", headers: h });
       if (res.ok) {
@@ -3227,7 +3247,7 @@ function ScheduleScreen({ token, readonly = false }) {
         setTemplates(prev => [...prev, created]);
       }
     }
-    setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" });
+    setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", start_time: "", end_time: "", color: "#1a3d2b", notes: "" });
     setShowTemplateForm(false); setEditingTemplate(null);
   }
 
@@ -3294,13 +3314,15 @@ function ScheduleScreen({ token, readonly = false }) {
       scheduled_date: form.scheduled_date,
       scheduled_hours: form.scheduled_hours,
     });
+    if (form.start_time) params.append("start_time", form.start_time);
+    if (form.end_time) params.append("end_time", form.end_time);
     if (form.notes) params.append("notes", form.notes);
     if (form.color) params.append("color", form.color);
     const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     setSubmitting(false);
     if (res.ok) {
       showMsg("Assignment added.");
-      setForm(f => ({ ...f, employee_id: "", job_id: "", cost_code_id: "", notes: "", color: "" }));
+      setForm(f => ({ ...f, employee_id: "", job_id: "", cost_code_id: "", start_time: "", end_time: "", notes: "", color: "" }));
       setErrors({});
       setTab("view");
       loadData();
@@ -3313,6 +3335,22 @@ function ScheduleScreen({ token, readonly = false }) {
     if (!window.confirm("Remove this shift?")) return;
     const res = await apiFetch(`${API}/schedules/${scheduleId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) { showMsg("Removed."); loadData(); }
+  }
+
+  async function handleSaveEdit() {
+    if (!editForm.job_id || !editForm.cost_code_id) return;
+    const params = new URLSearchParams({
+      job_id: editForm.job_id,
+      cost_code_id: editForm.cost_code_id,
+      scheduled_hours: editForm.scheduled_hours || "8",
+      start_time: editForm.start_time || "",
+      end_time: editForm.end_time || "",
+      notes: editForm.notes || "",
+      color: editForm.color || "",
+    });
+    const res = await apiFetch(`${API}/schedules/${editingShift.schedule_id}?${params}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { showMsg("Shift updated."); setEditingShift(null); loadData(); }
+    else showMsg("Failed to update.");
   }
 
   function quickAdd(dateStr, empId = "") {
@@ -3329,6 +3367,8 @@ function ScheduleScreen({ token, readonly = false }) {
       const tpl = dragItem.data;
       if (!tpl.job_id || !tpl.cost_code_id) { showMsg("Template is missing job or cost code."); return; }
       const params = new URLSearchParams({ employee_id: employeeId, job_id: tpl.job_id, cost_code_id: tpl.cost_code_id, scheduled_date: dateStr, scheduled_hours: tpl.hours });
+      if (tpl.start_time) params.append("start_time", tpl.start_time);
+      if (tpl.end_time) params.append("end_time", tpl.end_time);
       if (tpl.notes) params.append("notes", tpl.notes);
       if (tpl.color) params.append("color", tpl.color);
       const res = await apiFetch(`${API}/schedules?${params}`, { method: "POST", headers: h });
@@ -3469,15 +3509,15 @@ function ScheduleScreen({ token, readonly = false }) {
                       </div>
                     );
                   })}
-                  {!readonly && <button onClick={() => { setTab("templates"); setShowTemplateForm(true); setEditingTemplate(null); setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" }); }} style={{ width: "100%", padding: "7px", borderRadius: "8px", border: `1.5px dashed ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontSize: "11px", fontWeight: "600", fontFamily: font.body }}>+ Template</button>}
+                  {!readonly && <button onClick={() => { setTab("templates"); setShowTemplateForm(true); setEditingTemplate(null); setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", start_time: "", end_time: "", color: "#1a3d2b", notes: "" }); }} style={{ width: "100%", padding: "7px", borderRadius: "8px", border: `1.5px dashed ${theme.border}`, backgroundColor: "transparent", color: theme.textSecondary, cursor: "pointer", fontSize: "11px", fontWeight: "600", fontFamily: font.body }}>+ Template</button>}
                 </div>
               )}
 
               {/* Calendar grid */}
               <div style={{ flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                <div style={{ minWidth: "1100px" }}>
+                <div>
                   {/* Day header row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 130px)", gap: "4px", marginBottom: "4px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
                     <div />
                     {days.map(d => {
                       const ds = d.toISOString().split("T")[0];
@@ -3528,14 +3568,17 @@ function ScheduleScreen({ token, readonly = false }) {
                                   <div
                                     key={s.schedule_id}
                                     draggable={!readonly}
-                                    onDragStart={e => { e.stopPropagation(); setDragItem({ type: "assignment", data: s }); }}
-                                    onDragEnd={() => { setDragItem(null); setDragOverCell(null); }}
+                                    onDragStart={e => { e.stopPropagation(); dragInProgress.current = true; setDragItem({ type: "assignment", data: s }); }}
+                                    onDragEnd={() => { setDragItem(null); setDragOverCell(null); setTimeout(() => { dragInProgress.current = false; }, 80); }}
+                                    onClick={e => { e.stopPropagation(); if (!dragInProgress.current && !readonly) { setEditingShift(s); setEditForm({ job_id: String(s.job_id), cost_code_id: String(s.cost_code_id || ""), scheduled_hours: String(s.scheduled_hours || "8"), start_time: s.start_time || "", end_time: s.end_time || "", notes: s.notes || "", color: s.color || "" }); } }}
                                     title={`${emp.first_name} · ${job?.job_name} · ${s.scheduled_hours}h${s.notes ? "\n" + s.notes : ""}`}
-                                    style={{ backgroundColor: color, color: "white", borderRadius: "5px", padding: "5px 7px", marginBottom: "3px", fontSize: "11px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.schedule_id === s.schedule_id ? 0.4 : 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.18)", lineHeight: 1.3 }}
+                                    style={{ backgroundColor: color, color: "white", borderRadius: "5px", padding: "5px 7px", marginBottom: "3px", fontSize: "11px", cursor: readonly ? "default" : "pointer", userSelect: "none", opacity: dragItem?.data?.schedule_id === s.schedule_id ? 0.4 : 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.18)", lineHeight: 1.3 }}
                                   >
-                                    <div>
-                                      <div style={{ fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10.5px" }}>{job?.job_name || "?"}</div>
-                                      <div style={{ opacity: 0.85, fontSize: "9.5px", marginTop: "1px" }}>{s.scheduled_hours}h</div>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                      <div style={{ fontWeight: "700", fontSize: "10.5px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{job?.job_name || "?"}</div>
+                                      <div style={{ opacity: 0.85, fontSize: "9.5px", marginTop: "1px" }}>
+                                        {s.start_time && s.end_time ? `${fmtTime(s.start_time)}–${fmtTime(s.end_time)}` : `${s.scheduled_hours}h`}
+                                      </div>
                                     </div>
                                     {!readonly && <button onClick={e => { e.stopPropagation(); handleDelete(s.schedule_id); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.75)", cursor: "pointer", fontSize: "12px", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>}
                                   </div>
@@ -3624,6 +3667,24 @@ function ScheduleScreen({ token, readonly = false }) {
               {errors.scheduled_hours && <p style={styles.errorMsg}>{errors.scheduled_hours}</p>}
             </div>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={styles.label}>Start Time (optional)</label>
+              <input style={styles.input} type="time" value={form.start_time} onChange={e => {
+                const s = e.target.value;
+                const h = calcHours(s, form.end_time);
+                setForm({...form, start_time: s, ...(h ? { scheduled_hours: h } : {})});
+              }} />
+            </div>
+            <div>
+              <label style={styles.label}>End Time (optional)</label>
+              <input style={styles.input} type="time" value={form.end_time} onChange={e => {
+                const en = e.target.value;
+                const h = calcHours(form.start_time, en);
+                setForm({...form, end_time: en, ...(h ? { scheduled_hours: h } : {})});
+              }} />
+            </div>
+          </div>
           <label style={styles.label}>Notes (optional)</label>
           <textarea style={styles.textarea} placeholder="Any details for the crew member" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
           <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting || readonly}>
@@ -3645,7 +3706,7 @@ function ScheduleScreen({ token, readonly = false }) {
               <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>Drag these from the Calendar view onto any crew member to schedule a shift.</div>
             </div>
             {!showTemplateForm && !readonly && (
-              <button onClick={() => { setShowTemplateForm(true); setEditingTemplate(null); setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", color: "#1a3d2b", notes: "" }); }} style={{ ...styles.button, marginTop: 0, padding: "10px 16px", fontSize: "13px" }}>+ New Template</button>
+              <button onClick={() => { setShowTemplateForm(true); setEditingTemplate(null); setTemplateForm({ name: "", job_id: "", cost_code_id: "", hours: "8", start_time: "", end_time: "", color: "#1a3d2b", notes: "" }); }} style={{ ...styles.button, marginTop: 0, padding: "10px 16px", fontSize: "13px" }}>+ New Template</button>
             )}
           </div>
 
@@ -3676,6 +3737,22 @@ function ScheduleScreen({ token, readonly = false }) {
                 <div>
                   <label style={styles.label}>Notes (optional)</label>
                   <input style={styles.input} value={templateForm.notes} onChange={e => setTemplateForm({...templateForm, notes: e.target.value})} placeholder="e.g. Bring scaffold tools" />
+                </div>
+                <div>
+                  <label style={styles.label}>Default Start Time</label>
+                  <input style={styles.input} type="time" value={templateForm.start_time} onChange={e => {
+                    const s = e.target.value;
+                    const h = calcHours(s, templateForm.end_time);
+                    setTemplateForm({...templateForm, start_time: s, ...(h ? { hours: h } : {})});
+                  }} />
+                </div>
+                <div>
+                  <label style={styles.label}>Default End Time</label>
+                  <input style={styles.input} type="time" value={templateForm.end_time} onChange={e => {
+                    const en = e.target.value;
+                    const h = calcHours(templateForm.start_time, en);
+                    setTemplateForm({...templateForm, end_time: en, ...(h ? { hours: h } : {})});
+                  }} />
                 </div>
               </div>
               <div style={{ marginTop: "12px" }}>
@@ -3732,6 +3809,75 @@ function ScheduleScreen({ token, readonly = false }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT SHIFT MODAL ── */}
+      {editingShift && (
+        <div onClick={() => setEditingShift(null)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.48)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "480px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: font.body }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "18px" }}>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>Edit Shift</div>
+                <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "3px" }}>
+                  {editingShift.employee_name} · {new Date(editingShift.scheduled_date + "T00:00:00").toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric" })}
+                </div>
+              </div>
+              <button onClick={() => setEditingShift(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: theme.textLight, padding: "0 4px", lineHeight: 1 }}>×</button>
+            </div>
+
+            <label style={styles.label}>Job</label>
+            <select style={styles.input} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>
+              <option value="">Select job</option>
+              {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+            </select>
+
+            <label style={styles.label}>Cost Code</label>
+            <select style={styles.input} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>
+              <option value="">Select cost code</option>
+              {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+            </select>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+              <div>
+                <label style={styles.label}>Start</label>
+                <input type="time" style={styles.input} value={editForm.start_time} onChange={e => {
+                  const s = e.target.value;
+                  const h = calcHours(s, editForm.end_time);
+                  setEditForm({...editForm, start_time: s, ...(h ? { scheduled_hours: h } : {})});
+                }} />
+              </div>
+              <div>
+                <label style={styles.label}>End</label>
+                <input type="time" style={styles.input} value={editForm.end_time} onChange={e => {
+                  const en = e.target.value;
+                  const h = calcHours(editForm.start_time, en);
+                  setEditForm({...editForm, end_time: en, ...(h ? { scheduled_hours: h } : {})});
+                }} />
+              </div>
+              <div>
+                <label style={styles.label}>Hours</label>
+                <input type="number" step="0.5" style={styles.input} value={editForm.scheduled_hours} onChange={e => setEditForm({...editForm, scheduled_hours: e.target.value})} />
+              </div>
+            </div>
+
+            <label style={styles.label}>Notes</label>
+            <textarea style={styles.textarea} value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} placeholder="Any notes for the crew member" />
+
+            <div style={{ marginTop: "12px" }}>
+              <label style={styles.label}>Color</label>
+              <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+                {TEMPLATE_COLORS.map(c => (
+                  <button key={c} onClick={() => setEditForm({...editForm, color: c})} style={{ width: "26px", height: "26px", borderRadius: "50%", backgroundColor: c, border: editForm.color === c ? "3px solid white" : "none", boxShadow: editForm.color === c ? `0 0 0 2px ${c}` : "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
+              <button onClick={handleSaveEdit} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "12px" }}>Save Changes</button>
+              <button onClick={() => { handleDelete(editingShift.schedule_id); setEditingShift(null); }} style={{ padding: "12px 16px", borderRadius: "8px", border: `1px solid ${theme.danger}`, backgroundColor: "white", color: theme.danger, cursor: "pointer", fontFamily: font.body, fontSize: "13px", fontWeight: "600" }}>Remove</button>
+            </div>
           </div>
         </div>
       )}
