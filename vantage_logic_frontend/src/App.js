@@ -3893,7 +3893,7 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
 
 // ─── SETUP SECTION ──────────────────────────────────────────────
 function SetupSection({ number, title, subtitle, complete, completeLabel, children }) {
-  const [open, setOpen] = useState(!complete);
+  const [open, setOpen] = useState(number === "★" ? false : !complete);
   return (
     <div style={{ marginBottom: "10px", borderRadius: "12px", border: `1.5px solid ${complete ? theme.accent : theme.border}`, overflow: "hidden", backgroundColor: "white" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", backgroundColor: complete ? theme.accentLight : "white" }}>
@@ -4056,16 +4056,6 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
         />
       ) : (
         <>
-          {/* ── YOUR ACCOUNT ── */}
-          <SetupSection
-            number="★"
-            title="Your Account"
-            subtitle="Update your name, company name, and password."
-            complete={false}
-          >
-            <ProfileSettingsForm token={token} showCompany={true} />
-          </SetupSection>
-
           {/* ── STEP 1: JOBS ── */}
           <SetupSection
             number="1"
@@ -4247,7 +4237,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
             number="4"
             title="Give Crew App Access"
             subtitle="Create a login for each crew member so they can log hours and materials from their phone."
-            complete={false}
+            complete={true}
           >
             <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "12px" }}>Pick the crew member, set their email and password, and send them the link to app.vantagelogic.ca.</p>
             <select style={{...styles.input, marginBottom: "6px"}} value={loginForm.employee_id} onChange={e => setLoginForm({...loginForm, employee_id: e.target.value})}>
@@ -4265,6 +4255,16 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
             {loginError && <p style={styles.errorMsg}>{loginError}</p>}
             <button style={{...styles.button, backgroundColor: theme.accent, marginTop: 0}} onClick={createLogin}>Create Login</button>
             <UserManagement token={token} activeEmps={activeEmps} refreshSignal={userRefresh} />
+          </SetupSection>
+
+                    {/* ── YOUR ACCOUNT ── */}
+                    <SetupSection
+            number="★"
+            title="Your Account"
+            subtitle="Update your name, company name, and password."
+            complete={true}
+          >
+            <ProfileSettingsForm token={token} showCompany={true} />
           </SetupSection>
         </>
       )}
