@@ -3358,40 +3358,44 @@ function ScheduleScreen({ token, readonly = false }) {
     byDate[s.scheduled_date].push(s);
   });
   const weekHours = filteredSchedules.reduce((s, x) => s + Number(x.scheduled_hours || 0), 0);
-  const tabBtnStyle = (id) => ({ flex: 1, padding: "10px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s" });
+  const tabBtnStyle = (id) => ({ padding: "9px 18px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s", boxShadow: tab === id ? theme.shadowSm : "none", whiteSpace: "nowrap" });
 
   return (
-    <div style={styles.containerWide}>
-      <h1 style={styles.title}>Schedule</h1>
-      <p style={styles.subtitle}>Drag shift templates onto your crew to schedule the week</p>
+    <div style={{ padding: "24px 28px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "14px" }}>
+        <div>
+          <h1 style={{ ...styles.title, marginBottom: "3px" }}>Schedule</h1>
+          <p style={{ ...styles.subtitle, marginBottom: 0 }}>Drag shift templates onto your crew to schedule the week</p>
+        </div>
+        <div style={{ display: "inline-flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", border: `1px solid ${theme.border}`, boxShadow: theme.shadowSm, flexShrink: 0 }}>
+          <button onClick={() => setTab("calendar")} style={tabBtnStyle("calendar")}>Calendar</button>
+          <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Shift</button>
+          <button onClick={() => setTab("templates")} style={tabBtnStyle("templates")}>Templates</button>
+        </div>
+      </div>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
-
-      <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "18px", border: `1px solid ${theme.border}`, maxWidth: "460px" }}>
-        <button onClick={() => setTab("calendar")} style={tabBtnStyle("calendar")}>Calendar</button>
-        <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Shift</button>
-        <button onClick={() => setTab("templates")} style={tabBtnStyle("templates")}>Templates</button>
-      </div>
 
       {/* ── CALENDAR TAB ── */}
       {tab === "calendar" && (
         <>
           {/* Week nav */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
+          <div style={{ backgroundColor: "white", borderRadius: "12px", border: `1px solid ${theme.border}`, padding: "12px 16px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", boxShadow: theme.shadowSm }}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "15px", color: theme.textPrimary, fontWeight: "600", minHeight: "38px" }}>‹</button>
-              <div style={{ textAlign: "center", minWidth: "160px" }}>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{weekLabel}</div>
-                <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "1px" }}>
-                  {weekHours > 0 ? `${weekHours}h scheduled` : "Nothing scheduled"}
-                  {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", marginLeft: "6px", padding: 0 }}>Today</button>}
+              <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "6px 13px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: theme.bg, cursor: "pointer", fontFamily: font.body, fontSize: "16px", color: theme.textPrimary, fontWeight: "700", lineHeight: 1, minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+              <div style={{ textAlign: "center", minWidth: "180px" }}>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, letterSpacing: "-0.2px" }}>{weekLabel}</div>
+                <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>
+                  {weekHours > 0 ? <span style={{ color: theme.accent, fontWeight: "600" }}>{weekHours}h scheduled</span> : "Nothing scheduled"}
+                  {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ fontSize: "11px", color: theme.gold, background: "none", border: "none", cursor: "pointer", fontWeight: "700", marginLeft: "8px", padding: 0 }}>This week</button>}
                 </div>
               </div>
-              <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", fontFamily: font.body, fontSize: "15px", color: theme.textPrimary, fontWeight: "600", minHeight: "38px" }}>›</button>
+              <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "6px 13px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: theme.bg, cursor: "pointer", fontFamily: font.body, fontSize: "16px", color: theme.textPrimary, fontWeight: "700", lineHeight: 1, minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
             </div>
-            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-              <button onClick={() => setJobFilter("all")} style={{ padding: "4px 10px", borderRadius: "12px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>All</button>
-              {jobs.map(j => <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "4px 10px", borderRadius: "12px", border: `1.5px solid ${jobFilter === String(j.job_id) ? jobColors[j.job_id] : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? jobColors[j.job_id] : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>{j.job_name}</button>)}
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", color: theme.textLight, fontWeight: "500", marginRight: "2px" }}>Filter:</span>
+              <button onClick={() => setJobFilter("all")} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>All jobs</button>
+              {jobs.map(j => <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === String(j.job_id) ? jobColors[j.job_id] : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? jobColors[j.job_id] : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>{j.job_name}</button>)}
             </div>
           </div>
 
@@ -3446,8 +3450,8 @@ function ScheduleScreen({ token, readonly = false }) {
 
               {/* Template sidebar */}
               {templates.length > 0 && (
-                <div style={{ width: "154px", flexShrink: 0 }}>
-                  <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "8px" }}>Templates</div>
+                <div style={{ width: "176px", flexShrink: 0 }}>
+                  <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px", paddingBottom: "8px", borderBottom: `1px solid ${theme.border}` }}>Shift Templates</div>
                   {templates.map(tpl => {
                     const job = jobs.find(j => String(j.job_id) === String(tpl.job_id));
                     const cc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
@@ -3457,7 +3461,7 @@ function ScheduleScreen({ token, readonly = false }) {
                         draggable={!readonly}
                         onDragStart={() => setDragItem({ type: "template", data: tpl })}
                         onDragEnd={() => { setDragItem(null); setDragOverCell(null); }}
-                        style={{ backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "8px", padding: "9px 10px", marginBottom: "6px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.template_id === tpl.template_id ? 0.45 : 1, boxShadow: theme.shadowSm }}
+                        style={{ backgroundColor: tpl.color || theme.primary, color: "white", borderRadius: "8px", padding: "10px 12px", marginBottom: "7px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.template_id === tpl.template_id ? 0.45 : 1, boxShadow: theme.shadowSm, transition: "opacity 0.15s", lineHeight: 1.3 }}
                       >
                         <div style={{ fontWeight: "700", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</div>
                         <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job?.job_name || "?"}</div>
@@ -3471,19 +3475,19 @@ function ScheduleScreen({ token, readonly = false }) {
 
               {/* Calendar grid */}
               <div style={{ flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                <div style={{ minWidth: "560px" }}>
+                <div style={{ minWidth: "600px" }}>
                   {/* Day header row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "130px repeat(7, 1fr)", gap: "3px", marginBottom: "3px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
                     <div />
                     {days.map(d => {
                       const ds = d.toISOString().split("T")[0];
                       const isToday = ds === todayStr;
                       return (
-                        <div key={ds} style={{ textAlign: "center", padding: "3px 2px" }}>
-                          <div style={{ fontSize: "9px", fontWeight: "700", color: isToday ? theme.accent : theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        <div key={ds} style={{ textAlign: "center", padding: "6px 2px 8px" }}>
+                          <div style={{ fontSize: "10px", fontWeight: "700", color: isToday ? theme.accent : theme.textLight, textTransform: "uppercase", letterSpacing: "0.6px" }}>
                             {d.toLocaleDateString("en-CA", { weekday: "short" })}
                           </div>
-                          <div style={{ fontSize: "14px", fontWeight: isToday ? "800" : "600", color: isToday ? "white" : theme.textPrimary, width: "26px", height: "26px", borderRadius: "50%", backgroundColor: isToday ? theme.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", margin: "2px auto 0" }}>
+                          <div style={{ fontSize: "14px", fontWeight: isToday ? "800" : "600", color: isToday ? "white" : theme.textPrimary, width: "30px", height: "30px", borderRadius: "50%", backgroundColor: isToday ? theme.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", margin: "3px auto 0" }}>
                             {d.getDate()}
                           </div>
                         </div>
@@ -3497,10 +3501,10 @@ function ScheduleScreen({ token, readonly = false }) {
                   ) : employees.map(emp => {
                     const empHours = filteredSchedules.filter(s => s.employee_id === emp.employee_id).reduce((sum, s) => sum + Number(s.scheduled_hours || 0), 0);
                     return (
-                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "130px repeat(7, 1fr)", gap: "3px", marginBottom: "3px" }}>
-                        <div style={{ padding: "4px 8px 4px 0", display: "flex", flexDirection: "column", justifyContent: "center", minHeight: "58px", borderRight: `1px solid ${theme.border}`, paddingRight: "8px" }}>
+                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
+                        <div style={{ padding: "6px 10px 6px 4px", display: "flex", flexDirection: "column", justifyContent: "center", minHeight: "80px", borderRight: `1px solid ${theme.border}` }}>
                           <div style={{ fontSize: "12px", fontWeight: "700", color: theme.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.first_name} {emp.last_name}</div>
-                          <div style={{ fontSize: "10px", color: theme.textLight, marginTop: "1px" }}>{emp.role || "Crew"}{empHours > 0 ? ` · ${empHours}h` : ""}</div>
+                          <div style={{ fontSize: "10px", color: empHours > 0 ? theme.accent : theme.textLight, marginTop: "2px", fontWeight: empHours > 0 ? "600" : "400" }}>{emp.role || "Crew"}{empHours > 0 ? ` · ${empHours}h` : ""}</div>
                         </div>
                         {days.map(d => {
                           const ds = d.toISOString().split("T")[0];
@@ -3515,7 +3519,7 @@ function ScheduleScreen({ token, readonly = false }) {
                               onDragEnter={e => { e.preventDefault(); if (dragItem) setDragOverCell(cellKey); }}
                               onDragLeave={() => setDragOverCell(prev => prev === cellKey ? null : prev)}
                               onDrop={e => { e.preventDefault(); dropOnCell(emp.employee_id, ds); }}
-                              style={{ minHeight: "58px", borderRadius: "6px", padding: "3px", backgroundColor: isDragOver ? theme.accentLight : isToday ? "#f7fdf8" : "#fafaf9", border: isDragOver ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`, transition: "background-color 0.1s, border-color 0.1s", position: "relative" }}
+                              style={{ minHeight: "80px", borderRadius: "6px", padding: "4px", backgroundColor: isDragOver ? theme.accentLight : isToday ? "#f0faf3" : "#fafaf8", border: isDragOver ? `2px solid ${theme.accent}` : isToday ? `1.5px solid rgba(45,106,79,0.2)` : `1px solid ${theme.border}`, transition: "background-color 0.1s, border-color 0.1s", position: "relative" }}
                             >
                               {cellShifts.map(s => {
                                 const color = s.color || jobColors[s.job_id] || theme.primary;
@@ -3527,11 +3531,11 @@ function ScheduleScreen({ token, readonly = false }) {
                                     onDragStart={e => { e.stopPropagation(); setDragItem({ type: "assignment", data: s }); }}
                                     onDragEnd={() => { setDragItem(null); setDragOverCell(null); }}
                                     title={`${emp.first_name} · ${job?.job_name} · ${s.scheduled_hours}h${s.notes ? "\n" + s.notes : ""}`}
-                                    style={{ backgroundColor: color, color: "white", borderRadius: "4px", padding: "3px 5px", marginBottom: "2px", fontSize: "10px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.schedule_id === s.schedule_id ? 0.4 : 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "2px" }}
+                                    style={{ backgroundColor: color, color: "white", borderRadius: "5px", padding: "5px 7px", marginBottom: "3px", fontSize: "11px", cursor: readonly ? "default" : "grab", userSelect: "none", opacity: dragItem?.data?.schedule_id === s.schedule_id ? 0.4 : 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "3px", boxShadow: "0 1px 3px rgba(0,0,0,0.18)", lineHeight: 1.3 }}
                                   >
                                     <div>
-                                      <div style={{ fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "9.5px", maxWidth: "70px" }}>{job?.job_name || "?"}</div>
-                                      <div style={{ opacity: 0.9, fontSize: "9px" }}>{s.scheduled_hours}h</div>
+                                      <div style={{ fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10.5px" }}>{job?.job_name || "?"}</div>
+                                      <div style={{ opacity: 0.85, fontSize: "9.5px", marginTop: "1px" }}>{s.scheduled_hours}h</div>
                                     </div>
                                     {!readonly && <button onClick={e => { e.stopPropagation(); handleDelete(s.schedule_id); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.75)", cursor: "pointer", fontSize: "12px", lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>}
                                   </div>
@@ -3563,7 +3567,7 @@ function ScheduleScreen({ token, readonly = false }) {
 
       {/* ── ADD SHIFT TAB ── */}
       {tab === "add" && (
-        <div style={{ maxWidth: "640px" }}>
+        <div style={{ maxWidth: "800px" }}>
           {/* Template quick-fill picker */}
           {templates.length > 0 && (
             <div style={{ ...styles.card, marginBottom: "14px" }}>
@@ -3634,7 +3638,7 @@ function ScheduleScreen({ token, readonly = false }) {
 
       {/* ── TEMPLATES TAB ── */}
       {tab === "templates" && (
-        <div style={{ maxWidth: "720px" }}>
+        <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
             <div>
               <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>Shift Templates</div>
@@ -3707,7 +3711,7 @@ function ScheduleScreen({ token, readonly = false }) {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
             {templates.map(tpl => {
               const job = jobs.find(j => String(j.job_id) === String(tpl.job_id));
               const cc = costCodes.find(c => String(c.cost_code_id) === String(tpl.cost_code_id));
@@ -3893,7 +3897,7 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
 
 // ─── SETUP SECTION ──────────────────────────────────────────────
 function SetupSection({ number, title, subtitle, complete, completeLabel, children }) {
-  const [open, setOpen] = useState(number === "★" ? false : !complete);
+  const [open, setOpen] = useState(!complete);
   return (
     <div style={{ marginBottom: "10px", borderRadius: "12px", border: `1.5px solid ${complete ? theme.accent : theme.border}`, overflow: "hidden", backgroundColor: "white" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", backgroundColor: complete ? theme.accentLight : "white" }}>
