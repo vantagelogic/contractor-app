@@ -3401,13 +3401,14 @@ function ScheduleScreen({ token, readonly = false }) {
   const tabBtnStyle = (id) => ({ padding: "9px 18px", borderRadius: "7px", border: tab === id ? `1px solid ${theme.border}` : "none", backgroundColor: tab === id ? "white" : "transparent", color: tab === id ? theme.primary : theme.textSecondary, fontFamily: font.body, fontSize: "13px", fontWeight: tab === id ? "600" : "400", cursor: "pointer", transition: "all 0.15s", boxShadow: tab === id ? theme.shadowSm : "none", whiteSpace: "nowrap" });
 
   return (
-    <div style={{ padding: "24px 28px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "14px" }}>
-        <div>
-          <h1 style={{ ...styles.title, marginBottom: "3px" }}>Schedule</h1>
-          <p style={{ ...styles.subtitle, marginBottom: 0 }}>Drag shift templates onto your crew to schedule the week</p>
-        </div>
-        <div style={{ display: "inline-flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", border: `1px solid ${theme.border}`, boxShadow: theme.shadowSm, flexShrink: 0 }}>
+    <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "24px 28px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", boxSizing: "border-box" }}>
+      <div style={{ textAlign: "center", marginBottom: "18px" }}>
+        <h1 style={{ ...styles.title, marginBottom: "3px" }}>Schedule</h1>
+        <p style={{ ...styles.subtitle, marginBottom: 0 }}>Drag shift templates onto your crew to schedule the week</p>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "18px" }}>
+        <div style={{ display: "inline-flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", border: `1px solid ${theme.border}`, boxShadow: theme.shadowSm }}>
           <button onClick={() => setTab("calendar")} style={tabBtnStyle("calendar")}>Calendar</button>
           <button onClick={() => setTab("add")} style={tabBtnStyle("add")}>Add Shift</button>
           <button onClick={() => setTab("templates")} style={tabBtnStyle("templates")}>Templates</button>
@@ -3486,11 +3487,11 @@ function ScheduleScreen({ token, readonly = false }) {
             </div>
           ) : (
             /* ── DESKTOP: drag-and-drop grid ── */
-            <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: templates.length > 0 ? "180px minmax(0, 1fr)" : "1fr", gap: "16px", width: "100%", boxSizing: "border-box" }}>
 
-              {/* Template sidebar */}
+              {/* Template sidebar — fixed column, never scrolls */}
               {templates.length > 0 && (
-                <div style={{ width: "176px", flexShrink: 0 }}>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: "10px", paddingBottom: "8px", borderBottom: `1px solid ${theme.border}` }}>Shift Templates</div>
                   {templates.map(tpl => {
                     const job = jobs.find(j => String(j.job_id) === String(tpl.job_id));
@@ -3513,11 +3514,11 @@ function ScheduleScreen({ token, readonly = false }) {
                 </div>
               )}
 
-              {/* Calendar grid */}
-              <div style={{ flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              {/* Calendar grid — fills remaining width, no horizontal scroll */}
+              <div style={{ minWidth: 0 }}>
                 <div>
                   {/* Day header row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "150px repeat(7, minmax(0, 1fr))", gap: "4px", marginBottom: "4px" }}>
                     <div />
                     {days.map(d => {
                       const ds = d.toISOString().split("T")[0];
@@ -3541,7 +3542,7 @@ function ScheduleScreen({ token, readonly = false }) {
                   ) : employees.map(emp => {
                     const empHours = filteredSchedules.filter(s => s.employee_id === emp.employee_id).reduce((sum, s) => sum + Number(s.scheduled_hours || 0), 0);
                     return (
-                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "160px repeat(7, 130px)", gap: "4px", marginBottom: "4px" }}>
+                      <div key={emp.employee_id} style={{ display: "grid", gridTemplateColumns: "150px repeat(7, minmax(0, 1fr))", gap: "4px", marginBottom: "4px" }}>
                           <div style={{ padding: "6px 10px 6px 4px", display: "flex", flexDirection: "column", justifyContent: "center", height: "90px", borderRight: `1px solid ${theme.border}` }}>
                           <div style={{ fontSize: "12px", fontWeight: "700", color: theme.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.first_name} {emp.last_name}</div>
                           <div style={{ fontSize: "10px", color: empHours > 0 ? theme.accent : theme.textLight, marginTop: "2px", fontWeight: empHours > 0 ? "600" : "400" }}>{emp.role || "Crew"}{empHours > 0 ? ` · ${empHours}h` : ""}</div>
@@ -3655,21 +3656,13 @@ function ScheduleScreen({ token, readonly = false }) {
             {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <label style={styles.label}>Date</label>
+          <input style={errors.scheduled_date ? styles.inputError : styles.input} type="date" value={form.scheduled_date} onChange={e => { setForm({...form, scheduled_date: e.target.value}); setErrors({...errors, scheduled_date: ""}); }} />
+          {errors.scheduled_date && <p style={styles.errorMsg}>{errors.scheduled_date}</p>}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
             <div>
-              <label style={styles.label}>Date</label>
-              <input style={errors.scheduled_date ? styles.inputError : styles.input} type="date" value={form.scheduled_date} onChange={e => { setForm({...form, scheduled_date: e.target.value}); setErrors({...errors, scheduled_date: ""}); }} />
-              {errors.scheduled_date && <p style={styles.errorMsg}>{errors.scheduled_date}</p>}
-            </div>
-            <div>
-              <label style={styles.label}>Hours</label>
-              <input style={errors.scheduled_hours ? styles.inputError : styles.input} type="number" step="0.5" placeholder="8" value={form.scheduled_hours} onChange={e => { setForm({...form, scheduled_hours: e.target.value}); setErrors({...errors, scheduled_hours: ""}); }} />
-              {errors.scheduled_hours && <p style={styles.errorMsg}>{errors.scheduled_hours}</p>}
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <div>
-              <label style={styles.label}>Start Time (optional)</label>
+              <label style={styles.label}>Start Time</label>
               <input style={styles.input} type="time" value={form.start_time} onChange={e => {
                 const s = e.target.value;
                 const h = calcHours(s, form.end_time);
@@ -3677,14 +3670,21 @@ function ScheduleScreen({ token, readonly = false }) {
               }} />
             </div>
             <div>
-              <label style={styles.label}>End Time (optional)</label>
+              <label style={styles.label}>End Time</label>
               <input style={styles.input} type="time" value={form.end_time} onChange={e => {
                 const en = e.target.value;
                 const h = calcHours(form.start_time, en);
                 setForm({...form, end_time: en, ...(h ? { scheduled_hours: h } : {})});
               }} />
             </div>
+            <div>
+              <label style={styles.label}>Hours</label>
+              <input style={errors.scheduled_hours ? styles.inputError : styles.input} type="number" step="0.5" placeholder="8" value={form.scheduled_hours} onChange={e => { setForm({...form, scheduled_hours: e.target.value}); setErrors({...errors, scheduled_hours: ""}); }} />
+              {errors.scheduled_hours && <p style={styles.errorMsg}>{errors.scheduled_hours}</p>}
+            </div>
           </div>
+          <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "-2px", marginBottom: "2px" }}>Add start and end time to auto-fill hours, or just enter hours directly.</div>
+
           <label style={styles.label}>Notes (optional)</label>
           <textarea style={styles.textarea} placeholder="Any details for the crew member" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
           <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting || readonly}>
@@ -3730,16 +3730,11 @@ function ScheduleScreen({ token, readonly = false }) {
                     {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={styles.label}>Default Hours</label>
-                  <input style={styles.input} type="number" min="0.5" max="24" step="0.5" value={templateForm.hours} onChange={e => setTemplateForm({...templateForm, hours: e.target.value})} />
-                </div>
-                <div>
-                  <label style={styles.label}>Notes (optional)</label>
-                  <input style={styles.input} value={templateForm.notes} onChange={e => setTemplateForm({...templateForm, notes: e.target.value})} placeholder="e.g. Bring scaffold tools" />
-                </div>
-                <div>
-                  <label style={styles.label}>Default Start Time</label>
+                  <label style={styles.label}>Start Time</label>
                   <input style={styles.input} type="time" value={templateForm.start_time} onChange={e => {
                     const s = e.target.value;
                     const h = calcHours(s, templateForm.end_time);
@@ -3747,14 +3742,21 @@ function ScheduleScreen({ token, readonly = false }) {
                   }} />
                 </div>
                 <div>
-                  <label style={styles.label}>Default End Time</label>
+                  <label style={styles.label}>End Time</label>
                   <input style={styles.input} type="time" value={templateForm.end_time} onChange={e => {
                     const en = e.target.value;
                     const h = calcHours(templateForm.start_time, en);
                     setTemplateForm({...templateForm, end_time: en, ...(h ? { hours: h } : {})});
                   }} />
                 </div>
+                <div>
+                  <label style={styles.label}>Default Hours</label>
+                  <input style={styles.input} type="number" min="0.5" max="24" step="0.5" value={templateForm.hours} onChange={e => setTemplateForm({...templateForm, hours: e.target.value})} />
+                </div>
               </div>
+
+              <label style={styles.label}>Notes (optional)</label>
+              <input style={styles.input} value={templateForm.notes} onChange={e => setTemplateForm({...templateForm, notes: e.target.value})} placeholder="e.g. Bring scaffold tools" />
               <div style={{ marginTop: "12px" }}>
                 <label style={styles.label}>Color</label>
                 <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
