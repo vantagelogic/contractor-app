@@ -1525,7 +1525,7 @@ RESPONSE RULES:
         return {"reply": response.text.strip()}
     except Exception as e:
         print(f"Help chat error: {e}")
-        return {"reply": f"Error: {str(e)}"}
+        return {"reply": "Sorry, I couldn't process that. Please try again."}
 
 @app.delete("/materials/{material_id}")
 def delete_material(
