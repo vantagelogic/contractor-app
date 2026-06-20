@@ -21,6 +21,9 @@ class Company(Base):
     overtime_rules = Column(JSONB, nullable=True)
     default_markup_percent = Column(Numeric(5, 2), default=15)
     mileage_rate_per_km = Column(Numeric(6, 3), default=0.70)
+    estimate_labor_rate_per_hour = Column(Numeric(10, 2), default=75)
+    tax_rate_percent = Column(Numeric(5, 2), default=0)
+    tax_label = Column(String(30), default="HST")
 
 class User(Base):
     __tablename__ = "users"

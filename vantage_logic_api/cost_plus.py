@@ -103,16 +103,40 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         count = db.query(models.Invoice).filter(models.Invoice.company_id == company_id).count()
         return f"INV-{company_id:03d}-{count + 1:04d}"
 
-    def _recalc_estimate_totals(db: Session, estimate: models.Estimate):
+    def _company_labor_rate(company) -> float:
+        return float(getattr(company, "estimate_labor_rate_per_hour", None) or 0)
+
+    def _estimate_tax(company, subtotal: float) -> dict:
+        rate = float(getattr(company, "tax_rate_percent", None) or 0)
+        label = getattr(company, "tax_label", None) or "HST"
+        tax_amount = round(subtotal * rate / 100, 2) if rate > 0 else 0.0
+        return {
+            "tax_rate_percent": rate,
+            "tax_label": label,
+            "tax_amount": tax_amount,
+            "total_with_tax": round(subtotal + tax_amount, 2),
+        }
+
+    def _recalc_estimate_totals(db: Session, estimate: models.Estimate, company_id: int | None = None):
+        company = None
+        if company_id:
+            company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
+        labor_rate = _company_labor_rate(company) if company else 0.0
         lines = db.query(models.EstimateLineItem).filter(
             models.EstimateLineItem.estimate_id == estimate.estimate_id
         ).all()
         total_hours = total_mat = total_lab = 0.0
         for ln in lines:
             qty = float(ln.quantity or 1)
-            total_hours += float(ln.estimated_hours or 0) * qty
-            total_mat += float(ln.material_cost or 0) * qty
-            total_lab += float(ln.labor_cost or 0) * qty
+            hrs = float(ln.estimated_hours or 0)
+            mat = float(ln.material_cost or 0)
+            lab = float(ln.labor_cost or 0)
+            if lab <= 0 and hrs > 0 and labor_rate > 0:
+                lab = round(hrs * labor_rate, 2)
+                ln.labor_cost = lab
+            total_hours += hrs * qty
+            total_mat += mat * qty
+            total_lab += lab * qty
         estimate.total_hours = round(total_hours, 2)
         estimate.total_material_cost = round(total_mat, 2)
         estimate.total_labor_cost = round(total_lab, 2)
@@ -137,9 +161,14 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         ).update({"status": "superseded"})
 
     def _serialize_estimate(db: Session, estimate: models.Estimate):
+        company = db.query(models.Company).filter(models.Company.company_id == estimate.company_id).first()
         lines = db.query(models.EstimateLineItem).filter(
             models.EstimateLineItem.estimate_id == estimate.estimate_id
         ).order_by(models.EstimateLineItem.sort_order).all()
+        subtotal = float(estimate.total_cost or 0)
+        tax_info = _estimate_tax(company, subtotal) if company else {
+            "tax_rate_percent": 0, "tax_label": "HST", "tax_amount": 0, "total_with_tax": subtotal,
+        }
         return {
             "estimate_id": estimate.estimate_id,
             "job_id": estimate.job_id,
@@ -148,7 +177,12 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "total_hours": float(estimate.total_hours or 0),
             "total_material_cost": float(estimate.total_material_cost or 0),
             "total_labor_cost": float(estimate.total_labor_cost or 0),
-            "total_cost": float(estimate.total_cost or 0),
+            "total_cost": subtotal,
+            "subtotal": subtotal,
+            "tax_rate_percent": tax_info["tax_rate_percent"],
+            "tax_label": tax_info["tax_label"],
+            "tax_amount": tax_info["tax_amount"],
+            "total_with_tax": tax_info["total_with_tax"],
             "estimated_mileage_km": float(estimate.estimated_mileage_km or 0) if estimate.estimated_mileage_km else None,
             "customer_email": estimate.customer_email,
             "sent_at": str(estimate.sent_at) if estimate.sent_at else None,
@@ -366,7 +400,16 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             mi_cost = round(km * rate, 2)
             table_data.append(["Mileage / travel", "—", f"{km:,.0f} km", f"${mi_cost:,.2f}"])
 
-        table_data.append(["", "", "TOTAL", f"${float(estimate.total_cost or 0):,.2f}"])
+        subtotal = float(estimate.total_cost or 0)
+        tax_info = _estimate_tax(company, subtotal)
+        table_data.append(["", "", "Subtotal", f"${subtotal:,.2f}"])
+        if tax_info["tax_rate_percent"] > 0:
+            table_data.append([
+                "", "",
+                f"{tax_info['tax_label']} ({tax_info['tax_rate_percent']:g}%)",
+                f"${tax_info['tax_amount']:,.2f}",
+            ])
+        table_data.append(["", "", "TOTAL", f"${tax_info['total_with_tax']:,.2f}"])
 
         t = Table(table_data, colWidths=[3.0 * inch, 0.9 * inch, 1.2 * inch, 1.2 * inch])
         t.setStyle(TableStyle([
@@ -729,7 +772,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
                 labor_cost=ln.labor_cost,
                 sort_order=i,
             ))
-        _recalc_estimate_totals(db, estimate)
+        _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
         db.commit()
         db.refresh(estimate)
@@ -805,7 +848,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
                     sort_order=i,
                 ))
 
-        _recalc_estimate_totals(db, estimate)
+        _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
         if estimate.status == "sent":
             estimate.status = "draft"

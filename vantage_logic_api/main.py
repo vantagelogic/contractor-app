@@ -169,6 +169,18 @@ with engine.connect() as _conn:
         _conn.commit()
     except Exception:
         pass
+    for _col, _typ in [
+        ("estimate_labor_rate_per_hour", "NUMERIC(10,2) DEFAULT 75"),
+        ("tax_rate_percent", "NUMERIC(5,2) DEFAULT 0"),
+        ("tax_label", "VARCHAR(30) DEFAULT 'HST'"),
+    ]:
+        try:
+            _conn.execute(__import__("sqlalchemy").text(
+                f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {_col} {_typ}"
+            ))
+            _conn.commit()
+        except Exception:
+            pass
     try:
         _conn.execute(__import__("sqlalchemy").text(
             "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS crew_count INTEGER"
@@ -195,6 +207,42 @@ with engine.connect() as _conn:
             _conn.commit()
         except Exception:
             pass
+    for _col, _typ in [
+        ("first_name", "VARCHAR(100)"),
+        ("last_name", "VARCHAR(100)"),
+        ("employee_id", "INTEGER"),
+        ("is_verified", "BOOLEAN DEFAULT FALSE"),
+        ("verification_token", "VARCHAR"),
+        ("reset_token", "VARCHAR"),
+        ("reset_token_expires", "TIMESTAMP"),
+    ]:
+        try:
+            _conn.execute(__import__("sqlalchemy").text(
+                f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {_col} {_typ}"
+            ))
+            _conn.commit()
+        except Exception:
+            pass
+    for _col, _typ in [
+        ("stripe_customer_id", "VARCHAR"),
+        ("subscription_status", "VARCHAR(50) DEFAULT 'trial'"),
+        ("trial_end_date", "TIMESTAMP"),
+        ("subscription_tier", "VARCHAR(50)"),
+    ]:
+        try:
+            _conn.execute(__import__("sqlalchemy").text(
+                f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {_col} {_typ}"
+            ))
+            _conn.commit()
+        except Exception:
+            pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "UPDATE users SET is_verified = TRUE WHERE verification_token IS NULL AND is_verified = FALSE"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
 
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
@@ -490,13 +538,31 @@ def require_owner(current_user: models.User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Owner or admin access required")
     return current_user
 
+from cost_plus import register_cost_plus_routes
+register_cost_plus_routes(app, get_db, get_current_user, require_owner, _timesheet_labour_cost)
+
+
+def _has_route(path: str) -> bool:
+    return any(getattr(r, "path", None) == path for r in app.routes)
+
 # =============================================
 # HEALTH CHECK
 # =============================================
 
 @app.get("/")
 def root():
-    return {"message": "Vantage Logic API v2 is running"}
+    return {
+        "message": "Vantage Logic API v2 is running",
+        "estimating": _has_route("/job-types"),
+    }
+
+
+@app.get("/health/features")
+def health_features():
+    return {
+        "estimating": _has_route("/job-types"),
+        "estimate_templates": _has_route("/estimate-templates"),
+    }
 
 # =============================================
 # AUTH
@@ -508,7 +574,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
-    if not user.is_verified:
+    if user.is_verified is False and user.verification_token:
         raise HTTPException(status_code=403, detail="Please verify your email before signing in. Check your inbox for the verification link.")
     token = create_access_token({"user_id": user.user_id, "company_id": user.company_id, "role": user.role})
     company = db.query(models.Company).filter(models.Company.company_id == user.company_id).first()
@@ -568,14 +634,15 @@ def signup(
     db.refresh(company)
 
     verification_token = secrets.token_urlsafe(32)
+    auto_verify = not os.environ.get("RESEND_API_KEY")
 
     user = models.User(
         company_id=company.company_id,
         email=email,
         hashed_password=hash_password(password),
         role="owner",
-        is_verified=False,
-        verification_token=verification_token,
+        is_verified=auto_verify,
+        verification_token=None if auto_verify else verification_token,
         first_name=first_name,
         last_name=last_name,
     )
@@ -583,7 +650,13 @@ def signup(
     db.commit()
     db.refresh(user)
 
-    send_verification_email(email, verification_token)
+    if not auto_verify:
+        send_verification_email(email, verification_token)
+    if auto_verify:
+        return {
+            "message": "Account created. You can sign in now.",
+            "email": email,
+        }
     return {
         "message": "Account created. Check your email to verify your account before signing in.",
         "email": email
@@ -767,6 +840,11 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     "track_overtime": _company_track_overtime(company),
     "overtime_rate_multiplier": _company_ot_multiplier(company),
     "overtime_rules": _company_overtime_rules(company),
+    "mileage_rate_per_km": float(getattr(company, "mileage_rate_per_km", None) or 0.70),
+    "estimate_labor_rate_per_hour": float(getattr(company, "estimate_labor_rate_per_hour", None) or 75),
+    "tax_rate_percent": float(getattr(company, "tax_rate_percent", None) or 0),
+    "tax_label": getattr(company, "tax_label", None) or "HST",
+    "default_markup_percent": float(getattr(company, "default_markup_percent", None) or 15),
 }
 
 @app.get("/users")
@@ -1863,6 +1941,11 @@ def update_company(
     track_overtime: bool = None,
     overtime_rate_multiplier: float = None,
     overtime_rules: str = None,
+    mileage_rate_per_km: float = None,
+    estimate_labor_rate_per_hour: float = None,
+    tax_rate_percent: float = None,
+    tax_label: str = None,
+    default_markup_percent: float = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1884,6 +1967,16 @@ def update_company(
             if not isinstance(parsed, list):
                 raise HTTPException(status_code=400, detail="overtime_rules must be a JSON array")
             company.overtime_rules = parsed
+    if mileage_rate_per_km is not None and hasattr(company, "mileage_rate_per_km"):
+        company.mileage_rate_per_km = mileage_rate_per_km
+    if estimate_labor_rate_per_hour is not None and hasattr(company, "estimate_labor_rate_per_hour"):
+        company.estimate_labor_rate_per_hour = estimate_labor_rate_per_hour
+    if tax_rate_percent is not None and hasattr(company, "tax_rate_percent"):
+        company.tax_rate_percent = tax_rate_percent
+    if tax_label is not None and hasattr(company, "tax_label"):
+        company.tax_label = (tax_label or "HST").strip()[:30]
+    if default_markup_percent is not None and hasattr(company, "default_markup_percent"):
+        company.default_markup_percent = default_markup_percent
     db.commit()
     return {"message": "Company updated"}
 
@@ -3238,6 +3331,3 @@ def seed_demo(
     if result.get("skipped"):
         raise HTTPException(status_code=409, detail=result["message"])
     return result
-
-from cost_plus import register_cost_plus_routes
-register_cost_plus_routes(app, get_db, get_current_user, require_owner, _timesheet_labour_cost)

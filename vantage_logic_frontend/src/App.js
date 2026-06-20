@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const API =
   process.env.REACT_APP_API_URL ??
   (process.env.NODE_ENV === "development"
-    ? "http://127.0.0.1:8000"
+    ? "https://contractor-api-pi7o.onrender.com"
     : "https://contractor-api-pi7o.onrender.com");
 
 let _logoutFn = null;
@@ -111,6 +111,20 @@ function getStoredAuth() {
   try { return { token: localStorage.getItem("vl_token"), role: localStorage.getItem("vl_role") }; }
   catch { return { token: null, role: null }; }
 }
+
+function syncAuthForApiBase() {
+  try {
+    const prev = localStorage.getItem("vl_api_base");
+    const isLocalApi = /localhost|127\.0\.0\.1/.test(API);
+    const wasHosted = prev && /onrender\.com|vantagelogic/.test(prev);
+    if ((prev && prev !== API) || (isLocalApi && localStorage.getItem("vl_token") && (!prev || wasHosted))) {
+      localStorage.removeItem("vl_token");
+      localStorage.removeItem("vl_role");
+    }
+    localStorage.setItem("vl_api_base", API);
+  } catch {}
+}
+syncAuthForApiBase();
 
 function setStoredAuth(token, role) {
   try {
@@ -730,18 +744,23 @@ function Login({ onLogin, onSignUp, onForgot }) {
     if (!email || !password) { setError("Please enter your email and password"); return; }
     setError("");
     setLoading(true);
-    const formData = new URLSearchParams();
-    formData.append("username", email);
-    formData.append("password", password);
-    const response = await fetch(`${API}/login`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formData });
-    setLoading(false);
-    if (response.ok) {
-      const data = await response.json();
-      onLogin(data.access_token, data.role);
-    } else {
-      const data = await response.json().catch(() => ({}));
-      setError(data.detail || "Incorrect email or password");
+    try {
+      const formData = new URLSearchParams();
+      formData.append("username", email);
+      formData.append("password", password);
+      const response = await fetch(`${API}/login`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formData });
+      if (response.ok) {
+        const data = await response.json();
+        onLogin(data.access_token, data.role);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        if (response.status >= 500) setError("Server error — check that the API is running and the database is connected.");
+        else setError(data.detail || "Incorrect email or password");
+      }
+    } catch {
+      setError("Can't reach the server. Start the API on port 8000, then try again.");
     }
+    setLoading(false);
   }
 
   return (
@@ -5997,6 +6016,99 @@ function goToEstimatingSettings() {
   else if (window._setView) window._setView("settings");
 }
 
+function EstimateRatesSettings({ token, readonly = false }) {
+  const [form, setForm] = useState({
+    estimate_labor_rate_per_hour: "75",
+    mileage_rate_per_km: "0.70",
+    tax_label: "HST",
+    tax_rate_percent: "0",
+    default_markup_percent: "15",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const h = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(me => {
+      setForm({
+        estimate_labor_rate_per_hour: String(me.estimate_labor_rate_per_hour ?? 75),
+        mileage_rate_per_km: String(me.mileage_rate_per_km ?? 0.7),
+        tax_label: me.tax_label || "HST",
+        tax_rate_percent: String(me.tax_rate_percent ?? 0),
+        default_markup_percent: String(me.default_markup_percent ?? 15),
+      });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  async function save() {
+    setSaving(true);
+    setMessage("");
+    const params = new URLSearchParams({
+      estimate_labor_rate_per_hour: parseFloat(form.estimate_labor_rate_per_hour) || 0,
+      mileage_rate_per_km: parseFloat(form.mileage_rate_per_km) || 0,
+      tax_label: form.tax_label.trim() || "HST",
+      tax_rate_percent: parseFloat(form.tax_rate_percent) || 0,
+      default_markup_percent: parseFloat(form.default_markup_percent) || 0,
+    });
+    const res = await apiFetch(`${API}/me/update-company?${params}`, { method: "PATCH", headers: h });
+    setSaving(false);
+    if (res.ok) {
+      setMessage("Estimate & billing rates saved.");
+      setTimeout(() => setMessage(""), 3000);
+    } else {
+      setMessage("Could not save. Please try again.");
+    }
+  }
+
+  if (loading) return <Skeleton width="100%" height="120px" radius="12px" />;
+
+  return (
+    <div style={{ ...styles.card, marginBottom: 20 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Estimate &amp; billing rates</h3>
+      <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
+        Default labour, mileage, and tax rates used when building estimates and cost-plus invoices.
+      </p>
+      {message && <div style={{ color: theme.accent, fontWeight: 600, marginBottom: 10, fontSize: 13 }}>{message}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10 }}>
+        <div>
+          <label style={styles.label}>Labour rate ($/hr)</label>
+          <input style={styles.input} type="number" min="0" step="1" value={form.estimate_labor_rate_per_hour} disabled={readonly}
+            onChange={e => setForm({ ...form, estimate_labor_rate_per_hour: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Mileage rate ($/km)</label>
+          <input style={styles.input} type="number" min="0" step="0.01" value={form.mileage_rate_per_km} disabled={readonly}
+            onChange={e => setForm({ ...form, mileage_rate_per_km: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Tax label</label>
+          <input style={styles.input} placeholder="HST" value={form.tax_label} disabled={readonly}
+            onChange={e => setForm({ ...form, tax_label: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Tax rate (%)</label>
+          <input style={styles.input} type="number" min="0" step="0.1" value={form.tax_rate_percent} disabled={readonly}
+            onChange={e => setForm({ ...form, tax_rate_percent: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Invoice markup (%)</label>
+          <input style={styles.input} type="number" min="0" step="1" value={form.default_markup_percent} disabled={readonly}
+            onChange={e => setForm({ ...form, default_markup_percent: e.target.value })} />
+          <p style={{ fontSize: 11, color: theme.textLight, marginTop: 4 }}>Used on cost-plus invoices (bookkeeping).</p>
+        </div>
+      </div>
+      {!readonly && (
+        <button type="button" disabled={saving} onClick={save} style={{ ...styles.button, marginTop: 14, width: isMobile() ? "100%" : "auto", padding: "10px 20px" }}>
+          {saving ? "Saving…" : "Save rates"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [jobTypes, setJobTypes] = useState([]);
@@ -6010,31 +6122,45 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
   const [editingTpl, setEditingTpl] = useState(null);
   const [apiReady, setApiReady] = useState(null);
   const [apiIssue, setApiIssue] = useState(null);
+  const isLocalDev = process.env.NODE_ENV === "development";
+  const onLegacyDevPort = isLocalDev && typeof window !== "undefined" && window.location.port === "3000";
 
-  function load() {
+  function loadJobTypesAndTemplates() {
     apiFetch(`${API}/job-types`, { headers })
-      .then(async r => {
-        if (r.status === 404) {
-          setApiReady(false);
-          setApiIssue("missing");
-          setJobTypes([]);
-          return;
-        }
-        setApiReady(true);
-        setApiIssue(null);
-        setJobTypes(r.ok ? await r.json() : []);
-      })
-      .catch(() => {
-        setApiReady(false);
-        setApiIssue("unreachable");
-        setJobTypes([]);
-      });
+      .then(r => r.ok ? r.json() : [])
+      .then(setJobTypes)
+      .catch(() => setJobTypes([]));
     apiFetch(`${API}/estimate-templates`, { headers })
       .then(r => r.ok ? r.json() : [])
       .then(setTemplates)
       .catch(() => setTemplates([]));
   }
-  useEffect(() => { load(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function checkEstimatingApi() {
+    fetch(`${API}/job-types`)
+      .then(r => {
+        if (r.ok || r.status === 401 || r.status === 403) {
+          setApiReady(true);
+          setApiIssue(null);
+          loadJobTypesAndTemplates();
+          return;
+        }
+        if (r.status === 404) {
+          setApiReady(false);
+          setApiIssue("missing");
+          setJobTypes([]);
+          setTemplates([]);
+          return;
+        }
+        setApiReady(false);
+        setApiIssue("unreachable");
+      })
+      .catch(() => {
+        setApiReady(false);
+        setApiIssue("unreachable");
+      });
+  }
+  useEffect(() => { checkEstimatingApi(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function flash(m) { setMsg(m); setErr(""); setTimeout(() => setMsg(""), 3000); }
 
@@ -6151,7 +6277,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
     if (res.ok) {
       flash(editingJt ? "Job type updated." : "Job type added.");
       cancelEditJobType();
-      load();
+      checkEstimatingApi();
     } else {
       const d = await res.json().catch(() => ({}));
       setErr(parseApiError(res, d.detail, "Could not save job type."));
@@ -6177,7 +6303,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
     if (res.ok) {
       flash(editingTpl ? "Template updated." : "Template added.");
       cancelEditTemplate();
-      load();
+      checkEstimatingApi();
     } else {
       const d = await res.json().catch(() => ({}));
       setErr(parseApiError(res, d.detail, "Could not save template."));
@@ -6192,18 +6318,32 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
       {apiReady === false && (
         <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}` }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: theme.danger, marginBottom: 8 }}>
-            {apiIssue === "unreachable" ? "Can't reach the API" : "Estimating not on this server"}
+            {apiIssue === "unreachable" ? "Can't reach the API" : "Estimating API not connected"}
           </div>
-          <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>
-            {apiIssue === "unreachable"
-              ? <>Start the API in <code style={{ fontSize: 12 }}>vantage_logic_api</code> (<code style={{ fontSize: 12 }}>uvicorn main:app --reload --port 8000</code>), then refresh this page.</>
-              : <>Could not load estimating from <code style={{ fontSize: 12 }}>{API || "the API"}</code>. If the API is running locally, refresh the page. On the live site, Render must finish deploying the latest API.</>}
+          <p style={{ fontSize: 13, color: theme.textSecondary, margin: "0 0 10px", lineHeight: 1.55 }}>
+            {apiIssue === "unreachable" ? (
+              <>Run the API in <code style={{ fontSize: 12 }}>vantage_logic_api</code> with <code style={{ fontSize: 12 }}>uvicorn main:app --reload --port 8000</code>, then click Retry.</>
+            ) : onLegacyDevPort ? (
+              <>This tab is on <strong>localhost:3000</strong> (an old dev server). Close it and open the URL from your terminal — usually <strong>http://localhost:3001</strong>.</>
+            ) : isLocalDev ? (
+              <>App is calling <code style={{ fontSize: 12 }}>{API}</code> but that server has no Estimating routes yet. Restart <code style={{ fontSize: 12 }}>npm start</code> and make sure the API on port 8000 is running.</>
+            ) : (
+              <>The live API has not been updated yet. Estimating will work after Render deploys the latest backend.</>
+            )}
           </p>
+          {isLocalDev && (
+            <p style={{ fontSize: 12, color: theme.textLight, margin: "0 0 10px" }}>
+              This page: {typeof window !== "undefined" ? window.location.origin : ""} · API: {API}
+            </p>
+          )}
+          <button type="button" onClick={checkEstimatingApi} style={{ ...styles.button, marginTop: 0, width: "auto", padding: "8px 16px" }}>Retry</button>
         </div>
       )}
 
       {apiReady !== false && (
-        <>
+        <EstimateRatesSettings token={token} readonly={readonly} />
+      )}
+
       <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Job Types</h3>
       <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
         A <strong>job type</strong> is a starter kit for new estimates. Pick a name and which work categories belong on that job — when you create an estimate, those rows appear empty (you fill in hours and materials after).
@@ -6324,8 +6464,6 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
           </div>
         )}
       </div>
-        </>
-      )}
     </div>
   );
 }
@@ -6359,6 +6497,17 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
   const [savedJob, setSavedJob] = useState(initialJob);
   const [savedEstimate, setSavedEstimate] = useState(initialEstimate);
   const [sendMsg, setSendMsg] = useState("");
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
+  const [rates, setRates] = useState({
+    labor: 75,
+    mileage: 0.7,
+    tax: 0,
+    taxLabel: "HST",
+  });
+
+  useEffect(() => () => {
+    if (pdfPreviewUrl) window.URL.revokeObjectURL(pdfPreviewUrl);
+  }, [pdfPreviewUrl]);
 
   useEffect(() => {
     if (!initialJob) return;
@@ -6371,6 +6520,14 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     apiFetch(`${API}/job-types`, { headers }).then(r => r.ok ? r.json() : []).then(setJobTypes).catch(() => setJobTypes([]));
     apiFetch(`${API}/cost-codes`, { headers }).then(r => r.ok ? r.json() : []).then(setCostCodes).catch(() => setCostCodes([]));
     apiFetch(`${API}/estimate-templates`, { headers }).then(r => r.ok ? r.json() : []).then(setTemplates).catch(() => setTemplates([]));
+    apiFetch(`${API}/me`, { headers }).then(r => r.ok ? r.json() : {}).then(me => {
+      setRates({
+        labor: parseFloat(me.estimate_labor_rate_per_hour) || 75,
+        mileage: parseFloat(me.mileage_rate_per_km) || 0.7,
+        tax: parseFloat(me.tax_rate_percent) || 0,
+        taxLabel: me.tax_label || "HST",
+      });
+    }).catch(() => {});
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -6416,6 +6573,29 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
 
   const totalHours = rows.reduce((s, r) => s + (parseFloat(r.hours) || 0), 0);
   const totalMaterials = rows.reduce((s, r) => s + (parseFloat(r.materials) || 0), 0);
+  const totalLabor = rows.reduce((s, r) => s + (parseFloat(r.hours) || 0) * rates.labor, 0);
+  const mileageCost = (parseFloat(mileageKm) || 0) * rates.mileage;
+  const subtotal = totalMaterials + totalLabor + mileageCost;
+  const taxAmount = subtotal * (rates.tax / 100);
+  const grandTotal = subtotal + taxAmount;
+
+  function estimateSummaryGrid() {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 8, fontSize: 13 }}>
+        <div>Total hours: <strong>{totalHours.toFixed(1)}h</strong></div>
+        <div>Labour ({fmt(rates.labor)}/hr): <strong>${fmt(totalLabor)}</strong></div>
+        <div>Materials: <strong>${fmt(totalMaterials)}</strong></div>
+        <div>Mileage ({fmt(rates.mileage)}/km): <strong>{mileageKm || "0"} km · ${fmt(mileageCost)}</strong></div>
+        <div>Subtotal: <strong>${fmt(subtotal)}</strong></div>
+        {rates.tax > 0 && (
+          <div>{rates.taxLabel} ({rates.tax}%): <strong>${fmt(taxAmount)}</strong></div>
+        )}
+        <div style={{ gridColumn: isMobile() ? undefined : "1 / -1", fontSize: 14, marginTop: 4 }}>
+          Total: <strong style={{ color: theme.primary }}>${fmt(grandTotal)}</strong>
+        </div>
+      </div>
+    );
+  }
 
   function buildLineItems() {
     return rows
@@ -6507,7 +6687,18 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     return { job, est };
   }
 
-  async function generateAndSend() {
+  async function loadPdfPreview(estimateId) {
+    const res = await apiFetch(`${API}/estimates/${estimateId}/pdf`, { headers });
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    setPdfPreviewUrl(prev => {
+      if (prev) window.URL.revokeObjectURL(prev);
+      return window.URL.createObjectURL(blob);
+    });
+    return true;
+  }
+
+  async function prepareForReview() {
     setSaving(true);
     setError("");
     setSendMsg("");
@@ -6516,8 +6707,21 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     const { job, est } = saved;
     setSavedJob(job);
     setSavedEstimate(est);
+    const ok = await loadPdfPreview(est.estimate_id);
+    setSaving(false);
+    if (!ok) {
+      setError("Could not generate PDF preview");
+      return;
+    }
+    setPhase("review");
+  }
 
-    const sendRes = await apiFetch(`${API}/estimates/${est.estimate_id}/send-customer`, {
+  async function sendToCustomer() {
+    if (!savedEstimate) return;
+    setSaving(true);
+    setError("");
+    setSendMsg("");
+    const sendRes = await apiFetch(`${API}/estimates/${savedEstimate.estimate_id}/send-customer`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -6528,19 +6732,28 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     setSaving(false);
     if (!sendRes.ok) {
       const d = await sendRes.json().catch(() => ({}));
-      setError(typeof d.detail === "string" ? d.detail : "Could not generate customer estimate");
+      setError(typeof d.detail === "string" ? d.detail : "Could not send estimate to customer");
       return;
     }
     const data = await sendRes.json();
-    await downloadEstimatePdf(est.estimate_id);
+    setSavedEstimate(prev => prev ? { ...prev, status: "sent" } : prev);
     setPhase("sent");
     if (data.email_sent) {
-      setSendMsg(`PDF downloaded and emailed to ${customerEmail.trim()}`);
+      setSendMsg(`Estimate sent to ${customerEmail.trim()}`);
     } else if (customerEmail.trim()) {
-      setSendMsg("PDF downloaded — email not configured; send the PDF to your customer manually");
+      setSendMsg("Estimate marked sent — email not configured; download and send the PDF manually");
     } else {
-      setSendMsg("PDF downloaded — email or hand it to your customer for approval");
+      setSendMsg("Estimate marked sent — download the PDF and share it with your customer");
     }
+  }
+
+  async function refreshPreview() {
+    if (!savedEstimate) return;
+    setSaving(true);
+    setError("");
+    const ok = await loadPdfPreview(savedEstimate.estimate_id);
+    setSaving(false);
+    if (!ok) setError("Could not refresh PDF preview");
   }
 
   async function setDashboardBaseline() {
@@ -6558,10 +6771,63 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     }
   }
 
-  function adjustForNegotiations() {
+  function backToEdit() {
     setPhase("form");
     setSendMsg("");
     setError("");
+  }
+
+  function adjustForNegotiations() {
+    backToEdit();
+  }
+
+  if (phase === "review" && savedEstimate && savedJob) {
+    return (
+      <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
+        <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
+        <h1 style={styles.title}>Review before sending</h1>
+        <p style={styles.subtitle}>{savedJob.job_name} — check the PDF, then send to your customer.</p>
+        {error && <p style={styles.errorMsg}>{error}</p>}
+
+        <div style={{ ...styles.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Summary</div>
+          {estimateSummaryGrid()}
+          <label style={{ ...styles.label, marginTop: 12 }}>Customer email (optional)</label>
+          <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
+          <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>Leave blank to download and send the PDF yourself.</p>
+        </div>
+
+        <div style={{ ...styles.card, marginBottom: 16, padding: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "12px 16px", borderBottom: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary }}>PDF preview</div>
+            <button type="button" disabled={saving} onClick={refreshPreview} style={{ fontSize: 12, fontWeight: 600, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>
+              {saving ? "Refreshing…" : "Refresh preview"}
+            </button>
+          </div>
+          {pdfPreviewUrl ? (
+            <iframe
+              title="Estimate PDF preview"
+              src={pdfPreviewUrl}
+              style={{ width: "100%", height: isMobile() ? 420 : 560, border: "none", display: "block", backgroundColor: "#f5f5f5" }}
+            />
+          ) : (
+            <div style={{ padding: 40, textAlign: "center", color: theme.textLight, fontSize: 13 }}>Loading preview…</div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: isMobile() ? "column" : "row", gap: 10, flexWrap: "wrap" }}>
+          <button type="button" disabled={saving} onClick={backToEdit} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888", flex: isMobile() ? undefined : "0 0 auto" }}>
+            Back to edit
+          </button>
+          <button type="button" disabled={saving} onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accentLight, color: theme.primary, flex: isMobile() ? undefined : "0 0 auto" }}>
+            Download PDF
+          </button>
+          <button type="button" disabled={saving} onClick={sendToCustomer} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, flex: 1 }}>
+            {saving ? "Sending…" : customerEmail.trim() ? "Send to customer" : "Mark sent & continue"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (phase === "sent" && savedEstimate && savedJob) {
@@ -6600,7 +6866,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
       <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
       <h1 style={styles.title}>{isEditMode || savedEstimate ? "Edit Estimate" : "New Estimate"}</h1>
       <p style={{ ...styles.subtitle, maxWidth: 640 }}>
-        Send PDF to customer first. Set dashboard baseline after they approve.
+        Build the estimate, review the PDF, then send to your customer.
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -6696,23 +6962,22 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>3 — Mileage (optional)</div>
         <label style={styles.label}>Estimated km for this job</label>
         <input style={{ ...styles.input, maxWidth: 160 }} type="number" min="0" placeholder="0" value={mileageKm} onChange={e => setMileageKm(e.target.value)} />
-        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>Added to contract value at your company mileage rate when approved.</p>
+        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>Charged at ${fmt(rates.mileage)}/km from Settings → Estimating.</p>
       </div>
 
       <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>Estimate summary</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
-          <div>Total hours: <strong>{totalHours.toFixed(1)}h</strong></div>
-          <div>Materials: <strong>${fmt(totalMaterials)}</strong></div>
-          <div>Mileage: <strong>{mileageKm || "0"} km</strong></div>
-        </div>
+        {estimateSummaryGrid()}
+        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 10 }}>
+          Labour uses ${fmt(rates.labor)}/hr from Settings → Estimating. Tax and mileage match your company defaults.
+        </p>
       </div>
 
-      <button type="button" disabled={saving} onClick={generateAndSend} style={{ ...styles.button, backgroundColor: theme.accent }}>
-        {saving ? "Generating PDF…" : savedEstimate ? "Save changes & send updated PDF" : "Generate customer estimate & send"}
+      <button type="button" disabled={saving} onClick={prepareForReview} style={{ ...styles.button, backgroundColor: theme.accent }}>
+        {saving ? "Preparing preview…" : savedEstimate ? "Save changes & review" : "Continue to review"}
       </button>
       <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 12 }}>
-        Saves, downloads PDF, optionally emails customer.
+        Preview the PDF before you email your customer.
       </p>
     </div>
   );
