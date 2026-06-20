@@ -55,7 +55,8 @@ with engine.connect() as _conn:
             "ALTER TABLE shift_templates ADD COLUMN IF NOT EXISTS color VARCHAR(20)"
         ))
         _conn.commit()
-
+    except Exception:
+        pass
     try:
         _conn.execute(__import__("sqlalchemy").text(
             "ALTER TABLE schedules ADD COLUMN IF NOT EXISTS start_time VARCHAR(5)"

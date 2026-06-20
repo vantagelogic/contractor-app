@@ -4547,26 +4547,6 @@ function DonutChart({ segments, size = 140, strokeWidth = 16, centerContent }) {
   );
 }
 
-const [chartPrefs, setChartPrefs] = useState(() => {
-  try {
-    const saved = JSON.parse(localStorage.getItem("vl_dashboard_charts") || "{}");
-    const merged = {};
-    CHART_DEFS.forEach(c => { merged[c.id] = saved[c.id] !== false; });
-    return merged;
-  } catch {
-    const d = {}; CHART_DEFS.forEach(c => { d[c.id] = true; }); return d;
-  }
-});
-const [showChartMenu, setShowChartMenu] = useState(false);
-
-function toggleChart(id) {
-  setChartPrefs(prev => {
-    const next = { ...prev, [id]: !prev[id] };
-    try { localStorage.setItem("vl_dashboard_charts", JSON.stringify(next)); } catch {}
-    return next;
-  });
-}
-
 function Dashboard({ token, readonly = false }) {
   const [jobs, setJobs] = useState([]);
   const [mileage, setMileage] = useState([]);
@@ -4576,6 +4556,26 @@ function Dashboard({ token, readonly = false }) {
   const [filter, setFilter] = useState("all");
   const [coDraft, setCoDraft] = useState(null);
   const [savingCO, setSavingCO] = useState(false);
+
+  const [chartPrefs, setChartPrefs] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("vl_dashboard_charts") || "{}");
+      const merged = {};
+      CHART_DEFS.forEach(c => { merged[c.id] = saved[c.id] !== false; });
+      return merged;
+    } catch {
+      const d = {}; CHART_DEFS.forEach(c => { d[c.id] = true; }); return d;
+    }
+  });
+  const [showChartMenu, setShowChartMenu] = useState(false);
+  
+  function toggleChart(id) {
+    setChartPrefs(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem("vl_dashboard_charts", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
 
   function loadDashboard() {
     const h = { Authorization: `Bearer ${token}` };
