@@ -3320,7 +3320,7 @@ function ScheduleScreen({ token, readonly = false }) {
       setCostCodes(ccs);
       setSchedules(Array.isArray(sched) ? sched : []);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }
 
   useEffect(() => { loadData(); }, [weekOffset, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -4595,7 +4595,7 @@ function Dashboard({ token, readonly = false }) {
       setJobs(Array.isArray(dashData) ? dashData : []);
       setMileage(Array.isArray(mileageData) ? mileageData : []);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }
 
   useEffect(() => { loadDashboard(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps

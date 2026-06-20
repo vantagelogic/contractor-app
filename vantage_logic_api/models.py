@@ -16,6 +16,8 @@ class Company(Base):
     subscription_status = Column(String, default="trial")
     trial_end_date = Column(DateTime, nullable=True)
     subscription_tier = Column(String, nullable=True)
+    track_overtime = Column(Boolean, default=False)
+    overtime_rate_multiplier = Column(Numeric(4, 2), default=1.5)
 
 class User(Base):
     __tablename__ = "users"
@@ -146,6 +148,8 @@ class Schedule(Base):
     notes = Column(Text)
     color = Column(String(20), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+    start_time = Column(String(5), nullable=True)
+    end_time = Column(String(5), nullable=True)
 
 class Inventory(Base):
     __tablename__ = "inventory"
@@ -229,3 +233,5 @@ class ShiftTemplate(Base):
     color = Column(String(20), default="#1a3d2b")
     notes = Column(Text, default="")
     created_at = Column(DateTime, server_default=func.now())
+    start_time = Column(String(5), nullable=True)
+    end_time = Column(String(5), nullable=True)
