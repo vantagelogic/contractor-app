@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 const API =
   process.env.REACT_APP_API_URL ??
-  (process.env.NODE_ENV === "development" ? "" : "https://contractor-api-pi7o.onrender.com");
+  (process.env.NODE_ENV === "development"
+    ? "http://127.0.0.1:8000"
+    : "https://contractor-api-pi7o.onrender.com");
 
 let _logoutFn = null;
 function setLogoutHandler(fn) { _logoutFn = fn; }
@@ -6194,8 +6196,8 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
           </div>
           <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>
             {apiIssue === "unreachable"
-              ? <>Local API should be running on port 8000. Open this app at <strong>http://localhost:3001</strong> (your npm session moved off 3000). Refresh after the API is up.</>
-              : <>The live server has not been updated with Estimating yet. Run the API locally in <code style={{ fontSize: 12 }}>vantage_logic_api</code>, then restart <code style={{ fontSize: 12 }}>npm start</code>.</>}
+              ? <>Start the API in <code style={{ fontSize: 12 }}>vantage_logic_api</code> (<code style={{ fontSize: 12 }}>uvicorn main:app --reload --port 8000</code>), then refresh this page.</>
+              : <>Could not load estimating from <code style={{ fontSize: 12 }}>{API || "the API"}</code>. If the API is running locally, refresh the page. On the live site, Render must finish deploying the latest API.</>}
           </p>
         </div>
       )}
