@@ -2517,6 +2517,65 @@ def deactivate_inventory_item(
     db.commit()
     return {"message": f"{item.name} removed"}
 
+
+@app.post("/inventory/{inventory_id}/assign")
+def assign_inventory_to_job(
+    inventory_id: int,
+    job_id: int,
+    quantity: float,
+    cost_code_id: int = None,
+    notes: str = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime
+
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
+
+    inv = db.query(models.Inventory).filter(
+        models.Inventory.inventory_id == inventory_id,
+        models.Inventory.company_id == current_user.company_id,
+        models.Inventory.active == True,
+    ).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    job = db.query(models.Job).filter(
+        models.Job.job_id == job_id,
+        models.Job.company_id == current_user.company_id,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if float(inv.quantity or 0) < float(quantity):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient stock. Only {inv.quantity} {inv.unit} available.",
+        )
+
+    inv.quantity = float(inv.quantity or 0) - float(quantity)
+    unit_cost = float(inv.charge_out_price or inv.purchase_price or 0)
+    material = models.Material(
+        company_id=current_user.company_id,
+        job_id=job_id,
+        cost_code_id=cost_code_id,
+        description=f"{inv.name} (inventory assigned)",
+        quantity=quantity,
+        unit_cost=unit_cost,
+        total_cost=unit_cost * float(quantity),
+        purchase_date=datetime.utcnow().date(),
+        notes=notes,
+    )
+    db.add(material)
+    db.commit()
+    db.refresh(material)
+    return {
+        "message": f"Assigned {quantity} {inv.unit} of {inv.name} to {job.job_name}",
+        "material_id": material.material_id,
+        "remaining_quantity": float(inv.quantity),
+    }
+
 # =============================================
 # REQUESTS
 # =============================================
@@ -2920,13 +2979,12 @@ def export_report(
         raise HTTPException(status_code=400, detail="end_date must be on or after start_date.")
 
     company_id = current_user.company_id
-    jobs_q = db.query(models.Job).filter(models.Job.company_id == company_id)
+    all_jobs = {
+        j.job_id: j for j in db.query(models.Job).filter(models.Job.company_id == company_id).all()
+    }
     if job_id is not None:
-        jobs_q = jobs_q.filter(models.Job.job_id == job_id)
-    jobs = {j.job_id: j for j in jobs_q.all()}
-    job_ids = list(jobs.keys())
-    if job_id is not None and not job_ids:
-        raise HTTPException(status_code=404, detail="Project not found")
+        if job_id not in all_jobs:
+            raise HTTPException(status_code=404, detail="Project not found")
 
     employees = {e.employee_id: e for e in db.query(models.Employee).filter(models.Employee.company_id == company_id).all()}
     cost_codes = {c.cost_code_id: c for c in db.query(models.CostCode).filter(models.CostCode.company_id == company_id).all()}
@@ -2934,7 +2992,7 @@ def export_report(
     company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
 
     def job_name(jid):
-        j = jobs.get(jid)
+        j = all_jobs.get(jid)
         return j.job_name if j else "Unknown"
 
     def cc_label(ccid):
@@ -2959,8 +3017,8 @@ def export_report(
         models.Timesheet.shift_date >= start,
         models.Timesheet.shift_date <= end,
     )
-    if job_ids:
-        ts_q = ts_q.filter(models.Timesheet.job_id.in_(job_ids))
+    if job_id is not None:
+        ts_q = ts_q.filter(models.Timesheet.job_id == job_id)
     timesheets = ts_q.order_by(models.Timesheet.shift_date).all()
 
     writer.writerow(["TIMESHEETS"])
@@ -2990,8 +3048,8 @@ def export_report(
         models.Material.purchase_date >= start,
         models.Material.purchase_date <= end,
     )
-    if job_ids:
-        mat_q = mat_q.filter(models.Material.job_id.in_(job_ids))
+    if job_id is not None:
+        mat_q = mat_q.filter(models.Material.job_id == job_id)
     materials = mat_q.order_by(models.Material.purchase_date).all()
 
     writer.writerow(["MATERIALS"])
@@ -3015,8 +3073,8 @@ def export_report(
         models.Mileage.trip_date >= start,
         models.Mileage.trip_date <= end,
     )
-    if job_ids:
-        mi_q = mi_q.filter(models.Mileage.job_id.in_(job_ids))
+    if job_id is not None:
+        mi_q = mi_q.filter(models.Mileage.job_id == job_id)
     mileage = mi_q.order_by(models.Mileage.trip_date).all()
 
     writer.writerow(["MILEAGE"])
@@ -3038,8 +3096,8 @@ def export_report(
         models.Request.request_type == "Inventory Pull",
         models.Request.status == "approved",
     )
-    if job_ids:
-        req_q = req_q.filter(models.Request.job_id.in_(job_ids))
+    if job_id is not None:
+        req_q = req_q.filter(models.Request.job_id == job_id)
     requests = req_q.all()
     filtered_requests = [
         r for r in requests
@@ -3064,8 +3122,8 @@ def export_report(
     co_q = db.query(models.ChangeOrder).filter(
         models.ChangeOrder.company_id == company_id,
     )
-    if job_ids:
-        co_q = co_q.filter(models.ChangeOrder.job_id.in_(job_ids))
+    if job_id is not None:
+        co_q = co_q.filter(models.ChangeOrder.job_id == job_id)
     change_orders = [
         co for co in co_q.all()
         if co.created_at and start <= co.created_at.date() <= end
@@ -3100,8 +3158,8 @@ def export_report(
 
     filename = f"vantage-report-{start_date}-to-{end_date}.csv"
     return Response(
-        content=output.getvalue(),
-        media_type="text/csv",
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

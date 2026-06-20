@@ -134,31 +134,83 @@ function IdentityBadge({ name }) {
 // ─── LOGO ─────────────────────────────────────────────────────
 function VantageLogo({ size = 40, dark = false, centered = false }) {
   const scale = size / 40;
-  const textColor = dark ? "white" : theme.primary;
-  const subColor = dark ? "rgba(212,162,58,0.95)" : theme.gold;
-  const iconBg = dark
-    ? "linear-gradient(145deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.07) 100%)"
-    : `linear-gradient(145deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`;
+  const mark = Math.round(36 * scale);
+  const radius = Math.round(11 * scale);
+  const textMain = dark ? "#ffffff" : theme.primaryDark;
+  const textAccent = dark ? theme.gold : "#9a6b1a";
+  const showTagline = size >= 48;
 
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: Math.round(10 * scale) + "px", margin: centered ? "0 auto" : "0" }}>
-      <div style={{ width: Math.round(30 * scale) + "px", height: Math.round(30 * scale) + "px", borderRadius: Math.round(8 * scale) + "px", background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: dark ? "inset 0 1px 0 rgba(255,255,255,0.18)" : `inset 0 1px 0 rgba(255,255,255,0.14), 0 1px 3px rgba(15,40,24,0.3)`, border: dark ? "1px solid rgba(255,255,255,0.14)" : "none", boxSizing: "border-box" }}>
-        <svg width={Math.round(18 * scale)} height={Math.round(18 * scale)} viewBox="0 0 18 18" fill="none">
-          <circle cx="9" cy="3.6" r="1.5" fill={theme.gold}/>
-          <path d="M3 13.6 L9 6.4 L15 13.6" stroke={theme.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M6.1 13.6 L9 10.1 L11.9 13.6" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" opacity="0.5"/>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: Math.round(12 * scale) + "px", margin: centered ? "0 auto" : "0" }}>
+      <div style={{
+        width: mark,
+        height: mark,
+        borderRadius: radius,
+        background: dark
+          ? "linear-gradient(155deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)"
+          : `linear-gradient(155deg, ${theme.primary} 0%, ${theme.primaryDark} 100%)`,
+        border: dark ? "1.5px solid rgba(200,151,58,0.45)" : "1.5px solid rgba(200,151,58,0.35)",
+        boxShadow: dark
+          ? "0 4px 18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25)"
+          : "0 4px 16px rgba(15,40,24,0.28), inset 0 1px 0 rgba(255,255,255,0.12)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", inset: 0, background: dark ? "none" : "linear-gradient(135deg, rgba(200,151,58,0.12) 0%, transparent 55%)" }} />
+        <svg width={Math.round(22 * scale)} height={Math.round(22 * scale)} viewBox="0 0 22 22" fill="none" style={{ position: "relative" }}>
+          <path d="M3.5 17.5 H18.5" stroke={theme.gold} strokeWidth="1.4" strokeLinecap="round" opacity="0.85"/>
+          <path d="M4.5 17 L11 5.5 L17.5 17" stroke={theme.gold} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M7.5 17 L11 11.2 L14.5 17" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity={dark ? 0.7 : 0.45}/>
+          <rect x="9.2" y="3.2" width="3.6" height="3.6" rx="1.1" fill={theme.gold}/>
+          <path d="M6 14.5 L8.5 14.5 L11 10.5 L13.5 14.5 L16 14.5" stroke="white" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" opacity={dark ? 0.55 : 0.35}/>
         </svg>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(15 * scale) + "px", fontWeight: "800", color: textColor, letterSpacing: "-0.2px", lineHeight: 1, whiteSpace: "nowrap" }}>
-          VANTAGE
-        </span>
-        <span style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: Math.round(7 * scale) + "px", fontWeight: "600", color: subColor, letterSpacing: Math.round(4 * scale) + "px", lineHeight: 1, whiteSpace: "nowrap", marginTop: Math.round(3 * scale) + "px", paddingLeft: "1px" }}>
-          LOGIC
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: Math.round(5 * scale) + "px", lineHeight: 1 }}>
+          <span style={{ fontFamily: font.display, fontSize: Math.round(17 * scale) + "px", fontWeight: "800", color: textMain, letterSpacing: "-0.6px" }}>Vantage</span>
+          <span style={{ width: Math.round(4 * scale) + "px", height: Math.round(4 * scale) + "px", borderRadius: "50%", backgroundColor: theme.gold, flexShrink: 0, transform: `translateY(${Math.round(-1 * scale)}px)` }} />
+          <span style={{ fontFamily: font.display, fontSize: Math.round(17 * scale) + "px", fontWeight: "700", color: textAccent, letterSpacing: "-0.4px" }}>Logic</span>
+        </div>
+        <span style={{ fontFamily: font.body, fontSize: Math.round(7.5 * scale) + "px", fontWeight: "600", color: dark ? "rgba(255,255,255,0.55)" : theme.textLight, letterSpacing: Math.round(2.2 * scale) + "px", textTransform: "uppercase", marginTop: Math.round(5 * scale) + "px", display: showTagline ? "block" : "none" }}>
+          Project Costing
         </span>
       </div>
     </div>
   );
+}
+
+function csvEscape(val) {
+  const s = String(val ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(filename, csvText) {
+  const blob = new Blob(["\uFEFF" + csvText], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+async function parseApiError(res) {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    if (typeof data.detail === "string") return data.detail;
+    if (Array.isArray(data.detail)) return data.detail.map(d => d.msg || d).join(", ");
+    return text.slice(0, 160) || `Request failed (${res.status})`;
+  } catch {
+    return text.slice(0, 160) || `Request failed (${res.status})`;
+  }
 }
 
 // ─── NAV ICONS ────────────────────────────────────────────────
@@ -508,6 +560,24 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
     try { localStorage.setItem("vl_link_shared", "1"); } catch {}
   }
 
+  function shareAppLink(link) {
+    const shareText = "Log your hours and materials on Vantage Logic:";
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({ title: "Vantage Logic", text: shareText, url: link }).then(markLinkShared).catch(() => {});
+      return;
+    }
+    const mailto = `mailto:?subject=${encodeURIComponent("Vantage Logic crew app")}&body=${encodeURIComponent(`${shareText}\n\n${link}`)}`;
+    window.location.href = mailto;
+    markLinkShared();
+  }
+
+  function copyAppLink(link) {
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    markLinkShared();
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
     apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(Array.isArray(data) && data.length > 0)).catch(() => {});
@@ -584,19 +654,17 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
           </div>
           {!step.done && (
             step.copyLink ? (
-              <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                {typeof navigator !== "undefined" && navigator.share && (
-                  <button
-                    onClick={() => navigator.share({ title: "Vantage Logic", text: "Log your hours and materials here:", url: step.copyLink }).then(markLinkShared).catch(() => {})}
-                    aria-label="Share link"
-                    style={{ fontSize: "11px", padding: "5px 9px", borderRadius: "6px", border: `1px solid ${theme.accent}`, cursor: "pointer", backgroundColor: "white", color: theme.accent, fontWeight: "700", fontFamily: font.body, display: "flex", alignItems: "center", justifyContent: "center" }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                  </button>
-                )}
+              <div style={{ display: "flex", gap: "6px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <button
-                  onClick={() => { navigator.clipboard.writeText(step.copyLink); setCopied(true); markLinkShared(); setTimeout(() => setCopied(false), 2000); }}
-                  style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", whiteSpace: "nowrap", fontFamily: font.body }}
+                  onClick={() => shareAppLink(step.copyLink)}
+                  style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "6px", border: `1px solid ${theme.gold}`, cursor: "pointer", backgroundColor: theme.goldLight, color: "#7c5518", fontWeight: "700", whiteSpace: "nowrap", fontFamily: font.body, display: "inline-flex", alignItems: "center", gap: "5px" }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  Share
+                </button>
+                <button
+                  onClick={() => copyAppLink(step.copyLink)}
+                  style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", whiteSpace: "nowrap", fontFamily: font.body }}
                 >
                   {copied ? "Copied!" : "Copy link"}
                 </button>
@@ -2543,25 +2611,79 @@ function UserManagement({ token, activeEmps, refreshSignal }) {
 // ─── INVENTORY SCREEN ─────────────────────────────────────────
 function InventoryScreen({ token, readonly = false }) {
   const [items, setItems] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [costCodes, setCostCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [assignItem, setAssignItem] = useState(null);
+  const [assignForm, setAssignForm] = useState({ job_id: "", quantity: "", cost_code_id: "", notes: "" });
+  const [assignErrors, setAssignErrors] = useState({});
+  const [assigning, setAssigning] = useState(false);
   const [form, setForm] = useState({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "" });
   const [editForm, setEditForm] = useState({});
   const [errors, setErrors] = useState({});
 
   const UNITS = ["each", "box", "roll", "litre", "kg", "metre", "sheet", "bag", "pail", "tube"];
+  const h = { Authorization: `Bearer ${token}` };
 
   function showMsg(msg) { setMessage(msg); setTimeout(() => setMessage(""), 3000); }
 
   function loadItems() {
-    apiFetch(`${API}/inventory`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API}/inventory`, { headers: h })
       .then(r => r.json()).then(data => { setItems(Array.isArray(data) ? data : []); setLoading(false); });
   }
 
-  useEffect(() => { loadItems(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    Promise.all([
+      apiFetch(`${API}/inventory`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()),
+      apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()),
+    ]).then(([inv, jobList, ccs]) => {
+      setItems(Array.isArray(inv) ? inv : []);
+      setJobs(Array.isArray(jobList) ? jobList.filter(j => j.status === "active") : []);
+      setCostCodes(Array.isArray(ccs) ? ccs : []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openAssign(item) {
+    setAssignItem(item);
+    setAssignForm({ job_id: "", quantity: "", cost_code_id: "", notes: "" });
+    setAssignErrors({});
+  }
+
+  async function handleAssign() {
+    const e = {};
+    if (!assignForm.job_id) e.job_id = `Select a ${T.project.toLowerCase()}`;
+    if (!assignForm.quantity || parseFloat(assignForm.quantity) <= 0) e.quantity = "Enter quantity";
+    else if (assignItem && parseFloat(assignForm.quantity) > parseFloat(assignItem.quantity || 0)) {
+      e.quantity = `Only ${assignItem.quantity} ${assignItem.unit} available`;
+    }
+    setAssignErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setAssigning(true);
+    const params = new URLSearchParams({
+      job_id: assignForm.job_id,
+      quantity: assignForm.quantity,
+    });
+    if (assignForm.cost_code_id) params.append("cost_code_id", assignForm.cost_code_id);
+    if (assignForm.notes) params.append("notes", assignForm.notes);
+    const res = await apiFetch(`${API}/inventory/${assignItem.inventory_id}/assign?${params}`, { method: "POST", headers: h });
+    setAssigning(false);
+    if (res.ok) {
+      const data = await res.json();
+      showMsg(data.message || "Assigned to project.");
+      setAssignItem(null);
+      loadItems();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showMsg(err.detail || "Could not assign item.");
+    }
+  }
 
   function validate() {
     const e = {};
@@ -2613,15 +2735,49 @@ function InventoryScreen({ token, readonly = false }) {
       <p style={styles.subtitle}>Track materials and supplies on hand in your warehouse or shop</p>
 
       <div style={{ ...styles.card, marginBottom: "20px", backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}` }}>
-        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "8px" }}>How to charge inventory to a {T.project.toLowerCase()}</div>
-        <ol style={{ margin: "0 0 10px 18px", padding: 0, fontSize: "13px", color: theme.textSecondary, lineHeight: 1.6 }}>
-          <li>Add items here with quantity on hand (this page is your stock list only).</li>
-          <li>Crew goes to <strong>Log → Materials → From Inventory</strong> on their phone.</li>
-          <li>They pick the {T.project.toLowerCase()}, item, and quantity they need.</li>
-          <li>You approve the pull under <strong>Requests</strong> — stock is deducted automatically.</li>
-        </ol>
-        <p style={{ fontSize: "12px", color: theme.textLight, margin: 0 }}>Inventory is not assigned directly from this screen. Crew request pulls, and you approve them.</p>
+        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "8px" }}>Two ways to charge inventory to a {T.project.toLowerCase()}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "10px" }}>
+          <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "12px 14px", border: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: "12px", fontWeight: "700", color: theme.primary, marginBottom: "6px" }}>You assign directly</div>
+            <p style={{ fontSize: "12px", color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>Click <strong>Assign</strong> on any item below to charge it to a {T.project.toLowerCase()} immediately. Stock is deducted right away.</p>
+          </div>
+          <div style={{ backgroundColor: "white", borderRadius: "10px", padding: "12px 14px", border: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: "12px", fontWeight: "700", color: theme.primary, marginBottom: "6px" }}>Crew requests a pull</div>
+            <p style={{ fontSize: "12px", color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>Crew uses <strong>Log → Materials → From Inventory</strong>. You approve under <strong>Requests</strong> and stock is deducted then.</p>
+          </div>
+        </div>
       </div>
+
+      {assignItem && (
+        <div style={{ ...styles.card, marginBottom: "20px", border: `1.5px solid ${theme.gold}`, backgroundColor: theme.goldLight }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "4px" }}>Assign to {T.project}</div>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "14px" }}>
+            {assignItem.name} · {parseFloat(assignItem.quantity || 0)} {assignItem.unit} available
+          </p>
+          <label style={styles.label}>{T.project}</label>
+          <select style={assignErrors.job_id ? styles.inputError : styles.input} value={assignForm.job_id} onChange={e => { setAssignForm({...assignForm, job_id: e.target.value}); setAssignErrors({...assignErrors, job_id: ""}); }}>
+            <option value="">{T.selectProject}</option>
+            {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+          </select>
+          {assignErrors.job_id && <p style={styles.errorMsg}>{assignErrors.job_id}</p>}
+          <label style={styles.label}>{T.workCategory} (optional)</label>
+          <select style={styles.input} value={assignForm.cost_code_id} onChange={e => setAssignForm({...assignForm, cost_code_id: e.target.value})}>
+            <option value="">{T.selectWorkCategory}</option>
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+          </select>
+          <label style={styles.label}>Quantity</label>
+          <input style={assignErrors.quantity ? styles.inputError : styles.input} type="number" step="0.01" placeholder="0" value={assignForm.quantity} onChange={e => { setAssignForm({...assignForm, quantity: e.target.value}); setAssignErrors({...assignErrors, quantity: ""}); }} />
+          {assignErrors.quantity && <p style={styles.errorMsg}>{assignErrors.quantity}</p>}
+          <label style={styles.label}>Notes (optional)</label>
+          <input style={styles.input} placeholder="What is this for?" value={assignForm.notes} onChange={e => setAssignForm({...assignForm, notes: e.target.value})} />
+          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            <button onClick={handleAssign} disabled={assigning || readonly} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: theme.gold, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              {assigning ? <><Spinner /> Assigning...</> : "Assign Now"}
+            </button>
+            <button onClick={() => setAssignItem(null)} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: "#888" }}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -2717,7 +2873,10 @@ function InventoryScreen({ token, readonly = false }) {
                       </div>
                       {item.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{item.notes}</div>}
                     </div>
-                    <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+                    <div style={{ display: "flex", gap: "5px", flexShrink: 0, flexWrap: "wrap" }}>
+                      {!readonly && parseFloat(item.quantity || 0) > 0 && (
+                        <button onClick={() => openAssign(item)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.goldLight, color: "#7c5518", fontWeight: "700", fontFamily: font.body }}>Assign</button>
+                      )}
                       <button onClick={() => { setEditingId(item.inventory_id); setEditForm({ name: item.name, unit: item.unit, quantity: String(item.quantity || 0), purchase_price: String(item.purchase_price || ""), charge_out_price: String(item.charge_out_price || "") }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
                       <button onClick={() => handleRemove(item.inventory_id, item.name)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
                     </div>
@@ -4779,9 +4938,26 @@ function Dashboard({ token, readonly = false, topOffset = 0 }) {
 
           <div className="vl-statgrid">
             {statCards.map((item, i) => (
-              <div key={i} style={{ backgroundColor: item.highlight ? (item.positive ? "rgba(45,106,79,0.9)" : "rgba(184,50,50,0.9)") : "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)", borderRadius: "11px", padding: "14px 10px", textAlign: "center", border: item.highlight ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.1)" }}>
-                <div style={{ fontSize: "15px", fontWeight: "700", letterSpacing: "-0.3px" }}>{item.value}</div>
-                <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "4px", textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: "600" }}>{item.label}</div>
+              <div key={i} style={{
+                backgroundColor: item.highlight
+                  ? (item.positive ? "rgba(200,151,58,0.95)" : "rgba(184,50,50,0.92)")
+                  : "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(8px)",
+                borderRadius: "11px",
+                padding: "14px 10px",
+                textAlign: "center",
+                border: item.highlight
+                  ? (item.positive ? "1.5px solid rgba(255,255,255,0.45)" : "1px solid rgba(255,255,255,0.25)")
+                  : "1px solid rgba(255,255,255,0.1)",
+                boxShadow: item.highlight && item.positive ? "0 2px 12px rgba(200,151,58,0.35)" : "none",
+              }}>
+                <div style={{ fontSize: "15px", fontWeight: "800", letterSpacing: "-0.3px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                  {item.highlight && item.positive && <span style={{ fontSize: "12px", opacity: 0.9 }}>↑</span>}
+                  {item.value}
+                </div>
+                <div style={{ fontSize: "10px", opacity: item.highlight ? 0.95 : 0.7, marginTop: "4px", textTransform: "uppercase", letterSpacing: "0.6px", fontWeight: "700" }}>
+                  {item.highlight && item.positive ? "Profit Margin" : item.label}
+                </div>
               </div>
             ))}
           </div>
@@ -4893,11 +5069,25 @@ function Dashboard({ token, readonly = false, topOffset = 0 }) {
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
                     {hasBudget && job.margin !== null && (
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-block", backgroundColor: over ? theme.dangerLight : theme.accentLight, color: over ? theme.danger : theme.accent, fontSize: "13px", fontWeight: "800", padding: "4px 11px", borderRadius: "14px", letterSpacing: "-0.2px" }}>
+                        <div style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          backgroundColor: over ? theme.dangerLight : theme.goldLight,
+                          color: over ? theme.danger : "#7c5518",
+                          fontSize: "13px",
+                          fontWeight: "800",
+                          padding: "4px 11px",
+                          borderRadius: "14px",
+                          letterSpacing: "-0.2px",
+                          border: over ? `1px solid ${theme.danger}` : `1.5px solid ${theme.gold}`,
+                          boxShadow: over ? "none" : "0 1px 4px rgba(200,151,58,0.25)",
+                        }}>
+                          {!over && <span style={{ fontSize: "11px" }}>↑</span>}
                           {over ? "OVER" : `${job.margin_percent}%`}
                         </div>
-                        <div style={{ fontSize: "11px", color: over ? theme.danger : theme.textSecondary, marginTop: "4px", fontWeight: "600" }}>
-                          {over ? "-" : ""}${fmt(Math.abs(job.margin))} margin
+                        <div style={{ fontSize: "11px", color: over ? theme.danger : "#7c5518", marginTop: "4px", fontWeight: "700" }}>
+                          {over ? "-" : "+"}${fmt(Math.abs(job.margin))} profit
                         </div>
                       </div>
                     )}
@@ -5322,33 +5512,111 @@ function ExportReportForm({ token }) {
     }
   }
 
+  async function buildClientSideReport() {
+    const inRange = (d) => d && d >= startDate && d <= endDate;
+    const jobList = jobId
+      ? jobs.filter(j => String(j.job_id) === String(jobId))
+      : jobs;
+    const lines = [
+      ["Vantage Logic Report"],
+      ["Period", `${startDate} to ${endDate}`],
+      jobId ? ["Project", jobList[0]?.job_name || ""] : [],
+      [],
+      ["TIMESHEETS"],
+      ["Date", "Project", "Employee", "Regular Hours", "Overtime Hours", "Notes"],
+    ].filter(row => row.length > 0);
+
+    for (const job of jobList) {
+      const tsRes = await apiFetch(`${API}/jobs/${job.job_id}/timesheets`, { headers: h });
+      if (!tsRes.ok) continue;
+      const tsData = await tsRes.json();
+      (Array.isArray(tsData) ? tsData : []).forEach(t => {
+        const date = String(t.shift_date || "").slice(0, 10);
+        if (!inRange(date)) return;
+        lines.push([
+          date,
+          job.job_name,
+          t.employee_name || "",
+          t.hours_worked ?? "",
+          t.overtime_hours ?? "",
+          t.field_notes || "",
+        ]);
+      });
+    }
+
+    lines.push([]);
+    lines.push(["MATERIALS"]);
+    lines.push(["Date", "Project", "Description", "Amount", "Purchased By"]);
+    for (const job of jobList) {
+      const matRes = await apiFetch(`${API}/jobs/${job.job_id}/materials`, { headers: h });
+      if (!matRes.ok) continue;
+      const matData = await matRes.json();
+      (Array.isArray(matData) ? matData : []).forEach(m => {
+        const date = String(m.purchase_date || "").slice(0, 10);
+        if (!inRange(date)) return;
+        lines.push([date, job.job_name, m.description || "", m.total_cost ?? "", m.purchased_by || ""]);
+      });
+    }
+
+    lines.push([]);
+    lines.push(["MILEAGE"]);
+    lines.push(["Date", "Project", "Employee", "KM Driven", "Purpose"]);
+    const miRes = await apiFetch(`${API}/mileage`, { headers: h });
+    if (miRes.ok) {
+      const miData = await miRes.json();
+      (Array.isArray(miData) ? miData : []).forEach(m => {
+        const date = String(m.trip_date || "").slice(0, 10);
+        if (!inRange(date)) return;
+        if (jobId && !jobList.some(j => j.job_name === m.job_name)) return;
+        lines.push([date, m.job_name || "", m.employee_name || "", m.km_driven ?? "", m.purpose || ""]);
+      });
+    }
+
+    return lines.map(row => row.map(csvEscape).join(",")).join("\n");
+  }
+
   async function downloadReport() {
     if (!startDate || !endDate) { setMessage("Select a date range."); return; }
     setLoading(true);
     setMessage("");
     const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
     if (jobId) params.append("job_id", jobId);
+    const filename = `vantage-report-${startDate}-to-${endDate}.csv`;
     try {
       const res = await apiFetch(`${API}/export/report?${params}`, { headers: h });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setMessage(err.detail || "Export failed.");
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        setMessage("Report downloaded.");
+        setTimeout(() => setMessage(""), 3000);
         setLoading(false);
         return;
       }
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `vantage-report-${startDate}-to-${endDate}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      setMessage("Report downloaded.");
-      setTimeout(() => setMessage(""), 3000);
+      if (res.status === 404 || res.status === 502 || res.status === 503) {
+        const csv = await buildClientSideReport();
+        downloadCsv(filename, csv);
+        setMessage("Report downloaded (built from project data).");
+        setTimeout(() => setMessage(""), 3000);
+        setLoading(false);
+        return;
+      }
+      setMessage(await parseApiError(res));
     } catch {
-      setMessage("Export failed. Please try again.");
+      try {
+        const csv = await buildClientSideReport();
+        downloadCsv(filename, csv);
+        setMessage("Report downloaded (built from project data).");
+        setTimeout(() => setMessage(""), 3000);
+      } catch {
+        setMessage("Export failed. Please try again.");
+      }
     }
     setLoading(false);
   }
