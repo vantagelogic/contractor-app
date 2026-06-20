@@ -2733,3 +2733,22 @@ def add_comment(
                 db.add(notif)
         db.commit()
     return {"comment_id": comment.comment_id, "message": comment.message}
+
+# =============================================
+# DEMO DATA
+# =============================================
+
+@app.post("/seed-demo")
+def seed_demo(
+    force: bool = False,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    from seed_demo import seed_company_demo
+    try:
+        result = seed_company_demo(db, current_user.company_id, force=force)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if result.get("skipped"):
+        raise HTTPException(status_code=409, detail=result["message"])
+    return result

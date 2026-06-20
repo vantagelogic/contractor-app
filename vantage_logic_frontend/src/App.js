@@ -4215,6 +4215,19 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
     }
   }
 
+  async function loadDemoData() {
+    if (!window.confirm("Load demo jobs, crew, timesheets, schedule, and materials? Only works when you have no jobs yet.")) return;
+    const res = await apiFetch(`${API}/seed-demo`, { method: "POST", headers });
+    if (res.ok) {
+      const d = await res.json();
+      showMsg(`Demo loaded: ${d.jobs} jobs, ${d.employees} crew, ${d.timesheets} timesheets.`);
+      refresh();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      showMsg(d.detail || "Could not load demo data.");
+    }
+  }
+
   const activeEmps = employees.filter(e => e.active);
   const inactiveEmps = employees.filter(e => !e.active);
   const activeJobs = jobs.filter(j => j.status === "active");
@@ -4459,6 +4472,25 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
             complete={true}
           >
             <OvertimeSettingsForm token={token} />
+          </SetupSection>
+
+          {/* ── DEMO DATA ── */}
+          <SetupSection
+            number="📦"
+            title="Demo Data"
+            subtitle="Restore sample jobs, crew, timesheets, and schedule to explore the dashboard."
+            complete={jobs.length > 0}
+          >
+            <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "12px", lineHeight: 1.5 }}>
+              Adds two sample jobs (Johnson Basement Reno, Maple Street Addition), four crew members, a week of timesheets, materials, mileage, and this week's schedule.
+            </p>
+            <button
+              style={{ ...styles.button, backgroundColor: theme.accent, maxWidth: "220px" }}
+              onClick={loadDemoData}
+              disabled={readonly}
+            >
+              Load Demo Data
+            </button>
           </SetupSection>
         </>
       )}
