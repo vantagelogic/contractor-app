@@ -4767,8 +4767,8 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
             {settingsTab === "estimating" && (
               <div style={styles.card}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>Estimating</h2>
-                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 16, lineHeight: 1.55 }}>
-                  Define job types (which cost codes to include) and saved templates (default hours &amp; materials). Used when building new estimates.
+                <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 16 }}>
+                  Job type = empty rows. Template = hours/$.
                 </p>
                 <EstimatingSettingsPanel token={token} costCodes={costCodes} readonly={readonly} />
               </div>
@@ -6000,6 +6000,8 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
   const [jobTypes, setJobTypes] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
   const [jtForm, setJtForm] = useState({ name: "", hint: "", cost_code_ids: [] });
   const [editingJt, setEditingJt] = useState(null);
   const [tplForm, setTplForm] = useState({ name: "", cost_code_id: "", estimated_hours: "", estimated_material_cost: "" });
@@ -6011,18 +6013,50 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
   }
   useEffect(() => { load(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function flash(m) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
+  function flash(m) { setMsg(m); setErr(""); setTimeout(() => setMsg(""), 3000); }
+
+  function apiErr(detail, fallback) {
+    if (detail === "Not Found") return "Save failed — refresh the page and try again.";
+    if (typeof detail === "string") return detail;
+    return fallback;
+  }
+
+  function cancelEditJobType() {
+    setEditingJt(null);
+    setJtForm({ name: "", hint: "", cost_code_ids: [] });
+    setErr("");
+  }
+
+  function cancelEditTemplate() {
+    setEditingTpl(null);
+    setTplForm({ name: "", cost_code_id: "", estimated_hours: "", estimated_material_cost: "" });
+    setErr("");
+  }
 
   async function saveJobType() {
-    if (!jtForm.name.trim()) return;
+    setErr("");
+    if (!jtForm.name.trim()) { setErr("Enter a name first"); return; }
+    setSaving(true);
     const body = { name: jtForm.name.trim(), hint: jtForm.hint || null, cost_code_ids: jtForm.cost_code_ids.map(Number) };
-    const url = editingJt ? `${API}/job-types/${editingJt}` : `${API}/job-types`;
-    const res = await apiFetch(url, { method: editingJt ? "PATCH" : "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (res.ok) { flash(editingJt ? "Job type updated" : "Job type added"); setJtForm({ name: "", hint: "", cost_code_ids: [] }); setEditingJt(null); load(); }
+    const isEdit = editingJt != null && Number(editingJt) > 0;
+    const url = isEdit ? `${API}/job-types/${editingJt}` : `${API}/job-types`;
+    const method = isEdit ? "PUT" : "POST";
+    const res = await apiFetch(url, { method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    setSaving(false);
+    if (res.ok) {
+      flash(isEdit ? "Saved" : "Added");
+      cancelEditJobType();
+      load();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setErr(apiErr(d.detail, "Could not save job type"));
+    }
   }
 
   async function saveTemplate() {
-    if (!tplForm.name.trim()) return;
+    setErr("");
+    if (!tplForm.name.trim()) { setErr("Enter a name first"); return; }
+    setSaving(true);
     const body = {
       name: tplForm.name.trim(),
       cost_code_id: tplForm.cost_code_id ? parseInt(tplForm.cost_code_id, 10) : null,
@@ -6030,9 +6064,19 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
       estimated_material_cost: parseFloat(tplForm.estimated_material_cost) || 0,
       estimated_labor_cost: 0,
     };
-    const url = editingTpl ? `${API}/estimate-templates/${editingTpl}` : `${API}/estimate-templates`;
-    const res = await apiFetch(url, { method: editingTpl ? "PATCH" : "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (res.ok) { flash(editingTpl ? "Template updated" : "Template added"); setTplForm({ name: "", cost_code_id: "", estimated_hours: "", estimated_material_cost: "" }); setEditingTpl(null); load(); }
+    const isEdit = editingTpl != null && Number(editingTpl) > 0;
+    const url = isEdit ? `${API}/estimate-templates/${editingTpl}` : `${API}/estimate-templates`;
+    const method = isEdit ? "PUT" : "POST";
+    const res = await apiFetch(url, { method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    setSaving(false);
+    if (res.ok) {
+      flash(isEdit ? "Saved" : "Added");
+      cancelEditTemplate();
+      load();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setErr(apiErr(d.detail, "Could not save template"));
+    }
   }
 
   function toggleJtCostCode(id) {
@@ -6040,50 +6084,53 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
     setJtForm(f => ({ ...f, cost_code_ids: f.cost_code_ids.includes(n) ? f.cost_code_ids.filter(x => x !== n) : [...f.cost_code_ids, n] }));
   }
 
+  function jtHasCostCode(id) {
+    return jtForm.cost_code_ids.some(x => Number(x) === Number(id));
+  }
+
   return (
     <div>
       {msg && <div style={{ color: theme.accent, fontWeight: 600, marginBottom: 12, fontSize: 13 }}>{msg}</div>}
+      {err && <p style={styles.errorMsg}>{err}</p>}
 
-      <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Job type vs saved template — what&apos;s the difference?</div>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 12, fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ padding: "12px 14px", backgroundColor: "white", borderRadius: 8, border: `1px solid ${theme.border}` }}>
-            <div style={{ fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Job type = the skeleton</div>
-            <p style={{ margin: 0, color: theme.textSecondary }}>
-              <strong>Which rows</strong> show up when you start a new estimate. Example: &quot;Bathroom Reno&quot; adds Demo, Plumbing, Tile rows — hours stay blank until you fill them in. Also helps name the {T.project.toLowerCase()}.
-            </p>
-          </div>
-          <div style={{ padding: "12px 14px", backgroundColor: "white", borderRadius: 8, border: `1px solid ${theme.border}` }}>
-            <div style={{ fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Saved template = a price shortcut</div>
-            <p style={{ margin: 0, color: theme.textSecondary }}>
-              <strong>Default hours &amp; materials</strong> for one piece of work. Example: &quot;Standard demo&quot; → 8h and $150 on the Demo row. Use while building an estimate — tap &quot;Load saved template&quot; on the form.
-            </p>
-          </div>
-        </div>
-        <p style={{ fontSize: 12, color: theme.textLight, margin: "12px 0 0", lineHeight: 1.55 }}>
-          Simple rule: job type sets up <strong>empty rows</strong>. Templates fill in <strong>numbers</strong> on those rows. You can use both, either, or neither.
-        </p>
-      </div>
+      <p style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 14 }}>
+        Shortcuts for new estimates. <strong>Job type</strong> = empty rows. <strong>Template</strong> = hours/$ on one row.
+      </p>
 
       <div style={{ ...styles.card, marginBottom: 16 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 8px" }}>Job Types</h3>
-        <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
-          Pick cost codes that belong together for a kind of job. When someone starts an estimate and selects this type, those rows appear automatically (no hours yet).
-        </p>
-        <input style={styles.input} placeholder="Job type name" value={jtForm.name} onChange={e => setJtForm({ ...jtForm, name: e.target.value })} disabled={readonly} />
+        {editingJt && (
+          <div style={{ fontSize: 12, color: theme.accent, fontWeight: 600, marginBottom: 8 }}>
+            Editing — tap Cancel to add new instead
+          </div>
+        )}
+        <input style={styles.input} placeholder="Name" value={jtForm.name} onChange={e => { setJtForm({ ...jtForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
         <input style={styles.input} placeholder="Short hint (optional)" value={jtForm.hint} onChange={e => setJtForm({ ...jtForm, hint: e.target.value })} disabled={readonly} />
-        <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSecondary, margin: "10px 0 6px" }}>Cost codes included in this job type</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSecondary, margin: "10px 0 6px" }}>Cost codes (optional)</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {costCodes.map(cc => (
+          {costCodes.length === 0 ? (
+            <span style={{ fontSize: 12, color: theme.textLight }}>Add work categories first (Settings → Work Categories).</span>
+          ) : costCodes.map(cc => (
             <button key={cc.cost_code_id} type="button" disabled={readonly} onClick={() => toggleJtCostCode(cc.cost_code_id)} style={{
               padding: "6px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: font.body,
-              border: `1.5px solid ${jtForm.cost_code_ids.includes(cc.cost_code_id) ? theme.accent : theme.border}`,
-              backgroundColor: jtForm.cost_code_ids.includes(cc.cost_code_id) ? theme.accentLight : "white",
-              color: jtForm.cost_code_ids.includes(cc.cost_code_id) ? theme.primary : theme.textSecondary,
+              border: `1.5px solid ${jtHasCostCode(cc.cost_code_id) ? theme.accent : theme.border}`,
+              backgroundColor: jtHasCostCode(cc.cost_code_id) ? theme.accentLight : "white",
+              color: jtHasCostCode(cc.cost_code_id) ? theme.primary : theme.textSecondary,
             }}>{cc.code}</button>
           ))}
         </div>
-        {!readonly && <button type="button" onClick={saveJobType} style={{ ...styles.button, marginTop: 0, maxWidth: 200 }}>{editingJt ? "Update" : "Add"} Job Type</button>}
+        {!readonly && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" disabled={saving} onClick={saveJobType} style={{ ...styles.button, marginTop: 0, maxWidth: 200 }}>
+              {saving ? "Saving…" : editingJt ? "Save" : "Add job type"}
+            </button>
+            {editingJt && (
+              <button type="button" onClick={cancelEditJobType} style={{ ...styles.button, marginTop: 0, maxWidth: 120, backgroundColor: "#888" }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        )}
         {jobTypes.length > 0 && (
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
             {jobTypes.map(jt => (
@@ -6093,7 +6140,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
                   <div style={{ fontSize: 11, color: theme.textSecondary }}>{jt.hint || ""} · {(jt.cost_code_ids || []).length} categories</div>
                 </div>
                 {!readonly && (
-                  <button type="button" onClick={() => { setEditingJt(jt.job_type_id); setJtForm({ name: jt.name, hint: jt.hint || "", cost_code_ids: jt.cost_code_ids || [] }); }} style={{ fontSize: 12, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                  <button type="button" onClick={() => { setErr(""); setEditingJt(jt.job_type_id); setJtForm({ name: jt.name, hint: jt.hint || "", cost_code_ids: jt.cost_code_ids || [] }); }} style={{ fontSize: 12, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
                 )}
               </div>
             ))}
@@ -6102,10 +6149,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
       </div>
       <div style={styles.card}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 8px" }}>Saved Templates</h3>
-        <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
-          One reusable price for a single task — hours and materials for one cost code. Not a full job; just a shortcut so you don&apos;t re-type &quot;8 hours demo, $150 materials&quot; every time.
-        </p>
-        <input style={styles.input} placeholder="Template name" value={tplForm.name} onChange={e => setTplForm({ ...tplForm, name: e.target.value })} disabled={readonly} />
+        <input style={styles.input} placeholder="Name" value={tplForm.name} onChange={e => { setTplForm({ ...tplForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
         <select style={styles.input} value={tplForm.cost_code_id} onChange={e => setTplForm({ ...tplForm, cost_code_id: e.target.value })} disabled={readonly}>
           <option value="">Link to cost code (optional)</option>
           {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
@@ -6114,7 +6158,18 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
           <input style={styles.input} type="number" placeholder="Default hours" value={tplForm.estimated_hours} onChange={e => setTplForm({ ...tplForm, estimated_hours: e.target.value })} disabled={readonly} />
           <input style={styles.input} type="number" placeholder="Default materials $" value={tplForm.estimated_material_cost} onChange={e => setTplForm({ ...tplForm, estimated_material_cost: e.target.value })} disabled={readonly} />
         </div>
-        {!readonly && <button type="button" onClick={saveTemplate} style={{ ...styles.button, marginTop: 8, maxWidth: 200 }}>{editingTpl ? "Update" : "Add"} Template</button>}
+        {!readonly && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <button type="button" disabled={saving} onClick={saveTemplate} style={{ ...styles.button, marginTop: 0, maxWidth: 200 }}>
+              {saving ? "Saving…" : editingTpl ? "Save" : "Add template"}
+            </button>
+            {editingTpl && (
+              <button type="button" onClick={cancelEditTemplate} style={{ ...styles.button, marginTop: 0, maxWidth: 120, backgroundColor: "#888" }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        )}
         {templates.length > 0 && (
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
             {templates.map(t => (
@@ -6378,26 +6433,23 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         {sendMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{sendMsg}</div>}
         {error && <p style={styles.errorMsg}>{error}</p>}
         <div style={{ ...styles.card, marginBottom: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>What happens next</div>
-          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
-            <li>Customer reviews the PDF (hours, materials, total)</li>
-            <li>They sign off — email, text, or in person</li>
-            <li><strong>Then</strong> you set the dashboard baseline to track budget vs actual as crew log work</li>
-          </ol>
+          <div style={{ fontSize: 13, color: theme.textSecondary, lineHeight: 1.6 }}>
+            Customer reviews PDF → approves → you set dashboard baseline.
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 360 }}>
           <button type="button" onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent }}>
             Download PDF again
           </button>
           <button type="button" disabled={saving} onClick={adjustForNegotiations} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888" }}>
-            Adjust for negotiations
+            Adjust estimate
           </button>
           <button type="button" disabled={saving} onClick={setDashboardBaseline} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold }}>
             {saving ? "Setting baseline…" : "Customer approved — set dashboard baseline"}
           </button>
         </div>
-        <p style={{ fontSize: 12, color: theme.textLight, marginTop: 14, lineHeight: 1.5 }}>
-          Customer wants changes? Use <strong>Adjust for negotiations</strong> — remove rows, change hours/materials, then generate an updated PDF. Dashboard baseline stays separate until they approve.
+        <p style={{ fontSize: 12, color: theme.textLight, marginTop: 14 }}>
+          Need changes? Tap <strong>Adjust</strong>, edit rows, send updated PDF.
         </p>
       </div>
     );
@@ -6408,7 +6460,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
       <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
       <h1 style={styles.title}>{isEditMode || savedEstimate ? "Edit Estimate" : "New Estimate"}</h1>
       <p style={{ ...styles.subtitle, maxWidth: 640 }}>
-        Step 1: build the quote for your <strong>customer</strong>. Step 2: after they approve, set the <strong>dashboard baseline</strong>. Remove rows or change numbers anytime before sending — use × on a row or set hours/materials to zero.
+        Send PDF to customer first. Set dashboard baseline after they approve.
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -6421,20 +6473,11 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
 
       <div style={{ ...styles.card, marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 12 }}>1 — Project info</div>
-        <label style={styles.label}>Job type <span style={{ fontWeight: 400, color: theme.textLight }}>(optional — adds empty rows)</span></label>
+        <label style={styles.label}>Job type <span style={{ fontWeight: 400, color: theme.textLight }}>(optional)</span></label>
         <select style={styles.input} value={jobTypeId} onChange={e => setJobTypeId(e.target.value)} disabled={!!savedEstimate}>
-          <option value="">None — add rows manually</option>
+          <option value="">None</option>
           {jobTypes.map(jt => <option key={jt.job_type_id} value={jt.job_type_id}>{jt.name}</option>)}
         </select>
-        {savedEstimate ? (
-          <p style={{ fontSize: 11, color: theme.textLight, margin: "6px 0 0", lineHeight: 1.45 }}>
-            Job type is locked when editing an existing estimate — change the rows below instead.
-          </p>
-        ) : (
-          <p style={{ fontSize: 11, color: theme.textLight, margin: "6px 0 0", lineHeight: 1.45 }}>
-            Skeleton only: picks which {T.workCategories.toLowerCase()} appear as rows. Does not set hours or prices — use saved templates or type numbers yourself.
-          </p>
-        )}
         {selectedJobType?.hint && <p style={{ fontSize: 12, color: theme.textSecondary, margin: "6px 0 0" }}>{selectedJobType.hint}</p>}
         <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10, marginTop: 12 }}>
           <div>
@@ -6452,7 +6495,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           </div>
         )}
         <div style={{ marginTop: 12 }}>
-          <label style={styles.label}>Customer email (optional — for sending PDF)</label>
+          <label style={styles.label}>Customer email (optional)</label>
           <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
         </div>
       </div>
@@ -6462,14 +6505,11 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary }}>2 — Budget by {T.workCategory.toLowerCase()}</div>
           {templates.length > 0 && (
             <select style={{ ...styles.input, margin: 0, maxWidth: 240, fontSize: 13 }} defaultValue="" onChange={e => { if (e.target.value) { applyTemplate(e.target.value); e.target.value = ""; } }}>
-              <option value="">Load price shortcut…</option>
+              <option value="">Load template…</option>
               {templates.map(t => <option key={t.template_id} value={t.template_id}>{t.name}</option>)}
             </select>
           )}
         </div>
-        <p style={{ fontSize: 11, color: theme.textLight, margin: "0 0 10px", lineHeight: 1.45 }}>
-          Saved templates fill hours &amp; materials on one row — different from job type, which only decides which rows exist.
-        </p>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
@@ -6503,8 +6543,8 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
             </tbody>
           </table>
         </div>
-        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 8, lineHeight: 1.45 }}>
-          Hours = <strong>total project hours</strong> for each cost code (all crew combined). Actual crew size changes daily — the dashboard compares logged hours to this budget, not headcount.
+        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 8 }}>
+          Hours = total for all crew. × removes a row.
         </p>
         <button type="button" onClick={addRow} style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: theme.accent, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>+ Add row</button>
       </div>
@@ -6528,8 +6568,8 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
       <button type="button" disabled={saving} onClick={generateAndSend} style={{ ...styles.button, backgroundColor: theme.accent }}>
         {saving ? "Generating PDF…" : savedEstimate ? "Save changes & send updated PDF" : "Generate customer estimate & send"}
       </button>
-      <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 12, lineHeight: 1.55 }}>
-        Saves your changes, downloads a PDF, and optionally emails your customer. Negotiating scope? Remove lines or adjust hours, then send again — dashboard baseline only after final approval.
+      <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 12 }}>
+        Saves, downloads PDF, optionally emails customer.
       </p>
     </div>
   );
@@ -6734,7 +6774,7 @@ function EstimateHub({ token, readonly = false }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
           <h1 style={{ ...styles.title, marginBottom: 4 }}>Estimates</h1>
-          <p style={{ ...styles.subtitle, marginBottom: 0 }}>Customer quotes first — dashboard baseline only after they approve.</p>
+          <p style={{ ...styles.subtitle, marginBottom: 0 }}>Send quote → customer OK → set baseline.</p>
         </div>
         {!readonly && (
           <button type="button" onClick={() => setFormOpen(true)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold, whiteSpace: "nowrap", minWidth: 160 }}>
@@ -6743,33 +6783,16 @@ function EstimateHub({ token, readonly = false }) {
         )}
       </div>
 
-      <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>How estimates work</div>
-        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
-          <li><strong>Generate &amp; send</strong> — PDF quote for the customer (hours, materials, total)</li>
-          <li><strong>Customer approves</strong> — sign-off before work is locked in</li>
-          <li><strong>Set dashboard baseline</strong> — internal budget for tracking actual crew logs vs plan</li>
-        </ol>
-      </div>
-
-      <div style={{ ...styles.card, marginBottom: 16, border: `1.5px solid ${theme.accent}`, backgroundColor: theme.accentLight }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>How to edit a past estimate</div>
-        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
-          <li>Select the {T.project.toLowerCase()} below (same one the estimate belongs to)</li>
-          <li>Click <strong>Open &amp; edit</strong> on the estimate you want to change</li>
-          <li>Remove rows (×), change hours/materials, then <strong>Save changes &amp; send updated PDF</strong></li>
-        </ol>
-        <p style={{ fontSize: 12, color: theme.textLight, margin: "10px 0 0", lineHeight: 1.55 }}>
-          Only draft and sent estimates can be edited. Once you set the dashboard baseline (approved), the quote is locked — use change orders for mid-job scope changes later.
-        </p>
-      </div>
+      <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 16 }}>
+        Edit past quotes: pick a {T.project.toLowerCase()} below → <strong>Open &amp; edit</strong>.
+      </p>
 
       {actionMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{actionMsg}</div>}
       {actionErr && <p style={styles.errorMsg}>{actionErr}</p>}
 
       {jobs.length > 0 ? (
         <div style={{ marginBottom: 16 }}>
-          <label style={styles.label}>Select {T.project.toLowerCase()} to view or edit estimates</label>
+          <label style={styles.label}>{T.project}</label>
           <select style={styles.input} value={selectedJobId || ""} onChange={e => setSelectedJobId(e.target.value ? parseInt(e.target.value, 10) : null)}>
             <option value="">Choose a {T.project.toLowerCase()}…</option>
             {jobs.map(j => (
@@ -6779,13 +6802,7 @@ function EstimateHub({ token, readonly = false }) {
         </div>
       ) : (
         <div style={{ ...styles.card, marginBottom: 16, fontSize: 13, color: theme.textSecondary, textAlign: "center", padding: "20px 16px" }}>
-          No {T.projects.toLowerCase()} yet. Use <strong>+ New Estimate</strong> to create your first one.
-        </div>
-      )}
-
-      {!selectedJob && jobs.length > 0 && (
-        <div style={{ ...styles.card, fontSize: 13, color: theme.textSecondary, textAlign: "center", padding: "20px 16px", marginBottom: 16 }}>
-          Pick a {T.project.toLowerCase()} above to see its estimates and edit them.
+          No {T.projects.toLowerCase()} yet.
         </div>
       )}
 

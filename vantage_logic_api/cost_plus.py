@@ -415,6 +415,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         return {"job_type_id": jt.job_type_id, "name": jt.name, "hint": jt.hint, "cost_code_ids": jt.cost_code_ids or []}
 
     @app.patch("/job-types/{job_type_id}")
+    @app.put("/job-types/{job_type_id}")
     def update_job_type(
         job_type_id: int,
         body: JobTypeIn,
@@ -523,6 +524,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         return {"template_id": t.template_id, "name": t.name}
 
     @app.patch("/estimate-templates/{template_id}")
+    @app.put("/estimate-templates/{template_id}")
     def update_estimate_template(
         template_id: int,
         body: TemplateIn,
