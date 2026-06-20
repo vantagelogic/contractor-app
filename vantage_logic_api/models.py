@@ -18,6 +18,7 @@ class Company(Base):
     subscription_tier = Column(String, nullable=True)
     track_overtime = Column(Boolean, default=False)
     overtime_rate_multiplier = Column(Numeric(4, 2), default=1.5)
+    overtime_rules = Column(JSONB, nullable=True)
 
 class User(Base):
     __tablename__ = "users"
@@ -101,6 +102,7 @@ class Timesheet(Base):
     shift_date = Column(Date, nullable=False)
     hours_worked = Column(Numeric(5, 2), nullable=False)
     overtime_hours = Column(Numeric(5, 2), default=0)
+    premium_hours = Column(JSONB, nullable=True)
     field_notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
 

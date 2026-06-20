@@ -4,7 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 from database import get_db, engine
 from datetime import datetime, timedelta
@@ -19,8 +19,25 @@ import os
 import base64
 import json
 import re
+import csv
+import io
+from dotenv import load_dotenv
 from google import genai as google_genai
-gemini_client = google_genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
+
+load_dotenv()
+
+_gemini_client = None
+
+
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            raise HTTPException(status_code=503, detail="Voice/AI features are not configured.")
+        _gemini_client = google_genai.Client(api_key=api_key)
+    return _gemini_client
+
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "")
@@ -109,6 +126,20 @@ with engine.connect() as _conn:
         _conn.commit()
     except Exception:
         pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS overtime_rules JSONB"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS premium_hours JSONB"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
 
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
@@ -190,8 +221,61 @@ def _company_ot_multiplier(company) -> float:
     return float(val) if val else 1.5
 
 
+def _company_overtime_rules(company) -> list:
+    rules = _attr(company, "overtime_rules", None)
+    if rules and isinstance(rules, list) and len(rules) > 0:
+        return rules
+    if _company_track_overtime(company):
+        return [{"id": "default", "label": "Overtime", "multiplier": _company_ot_multiplier(company)}]
+    return []
+
+
+def _parse_json_param(val):
+    if val is None or val == "":
+        return None
+    if isinstance(val, (dict, list)):
+        return val
+    try:
+        import json
+        return json.loads(val)
+    except Exception:
+        return None
+
+
+def _employee_rate(emp) -> float:
+    if not emp:
+        return 0
+    if emp.worker_type == "contractor" and emp.hourly_rate:
+        return float(emp.hourly_rate)
+    if emp.burden_rate:
+        return float(emp.burden_rate)
+    if emp.hourly_rate:
+        return float(emp.hourly_rate)
+    return 0
+
+
 def _timesheet_ot_hours(ts) -> float:
     return float(_attr(ts, "overtime_hours", 0) or 0)
+
+
+def _timesheet_premium_hours(ts):
+    premium = _attr(ts, "premium_hours", None)
+    return premium if isinstance(premium, dict) else {}
+
+
+def _timesheet_labour_cost(ts, emp, company) -> float:
+    rate = _employee_rate(emp)
+    cost = float(ts.hours_worked or 0) * rate
+    premium = _timesheet_premium_hours(ts)
+    rules = {r["id"]: r for r in _company_overtime_rules(company)}
+    if premium:
+        for rule_id, hours in premium.items():
+            rule = rules.get(rule_id)
+            mult = float(rule["multiplier"]) if rule else _company_ot_multiplier(company)
+            cost += float(hours or 0) * rate * mult
+    elif _timesheet_ot_hours(ts) > 0:
+        cost += _timesheet_ot_hours(ts) * rate * _company_ot_multiplier(company)
+    return cost
 
 
 def send_welcome_email(to_email: str, company_name: str):
@@ -625,6 +709,7 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     "last_name": current_user.last_name,
     "track_overtime": _company_track_overtime(company),
     "overtime_rate_multiplier": _company_ot_multiplier(company),
+    "overtime_rules": _company_overtime_rules(company),
 }
 
 @app.get("/users")
@@ -1019,6 +1104,7 @@ def get_job_timesheets(
             "shift_date": str(t.shift_date),
             "hours_worked": float(t.hours_worked),
             "overtime_hours": _timesheet_ot_hours(t),
+            "premium_hours": _timesheet_premium_hours(t),
             "field_notes": t.field_notes,
         })
     return result
@@ -1058,11 +1144,15 @@ def create_timesheet(
     shift_date: str,
     hours_worked: float,
     overtime_hours: float = 0,
+    premium_hours: str = None,
     field_notes: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    timesheet = models.Timesheet(
+    parsed_premium = _parse_json_param(premium_hours)
+    if parsed_premium and isinstance(parsed_premium, dict):
+        overtime_hours = sum(float(v or 0) for v in parsed_premium.values())
+    timesheet_kwargs = dict(
         company_id=current_user.company_id,
         job_id=job_id,
         employee_id=employee_id,
@@ -1070,8 +1160,11 @@ def create_timesheet(
         shift_date=shift_date,
         hours_worked=hours_worked,
         overtime_hours=overtime_hours,
-        field_notes=field_notes
+        field_notes=field_notes,
     )
+    if parsed_premium and hasattr(models.Timesheet, "premium_hours"):
+        timesheet_kwargs["premium_hours"] = parsed_premium
+    timesheet = models.Timesheet(**timesheet_kwargs)
     db.add(timesheet)
     db.commit()
     db.refresh(timesheet)
@@ -1173,7 +1266,7 @@ If you cannot read the receipt clearly, return {"error": "could not parse receip
 
         # Send to Gemini
         from google.genai import types
-        response = gemini_client.models.generate_content(
+        response = get_gemini_client().models.generate_content(
             model="gemini-2.5-flash",
             contents=[
                 prompt,
@@ -1248,7 +1341,7 @@ Return ONLY a JSON object with this exact structure, no other text:
 Match job_name and cost_code to the closest option from the lists provided. If nothing matches, return empty string. Hours should be a number — convert phrases like 'half a day' to 4.0 or 'six and a half' to 6.5."""
 
         from google.genai import types
-        response = gemini_client.models.generate_content(
+        response = get_gemini_client().models.generate_content(
             model="gemini-2.5-flash",
             contents=[prompt]
         )
@@ -1325,7 +1418,7 @@ Rules:
 - For overtime: if they mention overtime as part of a larger total (e.g. "10 hours today, 2 of those were overtime"), put the regular portion in "hours" and the overtime portion in "overtime_hours". If overtime is mentioned as its own standalone statement (e.g. "log 4 hours overtime on the Johnson job"), put 0 in "hours" and the full amount in "overtime_hours" unless regular hours were also stated separately. If overtime isn't mentioned at all, "overtime_hours" should be 0.0"""
 
         from google.genai import types
-        response = gemini_client.models.generate_content(
+        response = get_gemini_client().models.generate_content(
             model="gemini-2.5-flash",
             contents=[prompt]
         )
@@ -1556,7 +1649,7 @@ RESPONSE RULES:
 - Always be friendly and encouraging — trades workers are busy people on job sites"""
 
     try:
-        response = gemini_client.models.generate_content(
+        response = get_gemini_client().models.generate_content(
             model="gemini-2.5-flash",
             contents=[f"{system_prompt}\n\nUser question: {body.message}"]
         )
@@ -1712,6 +1805,7 @@ def update_company(
     company_name: str = None,
     track_overtime: bool = None,
     overtime_rate_multiplier: float = None,
+    overtime_rules: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1727,6 +1821,12 @@ def update_company(
         company.track_overtime = track_overtime
     if overtime_rate_multiplier is not None and hasattr(company, "overtime_rate_multiplier"):
         company.overtime_rate_multiplier = overtime_rate_multiplier
+    if overtime_rules is not None and hasattr(company, "overtime_rules"):
+        parsed = _parse_json_param(overtime_rules)
+        if parsed is not None:
+            if not isinstance(parsed, list):
+                raise HTTPException(status_code=400, detail="overtime_rules must be a JSON array")
+            company.overtime_rules = parsed
     db.commit()
     return {"message": "Company updated"}
 
@@ -1753,6 +1853,7 @@ def update_timesheet(
     shift_date: str = None,
     hours_worked: float = None,
     overtime_hours: float = None,
+    premium_hours: str = None,
     field_notes: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1767,7 +1868,12 @@ def update_timesheet(
     if cost_code_id is not None: ts.cost_code_id = cost_code_id
     if shift_date is not None: ts.shift_date = shift_date
     if hours_worked is not None: ts.hours_worked = hours_worked
-    if overtime_hours is not None and hasattr(ts, "overtime_hours"):
+    parsed_premium = _parse_json_param(premium_hours)
+    if parsed_premium is not None and hasattr(ts, "premium_hours"):
+        ts.premium_hours = parsed_premium if isinstance(parsed_premium, dict) else None
+        if isinstance(parsed_premium, dict):
+            ts.overtime_hours = sum(float(v or 0) for v in parsed_premium.values())
+    elif overtime_hours is not None and hasattr(ts, "overtime_hours"):
         ts.overtime_hours = overtime_hours
     if field_notes is not None: ts.field_notes = field_notes
     db.commit()
@@ -2044,20 +2150,14 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
         total_materials_cost = sum(float(m.total_cost or 0) for m in materials)
 
         labour_cost = 0
+        company = db.query(models.Company).filter(
+            models.Company.company_id == current_user.company_id
+        ).first()
         for t in timesheets:
             emp = db.query(models.Employee).filter(
                 models.Employee.employee_id == t.employee_id
             ).first()
-            if emp:
-                if emp.worker_type == "contractor" and emp.hourly_rate:
-                    rate = float(emp.hourly_rate)
-                elif emp.burden_rate:
-                    rate = float(emp.burden_rate)
-                elif emp.hourly_rate:
-                    rate = float(emp.hourly_rate)
-                else:
-                    rate = 0
-                labour_cost += float(t.hours_worked or 0) * rate
+            labour_cost += _timesheet_labour_cost(t, emp, company)
 
         total_cost = labour_cost + total_materials_cost
         contract_value = float(job.contract_value or 0)
@@ -2796,6 +2896,214 @@ def add_comment(
                 db.add(notif)
         db.commit()
     return {"comment_id": comment.comment_id, "message": comment.message}
+
+# =============================================
+# EXPORT
+# =============================================
+
+@app.get("/export/report")
+def export_report(
+    start_date: str,
+    end_date: str,
+    job_id: int = None,
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    from datetime import date as date_type
+
+    try:
+        start = date_type.fromisoformat(start_date)
+        end = date_type.fromisoformat(end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    if end < start:
+        raise HTTPException(status_code=400, detail="end_date must be on or after start_date.")
+
+    company_id = current_user.company_id
+    jobs_q = db.query(models.Job).filter(models.Job.company_id == company_id)
+    if job_id is not None:
+        jobs_q = jobs_q.filter(models.Job.job_id == job_id)
+    jobs = {j.job_id: j for j in jobs_q.all()}
+    job_ids = list(jobs.keys())
+    if job_id is not None and not job_ids:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    employees = {e.employee_id: e for e in db.query(models.Employee).filter(models.Employee.company_id == company_id).all()}
+    cost_codes = {c.cost_code_id: c for c in db.query(models.CostCode).filter(models.CostCode.company_id == company_id).all()}
+    inventory = {i.inventory_id: i for i in db.query(models.Inventory).filter(models.Inventory.company_id == company_id).all()}
+    company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
+
+    def job_name(jid):
+        j = jobs.get(jid)
+        return j.job_name if j else "Unknown"
+
+    def cc_label(ccid):
+        cc = cost_codes.get(ccid)
+        return f"{cc.code} - {cc.description}" if cc else ""
+
+    def emp_name(eid):
+        e = employees.get(eid)
+        return f"{e.first_name} {e.last_name}" if e else "Unknown"
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Vantage Logic Report"])
+    writer.writerow(["Period", f"{start_date} to {end_date}"])
+    if job_id is not None:
+        writer.writerow(["Project", job_name(job_id)])
+    writer.writerow([])
+
+    # Timesheets
+    ts_q = db.query(models.Timesheet).filter(
+        models.Timesheet.company_id == company_id,
+        models.Timesheet.shift_date >= start,
+        models.Timesheet.shift_date <= end,
+    )
+    if job_ids:
+        ts_q = ts_q.filter(models.Timesheet.job_id.in_(job_ids))
+    timesheets = ts_q.order_by(models.Timesheet.shift_date).all()
+
+    writer.writerow(["TIMESHEETS"])
+    writer.writerow(["Date", "Project", "Employee", "Work Category", "Regular Hours", "Premium Hours", "Labour Cost", "Notes"])
+    for t in timesheets:
+        emp = employees.get(t.employee_id)
+        premium = _timesheet_premium_hours(t)
+        premium_str = "; ".join(
+            f"{next((r['label'] for r in _company_overtime_rules(company) if r['id'] == rid), rid)}: {hrs}h"
+            for rid, hrs in premium.items() if float(hrs or 0) > 0
+        ) if premium else (f"Overtime: {_timesheet_ot_hours(t)}h" if _timesheet_ot_hours(t) > 0 else "")
+        writer.writerow([
+            str(t.shift_date),
+            job_name(t.job_id),
+            emp_name(t.employee_id),
+            cc_label(t.cost_code_id),
+            float(t.hours_worked or 0),
+            premium_str,
+            round(_timesheet_labour_cost(t, emp, company), 2),
+            t.field_notes or "",
+        ])
+    writer.writerow([])
+
+    # Materials
+    mat_q = db.query(models.Material).filter(
+        models.Material.company_id == company_id,
+        models.Material.purchase_date >= start,
+        models.Material.purchase_date <= end,
+    )
+    if job_ids:
+        mat_q = mat_q.filter(models.Material.job_id.in_(job_ids))
+    materials = mat_q.order_by(models.Material.purchase_date).all()
+
+    writer.writerow(["MATERIALS"])
+    writer.writerow(["Date", "Project", "Purchased By", "Supplier", "Description", "Amount", "Work Category", "Notes"])
+    for m in materials:
+        writer.writerow([
+            str(m.purchase_date or ""),
+            job_name(m.job_id),
+            emp_name(m.purchased_by),
+            m.supplier or "",
+            m.description or "",
+            float(m.total_cost or 0),
+            cc_label(m.cost_code_id) if m.cost_code_id else "",
+            m.notes or "",
+        ])
+    writer.writerow([])
+
+    # Mileage
+    mi_q = db.query(models.Mileage).filter(
+        models.Mileage.company_id == company_id,
+        models.Mileage.trip_date >= start,
+        models.Mileage.trip_date <= end,
+    )
+    if job_ids:
+        mi_q = mi_q.filter(models.Mileage.job_id.in_(job_ids))
+    mileage = mi_q.order_by(models.Mileage.trip_date).all()
+
+    writer.writerow(["MILEAGE"])
+    writer.writerow(["Date", "Project", "Employee", "KM Driven", "Purpose", "Notes"])
+    for m in mileage:
+        writer.writerow([
+            str(m.trip_date),
+            job_name(m.job_id),
+            emp_name(m.employee_id),
+            float(m.km_driven or 0),
+            m.purpose or "",
+            m.notes or "",
+        ])
+    writer.writerow([])
+
+    # Inventory pulls (approved requests)
+    req_q = db.query(models.Request).filter(
+        models.Request.company_id == company_id,
+        models.Request.request_type == "Inventory Pull",
+        models.Request.status == "approved",
+    )
+    if job_ids:
+        req_q = req_q.filter(models.Request.job_id.in_(job_ids))
+    requests = req_q.all()
+    filtered_requests = [
+        r for r in requests
+        if r.reviewed_at and start <= r.reviewed_at.date() <= end
+    ]
+
+    writer.writerow(["INVENTORY PULLS"])
+    writer.writerow(["Date Approved", "Project", "Employee", "Item", "Quantity", "Description"])
+    for r in filtered_requests:
+        inv = inventory.get(r.inventory_id)
+        writer.writerow([
+            str(r.reviewed_at.date()) if r.reviewed_at else "",
+            job_name(r.job_id),
+            emp_name(r.employee_id),
+            inv.name if inv else "Unknown",
+            float(r.quantity_requested or 0),
+            r.description or "",
+        ])
+    writer.writerow([])
+
+    # Change orders
+    co_q = db.query(models.ChangeOrder).filter(
+        models.ChangeOrder.company_id == company_id,
+    )
+    if job_ids:
+        co_q = co_q.filter(models.ChangeOrder.job_id.in_(job_ids))
+    change_orders = [
+        co for co in co_q.all()
+        if co.created_at and start <= co.created_at.date() <= end
+    ]
+
+    writer.writerow(["CHANGE ORDERS"])
+    writer.writerow(["Date", "Project", "Type", "Description", "Amount"])
+    for co in change_orders:
+        writer.writerow([
+            str(co.created_at.date()) if co.created_at else "",
+            job_name(co.job_id),
+            co.order_type or "",
+            co.description or "",
+            float(co.amount or 0),
+        ])
+    writer.writerow([])
+
+    # Summary
+    total_labour = sum(_timesheet_labour_cost(t, employees.get(t.employee_id), company) for t in timesheets)
+    total_materials = sum(float(m.total_cost or 0) for m in materials)
+    total_km = sum(float(m.km_driven or 0) for m in mileage)
+
+    writer.writerow(["SUMMARY"])
+    writer.writerow(["Total Labour Cost", round(total_labour, 2)])
+    writer.writerow(["Total Materials Cost", round(total_materials, 2)])
+    writer.writerow(["Total KM Driven", round(total_km, 2)])
+    writer.writerow(["Timesheet Entries", len(timesheets)])
+    writer.writerow(["Material Entries", len(materials)])
+    writer.writerow(["Mileage Entries", len(mileage)])
+    writer.writerow(["Inventory Pulls", len(filtered_requests)])
+    writer.writerow(["Change Orders", len(change_orders)])
+
+    filename = f"vantage-report-{start_date}-to-{end_date}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 # =============================================
 # DEMO DATA

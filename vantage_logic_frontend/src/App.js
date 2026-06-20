@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const API =
   process.env.REACT_APP_API_URL ??
@@ -51,7 +51,7 @@ const isMobile = () => window.innerWidth < 768;
 const styles = {
   container: { maxWidth: "640px", margin: "0 auto", padding: "24px 18px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
   containerCrew: { maxWidth: "960px", margin: "0 auto", padding: "24px 18px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
-  containerWide: { maxWidth: "1120px", margin: "0 auto", padding: "24px 24px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
+  containerWide: { maxWidth: "1120px", margin: "0 auto", padding: "66px 24px 110px", fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh" },
   title: { fontSize: "27px", fontWeight: "800", color: theme.primary, marginBottom: "5px", fontFamily: font.display, letterSpacing: "-0.7px", lineHeight: 1.15 },
   subtitle: { fontSize: "14px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.4 },
   form: { display: "flex", flexDirection: "column", gap: "4px" },
@@ -67,6 +67,17 @@ const styles = {
 function fmt(n) {
   return Number(n || 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+// User-facing labels (backend still uses job_id, cost_code_id, etc.)
+const T = {
+  project: "Project",
+  projects: "Projects",
+  selectProject: "Select project",
+  workCategory: "Work Category",
+  workCategories: "Work Categories",
+  selectWorkCategory: "Select work category",
+  workCategoryHint: "The type of work being done — e.g. Framing, Electrical, Labour",
+};
 
 function calcHours(start, end) {
   if (!start || !end) return null;
@@ -373,7 +384,7 @@ function OnboardingModal({ onClose }) {
       icon: <VantageLogo size={52} dark={true} centered={true} />,
       label: null,
       title: "Welcome to VantageLogic",
-      body: "Your job costing and crew tracking platform is ready. This quick guide covers the 3 things you need to start tracking your first job.",
+      body: `Your project costing and crew tracking platform is ready. This quick guide covers the 3 things you need to start tracking your first ${T.project.toLowerCase()}.`,
       tip: null,
     },
     {
@@ -387,8 +398,8 @@ function OnboardingModal({ onClose }) {
         </svg>
       ),
       label: "Step 1 of 3",
-      title: "Create Your First Job",
-      body: "Jobs are the foundation of everything. Every hour logged, material purchased, and mile driven is tracked against a job. Add a contract value and budget to see your profitability in real time.",
+      title: `Create Your First ${T.project}`,
+      body: `${T.projects} are the foundation of everything. Every hour logged, material purchased, and mile driven is tracked against a ${T.project.toLowerCase()}. Add a contract value and budget to see your profitability in real time.`,
       tip: "Even if you don't have a final contract value yet — add an estimate. You can update it anytime.",
     },
     {
@@ -505,15 +516,15 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
 
   const steps = [
     {
-      label: "Create your first job",
-      desc: "Add a job with a budget and contract value",
+      label: `Create your first ${T.project.toLowerCase()}`,
+      desc: `Add a ${T.project.toLowerCase()} with a budget and contract value`,
       done: hasJob,
       view: "admin",
       color: "#2d6a4f",
     },
     {
       label: "Add crew members",
-      desc: "Add employees with hourly rates for accurate job costing",
+      desc: "Add employees with hourly rates for accurate costing",
       done: hasEmployee,
       view: "admin",
       color: "#c8973a",
@@ -529,17 +540,30 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
 
   const doneCount = steps.filter(s => s.done).length;
   const pct = Math.round((doneCount / steps.length) * 100);
+  const allDone = doneCount === steps.length;
+
+  useEffect(() => {
+    if (allDone) {
+      const timer = setTimeout(() => onDismiss(), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [allDone, onDismiss]);
 
   return (
-    <div style={{ backgroundColor: "white", borderRadius: "14px", padding: "20px 22px 16px", marginBottom: "20px", border: `1.5px solid ${theme.accent}`, boxShadow: "0 2px 16px rgba(45,106,79,0.1)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
-        <div>
+    <div style={{ backgroundColor: "white", borderRadius: "14px", padding: "20px 22px 16px", marginBottom: "20px", border: `1.5px solid ${theme.accent}`, boxShadow: "0 2px 16px rgba(45,106,79,0.1)", paddingRight: "58px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", gap: "12px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: "700", fontSize: "15px", color: theme.primary, fontFamily: font.display, letterSpacing: "-0.2px" }}>Getting started</div>
           <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>
-            {doneCount === steps.length ? "You're all set! 🎉" : `${doneCount} of ${steps.length} steps complete`}
+            {allDone ? "You're all set! This checklist will hide automatically." : `${doneCount} of ${steps.length} steps complete`}
           </div>
         </div>
-        <button onClick={onDismiss} style={{ fontSize: "22px", color: theme.textLight, background: "none", border: "none", cursor: "pointer", padding: "0 0 2px 14px", lineHeight: 1, fontWeight: "300" }}>×</button>
+        <button
+          onClick={onDismiss}
+          style={{ fontSize: "11px", color: theme.textSecondary, background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", cursor: "pointer", padding: "5px 10px", lineHeight: 1.3, fontWeight: "600", fontFamily: font.body, whiteSpace: "nowrap", flexShrink: 0 }}
+        >
+          Hide checklist
+        </button>
       </div>
 
       {/* Progress bar */}
@@ -1118,7 +1142,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
         <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>This Week</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
           <StatCard label="Hours" value={stats.week.hours} unit="h" />
-          <StatCard label="Jobs" value={stats.week.jobs} />
+          <StatCard label={T.projects} value={stats.week.jobs} />
           <StatCard label="KM Driven" value={stats.week.km} unit="km" />
         </div>
       </div>
@@ -1151,7 +1175,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Hours</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{voiceResult.hours || "?"}</span></div>
                     {voiceResult.overtime_hours > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Overtime</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.gold }}>{voiceResult.overtime_hours}</span></div>}
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Cost Code</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedCCLabel || voiceResult.cost_code || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.workCategory}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedCCLabel || voiceResult.cost_code || "?"}</span></div>
                     {voiceResult.cost_code_confidence === "low" && (
                       <div style={{ marginTop: "4px" }}>
                         <label style={{ fontSize: "11px", color: theme.warning, fontWeight: "600", display: "block", marginBottom: "4px" }}>Cost code unclear — pick one:</label>
@@ -1159,7 +1183,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
                           const cc = costCodes.find(c => String(c.cost_code_id) === e.target.value);
                           setVoiceResult(prev => ({ ...prev, _matchedCCId: e.target.value, _matchedCCLabel: cc ? `${cc.code} ${cc.description}` : "" }));
                         }}>
-                          <option value="">Select cost code</option>
+                          <option value="">Select work category</option>
                           {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
                         </select>
                       </div>
@@ -1538,10 +1562,10 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
                 <div style={{ padding: "14px 16px", backgroundColor: theme.bg, borderTop: `1px solid ${theme.border}` }}>
                   {type === "timesheet" && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                      <div><label style={styles.label}>Job</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
+                      <div><label style={styles.label}>{T.project}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
                       <div><label style={styles.label}>Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.hours_worked} onChange={e => setEditForm({...editForm, hours_worked: e.target.value})} /></div>
                       <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.shift_date} onChange={e => setEditForm({...editForm, shift_date: e.target.value})} /></div>
-                      <div><label style={styles.label}>Cost Code</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>{costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code}</option>)}</select></div>
+                      <div><label style={styles.label}>{T.workCategory}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>{costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code}</option>)}</select></div>
                       {trackOvertime && (
                         <div><label style={styles.label}>Overtime Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.overtime_hours} onChange={e => setEditForm({...editForm, overtime_hours: e.target.value})} /></div>
                       )}
@@ -1549,7 +1573,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
                   )}
                   {type === "material" && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                      <div><label style={styles.label}>Job</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
+                      <div><label style={styles.label}>{T.project}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
                       <div><label style={styles.label}>Amount ($)</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.total_cost} onChange={e => setEditForm({...editForm, total_cost: e.target.value})} /></div>
                       <div><label style={styles.label}>Description</label><input style={{...styles.input, marginTop: "4px"}} value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} /></div>
                       <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.purchase_date} onChange={e => setEditForm({...editForm, purchase_date: e.target.value})} /></div>
@@ -1557,7 +1581,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
                   )}
                   {type === "mileage" && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-                      <div><label style={styles.label}>Job</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
+                      <div><label style={styles.label}>{T.project}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
                       <div><label style={styles.label}>KM Driven</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.1" value={editForm.km_driven} onChange={e => setEditForm({...editForm, km_driven: e.target.value})} /></div>
                       <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.trip_date} onChange={e => setEditForm({...editForm, trip_date: e.target.value})} /></div>
                       <div><label style={styles.label}>Purpose</label><input style={{...styles.input, marginTop: "4px"}} value={editForm.purpose} onChange={e => setEditForm({...editForm, purpose: e.target.value})} /></div>
@@ -1591,6 +1615,8 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" });
   const [addOvertime, setAddOvertime] = useState(false);
   const [trackOvertime, setTrackOvertime] = useState(false);
+  const [overtimeRules, setOvertimeRules] = useState([]);
+  const [premiumHours, setPremiumHours] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -1613,6 +1639,11 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
       apiFetch(`${API}/my-schedule-to-log`, { headers: h }).then(r => r.json()).catch(() => []),
     ]).then(([me, emps, jobs, ccs, schedToLog]) => {
       setTrackOvertime(!!me.track_overtime);
+      const rules = Array.isArray(me.overtime_rules) && me.overtime_rules.length > 0
+        ? me.overtime_rules
+        : (me.track_overtime ? [{ id: "default", label: "Overtime", multiplier: me.overtime_rate_multiplier || 1.5 }] : []);
+      setOvertimeRules(rules);
+      setPremiumHours(Object.fromEntries(rules.map(r => [r.id, ""])));
       if (me.employee_id) {
         setLinkedEmployeeId(me.employee_id);
         setFormData(prev => ({ ...prev, employee_id: me.employee_id }));
@@ -1657,13 +1688,16 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
   function validate() {
     const e = {};
     if (!formData.employee_id) e.employee_id = "Please select an employee";
-    if (!formData.job_id) e.job_id = "Please select a job";
-    if (!formData.cost_code_id) e.cost_code_id = "Please select a cost code";
+    if (!formData.job_id) e.job_id = `Please select a ${T.project.toLowerCase()}`;
+    if (!formData.cost_code_id) e.cost_code_id = `Please select a ${T.workCategory.toLowerCase()}`;
     if (!formData.shift_date) e.shift_date = "Date is required";
     if (!formData.hours_worked) e.hours_worked = "Hours are required";
     else if (parseFloat(formData.hours_worked) <= 0) e.hours_worked = "Must be greater than 0";
     else if (parseFloat(formData.hours_worked) > 24) e.hours_worked = "Hours can't exceed 24";
-    if (addOvertime && (!formData.overtime_hours || parseFloat(formData.overtime_hours) <= 0)) e.overtime_hours = "Enter overtime hours, or uncheck the box";
+    if (addOvertime) {
+      const hasPremium = overtimeRules.some(r => parseFloat(premiumHours[r.id] || 0) > 0);
+      if (!hasPremium) e.overtime_hours = "Enter premium hours, or uncheck the box";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -1672,7 +1706,23 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    const response = await apiFetch(`${API}/timesheets?${new URLSearchParams(formData)}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const params = new URLSearchParams(formData);
+    if (trackOvertime && addOvertime) {
+      const premiumPayload = {};
+      let otTotal = 0;
+      overtimeRules.forEach(r => {
+        const hrs = parseFloat(premiumHours[r.id] || 0);
+        if (hrs > 0) {
+          premiumPayload[r.id] = hrs;
+          otTotal += hrs;
+        }
+      });
+      params.set("overtime_hours", String(otTotal));
+      params.set("premium_hours", JSON.stringify(premiumPayload));
+    } else {
+      params.set("overtime_hours", "0");
+    }
+    const response = await apiFetch(`${API}/timesheets?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     setSubmitting(false);
     if (response.ok) setSubmitted(true);
     else setErrors({ general: "Failed to submit. Please try again." });
@@ -1687,7 +1737,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
           </div>
           <h2 style={{ fontSize: "24px", fontWeight: "700", color: theme.primary, fontFamily: font.display, margin: "0 0 8px", letterSpacing: "-0.3px" }}>Hours logged</h2>
           <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Entry saved successfully.</p>
-          <button style={styles.button} onClick={() => { setSubmitted(false); setAddOvertime(false); setFormData({ employee_id: linkedEmployeeId || "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" }); }}>Log Another</button>
+          <button style={styles.button} onClick={() => { setSubmitted(false); setAddOvertime(false); setPremiumHours(Object.fromEntries(overtimeRules.map(r => [r.id, ""]))); setFormData({ employee_id: linkedEmployeeId || "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" }); }}>Log Another</button>
         </div>
       </div>
     );
@@ -1756,16 +1806,16 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
             </>
           )}
 
-          <label style={styles.label}>Job</label>
+          <label style={styles.label}>{T.project}</label>
           <select style={errors.job_id ? styles.inputError : styles.input} name="job_id" value={formData.job_id} onChange={handleChange}>
-            <option value="">Select job</option>
+            <option value="">Select project</option>
             {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
           </select>
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
 
-          <label style={styles.label}>Cost Code</label>
+          <label style={styles.label}>{T.workCategory}</label>
           <select style={errors.cost_code_id ? styles.inputError : styles.input} name="cost_code_id" value={formData.cost_code_id} onChange={handleChange}>
-            <option value="">Select cost code</option>
+            <option value="">Select work category</option>
             {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
@@ -1778,19 +1828,26 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
           <input style={errors.hours_worked ? styles.inputError : styles.input} name="hours_worked" type="number" step="0.5" placeholder="e.g. 8.5" value={formData.hours_worked} onChange={handleChange} />
           {errors.hours_worked && <p style={styles.errorMsg}>{errors.hours_worked}</p>}
 
-          {trackOvertime && (
+          {trackOvertime && overtimeRules.length > 0 && (
             <div style={{ marginBottom: "14px" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontWeight: "600", marginTop: "4px" }}>
-                <input type="checkbox" checked={addOvertime} onChange={e => { setAddOvertime(e.target.checked); if (!e.target.checked) setFormData(f => ({...f, overtime_hours: "0"})); }} style={{ width: "16px", height: "16px", accentColor: theme.accent, cursor: "pointer" }} />
-                Add overtime hours
+                <input type="checkbox" checked={addOvertime} onChange={e => { setAddOvertime(e.target.checked); if (!e.target.checked) setPremiumHours(Object.fromEntries(overtimeRules.map(r => [r.id, ""]))); }} style={{ width: "16px", height: "16px", accentColor: theme.accent, cursor: "pointer" }} />
+                Add premium hours (overtime, double time, etc.)
               </label>
-              {addOvertime && (
-                <>
-                  <label style={{...styles.label, marginTop: "10px"}}>Overtime Hours</label>
-                  <input style={errors.overtime_hours ? styles.inputError : styles.input} name="overtime_hours" type="number" step="0.5" placeholder="e.g. 2" value={formData.overtime_hours} onChange={handleChange} />
-                  {errors.overtime_hours && <p style={styles.errorMsg}>{errors.overtime_hours}</p>}
-                </>
-              )}
+              {addOvertime && overtimeRules.map(rule => (
+                <div key={rule.id} style={{ marginTop: "10px" }}>
+                  <label style={{...styles.label, marginTop: "0"}}>{rule.label} ({rule.multiplier}×)</label>
+                  <input
+                    style={errors.overtime_hours ? styles.inputError : styles.input}
+                    type="number"
+                    step="0.5"
+                    placeholder="e.g. 2"
+                    value={premiumHours[rule.id] || ""}
+                    onChange={e => setPremiumHours(prev => ({ ...prev, [rule.id]: e.target.value }))}
+                  />
+                </div>
+              ))}
+              {errors.overtime_hours && <p style={styles.errorMsg}>{errors.overtime_hours}</p>}
             </div>
           )}
 
@@ -1875,7 +1932,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   function validate() {
     const e = {};
-    if (!formData.job_id) e.job_id = "Please select a job";
+    if (!formData.job_id) e.job_id = `Please select a ${T.project.toLowerCase()}`;
     if (!formData.description) e.description = "Description is required";
     if (!formData.total_cost) e.total_cost = "Total amount is required";
     else if (parseFloat(formData.total_cost) <= 0) e.total_cost = "Must be greater than 0";
@@ -2140,15 +2197,23 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
         </div>
       ) : matTab === "inventory" ? (
         <div style={styles.card}>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>Pull from Inventory</div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "6px" }}>Pull from Inventory</div>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "14px", lineHeight: 1.5 }}>
+            Request stock from the warehouse for a {T.project.toLowerCase()}. Your admin approves the pull and stock is deducted automatically.
+          </p>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
+            {["1. Pick project", "2. Pick item", "3. Enter qty", "4. Submit request"].map((step, i) => (
+              <span key={i} style={{ fontSize: "10px", fontWeight: "700", color: theme.accent, backgroundColor: theme.accentLight, padding: "4px 8px", borderRadius: "6px" }}>{step}</span>
+            ))}
+          </div>
           {linkedEmployeeId && <IdentityBadge name={linkedEmployeeName} />}
-          <label style={styles.label}>Job</label>
+          <label style={styles.label}>{T.project} <span style={{ fontWeight: "400", textTransform: "none", letterSpacing: 0 }}>— which job site needs this?</span></label>
           <select style={invErrors.job_id ? styles.inputError : styles.input} value={invForm.job_id} onChange={e => { setInvForm({...invForm, job_id: e.target.value}); setInvErrors({...invErrors, job_id: ""}); }}>
-            <option value="">Select job</option>
+            <option value="">Select project</option>
             {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
           </select>
           {invErrors.job_id && <p style={styles.errorMsg}>{invErrors.job_id}</p>}
-          <label style={styles.label}>Item</label>
+          <label style={styles.label}>Item <span style={{ fontWeight: "400", textTransform: "none", letterSpacing: 0 }}>— from company stock</span></label>
           <select style={invErrors.inventory_id ? styles.inputError : styles.input} value={invForm.inventory_id} onChange={e => { setInvForm({...invForm, inventory_id: e.target.value}); setInvErrors({...invErrors, inventory_id: ""}); }}>
             <option value="">Select item</option>
             {inventory.map(i => <option key={i.inventory_id} value={i.inventory_id}>{i.name} ({parseFloat(i.quantity || 0)} {i.unit} available)</option>)}
@@ -2161,7 +2226,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
           <textarea style={styles.textarea} placeholder="What is this for?" value={invForm.description} onChange={e => setInvForm({...invForm, description: e.target.value})} />
           <button style={{ ...styles.button, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} type="button" onClick={async () => {
             const e = {};
-            if (!invForm.job_id) e.job_id = "Select a job";
+            if (!invForm.job_id) e.job_id = `Select a ${T.project.toLowerCase()}`;
             if (!invForm.inventory_id) e.inventory_id = "Select an item";
             if (!invForm.quantity_requested || parseFloat(invForm.quantity_requested) <= 0) e.quantity_requested = "Enter quantity";
             setInvErrors(e);
@@ -2175,7 +2240,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
           }} disabled={invSubmitting}>
             {invSubmitting ? <><Spinner /> Submitting...</> : "Request from Inventory"}
           </button>
-          <p style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "10px", textAlign: "center" }}>Your request will be sent to the admin for approval.</p>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "10px", textAlign: "center" }}>Your request goes to the admin for approval. Stock is deducted once approved.</p>
         </div>
       ) : (
       <div style={styles.card}>
@@ -2192,9 +2257,9 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
             </>
           )}
 
-          <label style={styles.label}>Job</label>
+          <label style={styles.label}>{T.project}</label>
           <select style={errors.job_id ? styles.inputError : styles.input} value={formData.job_id} onChange={e => { setFormData({...formData, job_id: e.target.value}); setErrors({...errors, job_id: ""}); }}>
-            <option value="">Select job</option>
+            <option value="">Select project</option>
             {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
           </select>
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
@@ -2287,7 +2352,7 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
     const e = {};
     const empId = linkedEmployeeId || parseInt(selectedEmployeeId);
     if (!empId) e.employee_id = "Please select an employee";
-    if (!formData.job_id) e.job_id = "Please select a job";
+    if (!formData.job_id) e.job_id = `Please select a ${T.project.toLowerCase()}`;
     if (!formData.trip_date) e.trip_date = "Date is required";
     if (!formData.km_driven) e.km_driven = "KM is required";
     else if (parseFloat(formData.km_driven) <= 0) e.km_driven = "Must be greater than 0";
@@ -2351,9 +2416,9 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
             </>
           )}
 
-          <label style={styles.label}>Job</label>
+          <label style={styles.label}>{T.project}</label>
           <select style={errors.job_id ? styles.inputError : styles.input} name="job_id" value={formData.job_id} onChange={handleChange}>
-            <option value="">Select job</option>
+            <option value="">Select project</option>
             {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
           </select>
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
@@ -2545,7 +2610,18 @@ function InventoryScreen({ token, readonly = false }) {
   return (
     <div style={styles.containerWide}>
       <h1 style={styles.title}>Inventory</h1>
-      <p style={styles.subtitle}>Track materials and supplies on hand</p>
+      <p style={styles.subtitle}>Track materials and supplies on hand in your warehouse or shop</p>
+
+      <div style={{ ...styles.card, marginBottom: "20px", backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}` }}>
+        <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "8px" }}>How to charge inventory to a {T.project.toLowerCase()}</div>
+        <ol style={{ margin: "0 0 10px 18px", padding: 0, fontSize: "13px", color: theme.textSecondary, lineHeight: 1.6 }}>
+          <li>Add items here with quantity on hand (this page is your stock list only).</li>
+          <li>Crew goes to <strong>Log → Materials → From Inventory</strong> on their phone.</li>
+          <li>They pick the {T.project.toLowerCase()}, item, and quantity they need.</li>
+          <li>You approve the pull under <strong>Requests</strong> — stock is deducted automatically.</li>
+        </ol>
+        <p style={{ fontSize: "12px", color: theme.textLight, margin: 0 }}>Inventory is not assigned directly from this screen. Crew request pulls, and you approve them.</p>
+      </div>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -3091,9 +3167,9 @@ function CrewRequestsScreen({ token, readonly = false }) {
       ) : (
         <div style={{ ...styles.card, marginBottom: "20px" }}>
           <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>New Request</div>
-          <label style={styles.label}>Job</label>
+          <label style={styles.label}>{T.project}</label>
           <select style={errors.job_id ? styles.inputError : styles.input} value={form.job_id} onChange={e => { setForm({...form, job_id: e.target.value}); setErrors({...errors, job_id: ""}); }}>
-            <option value="">Select job</option>
+            <option value="">Select project</option>
             {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
           </select>
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
@@ -3475,7 +3551,7 @@ function ScheduleScreen({ token, readonly = false }) {
             </div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: "11px", color: theme.textLight, fontWeight: "500", marginRight: "2px" }}>Filter:</span>
-              <button onClick={() => setJobFilter("all")} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>All jobs</button>
+              <button onClick={() => setJobFilter("all")} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>All {T.projects.toLowerCase()}</button>
               {jobs.map(j => <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === String(j.job_id) ? jobColors[j.job_id] : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? jobColors[j.job_id] : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>{j.job_name}</button>)}
             </div>
           </div>
@@ -3684,15 +3760,15 @@ function ScheduleScreen({ token, readonly = false }) {
             {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
           </select>
           {errors.employee_id && <p style={styles.errorMsg}>{errors.employee_id}</p>}
-          <label style={styles.label}>Job</label>
+          <label style={styles.label}>{T.project}</label>
           <select style={errors.job_id ? styles.inputError : styles.input} value={form.job_id} onChange={e => { setForm({...form, job_id: e.target.value}); setErrors({...errors, job_id: ""}); }}>
-            <option value="">Select job</option>
+            <option value="">Select project</option>
             {jobs.map(job => <option key={job.job_id} value={job.job_id}>{job.job_name}</option>)}
           </select>
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
-          <label style={styles.label}>Cost Code</label>
+          <label style={styles.label}>{T.workCategory}</label>
           <select style={errors.cost_code_id ? styles.inputError : styles.input} value={form.cost_code_id} onChange={e => { setForm({...form, cost_code_id: e.target.value}); setErrors({...errors, cost_code_id: ""}); }}>
-            <option value="">Select cost code</option>
+            <option value="">Select work category</option>
             {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
@@ -3757,16 +3833,16 @@ function ScheduleScreen({ token, readonly = false }) {
               <input style={styles.input} value={templateForm.name} onChange={e => setTemplateForm({...templateForm, name: e.target.value})} placeholder='e.g. "8h Framing – Smith House"' />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={styles.label}>Job</label>
+                  <label style={styles.label}>{T.project}</label>
                   <select style={styles.input} value={templateForm.job_id} onChange={e => setTemplateForm({...templateForm, job_id: e.target.value})}>
-                    <option value="">Select job</option>
+                    <option value="">Select project</option>
                     {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={styles.label}>Cost Code</label>
+                  <label style={styles.label}>{T.workCategory}</label>
                   <select style={styles.input} value={templateForm.cost_code_id} onChange={e => setTemplateForm({...templateForm, cost_code_id: e.target.value})}>
-                    <option value="">Select cost code</option>
+                    <option value="">Select work category</option>
                     {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
                   </select>
                 </div>
@@ -3869,15 +3945,15 @@ function ScheduleScreen({ token, readonly = false }) {
               <button onClick={() => setEditingShift(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: theme.textLight, padding: "0 4px", lineHeight: 1 }}>×</button>
             </div>
 
-            <label style={styles.label}>Job</label>
+            <label style={styles.label}>{T.project}</label>
             <select style={styles.input} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>
-              <option value="">Select job</option>
+              <option value="">Select project</option>
               {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
             </select>
 
-            <label style={styles.label}>Cost Code</label>
+            <label style={styles.label}>{T.workCategory}</label>
             <select style={styles.input} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>
-              <option value="">Select cost code</option>
+              <option value="">Select work category</option>
               {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
             </select>
 
@@ -3964,7 +4040,7 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
   }
 
   const steps = [
-    { n: 1, label: "Job Details" },
+    { n: 1, label: `${T.project} Details` },
     { n: 2, label: "Assign Crew" },
     { n: 3, label: "Done" }
   ];
@@ -3990,9 +4066,9 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
       {step === 1 && (
         <>
           <h3 style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, margin: "0 0 18px", fontFamily: font.display }}>New Job</h3>
-          <label style={styles.label}>Job Name *</label>
+          <label style={styles.label}>{T.project} Name *</label>
           <input style={styles.input} placeholder="e.g. Johnson Basement Reno" value={jobForm.job_name} onChange={e => { setJobForm({...jobForm, job_name: e.target.value}); setError(""); }} />
-          <label style={styles.label}>Job Code (optional)</label>
+          <label style={styles.label}>{T.project} Code (optional)</label>
           <input style={styles.input} placeholder="e.g. JB-2024-047" value={jobForm.job_code} onChange={e => setJobForm({...jobForm, job_code: e.target.value})} />
           <label style={styles.label}>City</label>
           <input style={styles.input} placeholder="e.g. Burnaby" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
@@ -4039,7 +4115,7 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
                   </select>
                 </div>
                 <div>
-                  <label style={styles.label}>Cost Code</label>
+                  <label style={styles.label}>{T.workCategory}</label>
                   <select style={styles.input} value={a.cost_code_id} onChange={e => setSchedAssignments(prev => prev.map((x, i) => i === idx ? {...x, cost_code_id: e.target.value} : x))}>
                     <option value="">Select</option>
                     {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
@@ -4264,17 +4340,17 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
           {/* ── STEP 1: JOBS ── */}
           <SetupSection
             number="1"
-            title="Jobs"
-            subtitle="Add a job and assign your crew. This is what powers the dashboard and tracks your margin."
+            title={T.projects}
+            subtitle={`Add a ${T.project.toLowerCase()} and assign your crew. This powers the dashboard and tracks your margin.`}
             complete={activeJobs.length > 0}
-            completeLabel={`${activeJobs.length} active job${activeJobs.length !== 1 ? "s" : ""}`}
+            completeLabel={`${activeJobs.length} active ${T.project.toLowerCase()}${activeJobs.length !== 1 ? "s" : ""}`}
           >
             {editingJob ? (
               <>
                 <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingJob.job_name}</p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
-                  <input style={styles.input} placeholder="Job Name" value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
-                  <input style={styles.input} placeholder="Job Code (optional)" value={jobForm.job_code || ""} onChange={e => setJobForm({...jobForm, job_code: e.target.value})} />
+                  <input style={styles.input} placeholder={`${T.project} Name`} value={jobForm.job_name} onChange={e => setJobForm({...jobForm, job_name: e.target.value})} />
+                  <input style={styles.input} placeholder={`${T.project} Code (optional)`} value={jobForm.job_code || ""} onChange={e => setJobForm({...jobForm, job_code: e.target.value})} />
                   <input style={styles.input} placeholder="City" value={jobForm.city} onChange={e => setJobForm({...jobForm, city: e.target.value})} />
                   <input style={styles.input} placeholder="Contract Value $" type="number" value={jobForm.contract_value} onChange={e => setJobForm({...jobForm, contract_value: e.target.value})} />
                   <input style={styles.input} placeholder="Budgeted Hours" type="number" value={jobForm.budgeted_hours} onChange={e => setJobForm({...jobForm, budgeted_hours: e.target.value})} />
@@ -4286,7 +4362,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
               </>
             ) : (
               <button onClick={() => setShowJobFlow(true)} style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, width: "100%" }}>
-                + Add New Job
+                + Add New {T.project}
               </button>
             )}
             {activeJobs.length > 0 && (
@@ -4400,8 +4476,8 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
           {/* ── STEP 3: COST CODES ── */}
           <SetupSection
             number="3"
-            title="Cost Codes"
-            subtitle="How you break down work on a job (e.g. Framing, Electrical, Labour). Used for tracking where time and money go."
+            title={T.workCategories}
+            subtitle={T.workCategoryHint + ". Used for tracking where time and money go on each project."}
             complete={costCodes.length > 0}
             completeLabel={`${costCodes.length} code${costCodes.length !== 1 ? "s" : ""} set up`}
           >
@@ -4425,7 +4501,7 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
                   <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
                 </div>
                 <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
-                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add Cost Code</button>
+                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add {T.workCategory}</button>
               </>
             )}
             {costCodes.length > 0 && (
@@ -4475,11 +4551,21 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
           {/* ── OVERTIME ── */}
           <SetupSection
             number="⏱"
-            title="Overtime"
-            subtitle="Decide whether your crew can log overtime hours separately, and at what rate it's costed."
+            title="Overtime & Premium Rates"
+            subtitle="Set overtime, double time, or other premium hour types and their pay multipliers."
             complete={true}
           >
             <OvertimeSettingsForm token={token} />
+          </SetupSection>
+
+          {/* ── EXPORT ── */}
+          <SetupSection
+            number="📊"
+            title="Export Reports"
+            subtitle="Download a full activity report by date range or specific project."
+            complete={true}
+          >
+            <ExportReportForm token={token} />
           </SetupSection>
 
           {/* ── DEMO DATA ── */}
@@ -4564,7 +4650,7 @@ function EmpTimesheetGroup({ empName, empData, token, onDelete }) {
   );
 }
 
-function Dashboard({ token, readonly = false }) {
+function Dashboard({ token, readonly = false, topOffset = 0 }) {
   const [jobs, setJobs] = useState([]);
   const [mileage, setMileage] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4673,7 +4759,7 @@ function Dashboard({ token, readonly = false }) {
   const totalKm = mileage.reduce((s, m) => s + Number(m.km_driven || 0), 0);
 
   return (
-    <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "90px" }}>
+    <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "90px", paddingTop: topOffset ? `${topOffset}px` : undefined }}>
       {/* Header */}
       <div style={{ background: `linear-gradient(150deg, ${theme.primaryDark} 0%, ${theme.primary} 55%, ${theme.accent} 115%)`, padding: "32px 22px 38px", color: "white", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.06)" }}>
         <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
@@ -4681,7 +4767,7 @@ function Dashboard({ token, readonly = false }) {
             <VantageLogo size={32} dark={true} />
           </div>
           <h1 style={{ fontSize: "26px", fontWeight: "700", margin: "0 0 4px", fontFamily: font.display, letterSpacing: "-0.5px" }}>Project Overview</h1>
-          <p style={{ fontSize: "13px", opacity: 0.65, margin: "0 0 20px" }}>Live job profitability, most recent activity first</p>
+          <p style={{ fontSize: "13px", opacity: 0.65, margin: "0 0 20px" }}>Live project profitability, most recent activity first</p>
 
           <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
             {["all", "active", "completed"].map(f => (
@@ -4754,7 +4840,7 @@ function Dashboard({ token, readonly = false }) {
               <p style={{ fontSize: "14px", color: theme.textSecondary, lineHeight: 1.6, margin: "0 0 24px" }}>Your dashboard shows live job profitability as your crew logs time and materials. To get started, you need three things.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
                 {[
-                  { num: "1", title: "Add a job", desc: "Create your first active job with a budget and contract value." },
+                  { num: "1", title: `Add a ${T.project.toLowerCase()}`, desc: `Create your first active ${T.project.toLowerCase()} with a budget and contract value.` },
                   { num: "2", title: "Add your crew", desc: "Add employees with their hourly rates so labour costs are accurate." },
                   { num: "3", title: "Give crew app access", desc: "Create logins so they can log hours and materials from their phones." },
                 ].map(step => (
@@ -4770,7 +4856,7 @@ function Dashboard({ token, readonly = false }) {
               <button onClick={() => window._setView && window._setView("admin")} style={{ ...styles.button, marginTop: 0, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px" }}>
                 Go to Setup
               </button>
-              <p style={{ fontSize: "12px", color: theme.textLight, textAlign: "center", marginTop: "12px", marginBottom: 0 }}>Takes about 5 minutes to get your first job running</p>
+              <p style={{ fontSize: "12px", color: theme.textLight, textAlign: "center", marginTop: "12px", marginBottom: 0 }}>{`Takes about 5 minutes to get your first ${T.project.toLowerCase()} running`}</p>
             </div>
           </div>
         ) : (
@@ -5102,23 +5188,58 @@ function LogHub({ setView }) {
 }
 
 function OvertimeSettingsForm({ token }) {
-  const [form, setForm] = useState({ track_overtime: false, overtime_rate_multiplier: "1.5" });
+  const [form, setForm] = useState({ track_overtime: false, rules: [{ id: "default", label: "Overtime", multiplier: "1.5" }] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const h = { Authorization: `Bearer ${token}` };
 
+  function newRuleId() {
+    return `rule_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  }
+
   useEffect(() => {
     apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(me => {
-      setForm({ track_overtime: !!me.track_overtime, overtime_rate_multiplier: String(me.overtime_rate_multiplier || 1.5) });
+      const rules = Array.isArray(me.overtime_rules) && me.overtime_rules.length > 0
+        ? me.overtime_rules.map(r => ({ id: r.id || newRuleId(), label: r.label || "Overtime", multiplier: String(r.multiplier || 1.5) }))
+        : [{ id: "default", label: "Overtime", multiplier: String(me.overtime_rate_multiplier || 1.5) }];
+      setForm({ track_overtime: !!me.track_overtime, rules });
       setLoading(false);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  function updateRule(index, field, value) {
+    setForm(prev => {
+      const rules = prev.rules.map((r, i) => i === index ? { ...r, [field]: value } : r);
+      return { ...prev, rules };
+    });
+  }
+
+  function addRule() {
+    setForm(prev => ({
+      ...prev,
+      rules: [...prev.rules, { id: newRuleId(), label: "Double Time", multiplier: "2.0" }],
+    }));
+  }
+
+  function removeRule(index) {
+    setForm(prev => ({
+      ...prev,
+      rules: prev.rules.filter((_, i) => i !== index),
+    }));
+  }
+
   async function save() {
     setSaving(true);
-    const params = new URLSearchParams({ track_overtime: form.track_overtime, overtime_rate_multiplier: form.overtime_rate_multiplier || "1.5" });
+    const rulesPayload = form.rules
+      .filter(r => r.label.trim())
+      .map(r => ({ id: r.id, label: r.label.trim(), multiplier: parseFloat(r.multiplier) || 1.5 }));
+    const params = new URLSearchParams({
+      track_overtime: form.track_overtime,
+      overtime_rate_multiplier: rulesPayload[0]?.multiplier || "1.5",
+      overtime_rules: JSON.stringify(rulesPayload),
+    });
     const res = await apiFetch(`${API}/me/update-company?${params}`, { method: "PATCH", headers: h });
     setSaving(false);
     if (res.ok) { setMessage("Overtime settings saved."); setTimeout(() => setMessage(""), 3000); }
@@ -5131,19 +5252,143 @@ function OvertimeSettingsForm({ token }) {
     <>
       <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", marginBottom: form.track_overtime ? "16px" : "4px" }}>
         <input type="checkbox" checked={form.track_overtime} onChange={e => setForm({...form, track_overtime: e.target.checked})} style={{ width: "17px", height: "17px", accentColor: theme.accent, cursor: "pointer" }} />
-        <span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>Track overtime hours separately</span>
+        <span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>Track premium hours separately</span>
       </label>
       {form.track_overtime && (
         <>
-          <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "10px" }}>When this is on, crew can log overtime hours separately from regular hours when logging time. Overtime is costed at the multiplier below.</p>
-          <label style={styles.label}>Overtime Multiplier</label>
-          <input style={{ ...styles.input, maxWidth: "120px" }} type="number" step="0.1" min="1" value={form.overtime_rate_multiplier} onChange={e => setForm({...form, overtime_rate_multiplier: e.target.value})} />
-          <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>1.5 means overtime hours cost 1.5x the regular hourly rate. BC's standard rate is 1.5x.</p>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "12px" }}>When this is on, crew can log premium hours (overtime, double time, etc.) separately from regular hours. Each type is costed at its own rate multiplier.</p>
+          {form.rules.map((rule, i) => (
+            <div key={rule.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px auto", gap: "8px", marginBottom: "8px", alignItems: "end" }}>
+              <div>
+                {i === 0 && <label style={{...styles.label, marginTop: 0}}>Rate Name</label>}
+                <input style={styles.input} placeholder="e.g. Overtime" value={rule.label} onChange={e => updateRule(i, "label", e.target.value)} />
+              </div>
+              <div>
+                {i === 0 && <label style={{...styles.label, marginTop: 0}}>Multiplier</label>}
+                <input style={styles.input} type="number" step="0.1" min="1" value={rule.multiplier} onChange={e => updateRule(i, "multiplier", e.target.value)} />
+              </div>
+              {form.rules.length > 1 ? (
+                <button type="button" onClick={() => removeRule(i)} style={{ padding: "12px 10px", borderRadius: "8px", border: `1px solid ${theme.border}`, background: "white", color: theme.danger, cursor: "pointer", fontSize: "12px", fontWeight: "600", fontFamily: font.body }}>Remove</button>
+              ) : <div />}
+            </div>
+          ))}
+          <button type="button" onClick={addRule} style={{ fontSize: "12px", color: theme.accent, fontWeight: "700", background: "none", border: "none", cursor: "pointer", padding: "4px 0 12px", fontFamily: font.body }}>+ Add another rate (e.g. Double Time at 2.0x)</button>
+          <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "0", marginBottom: "4px" }}>1.5 means those hours cost 1.5× the regular hourly rate. BC standard overtime is 1.5×; double time is 2.0×.</p>
         </>
       )}
       {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "10px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
       <button onClick={save} disabled={saving} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
         {saving ? <><Spinner /> Saving...</> : "Save Overtime Settings"}
+      </button>
+    </>
+  );
+}
+
+function ExportReportForm({ token }) {
+  const [jobs, setJobs] = useState([]);
+  const [period, setPeriod] = useState("custom");
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split("T")[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [jobId, setJobId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const h = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setJobs(Array.isArray(data) ? data : [])).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  function applyPeriod(p) {
+    setPeriod(p);
+    const today = new Date();
+    const end = today.toISOString().split("T")[0];
+    if (p === "daily") {
+      setStartDate(end);
+      setEndDate(end);
+    } else if (p === "weekly") {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      setStartDate(start.toISOString().split("T")[0]);
+      setEndDate(end);
+    } else if (p === "monthly") {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStartDate(start.toISOString().split("T")[0]);
+      setEndDate(end);
+    }
+  }
+
+  async function downloadReport() {
+    if (!startDate || !endDate) { setMessage("Select a date range."); return; }
+    setLoading(true);
+    setMessage("");
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    if (jobId) params.append("job_id", jobId);
+    try {
+      const res = await apiFetch(`${API}/export/report?${params}`, { headers: h });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setMessage(err.detail || "Export failed.");
+        setLoading(false);
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vantage-report-${startDate}-to-${endDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setMessage("Report downloaded.");
+      setTimeout(() => setMessage(""), 3000);
+    } catch {
+      setMessage("Export failed. Please try again.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <>
+      <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "14px", lineHeight: 1.5 }}>
+        Download a CSV with timesheets, materials, mileage, inventory pulls, and change orders for any date range or specific {T.project.toLowerCase()}.
+      </p>
+      <label style={styles.label}>Quick Range</label>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px" }}>
+        {[
+          { id: "daily", label: "Today" },
+          { id: "weekly", label: "Last 7 days" },
+          { id: "monthly", label: "This month" },
+          { id: "custom", label: "Custom dates" },
+        ].map(opt => (
+          <button key={opt.id} type="button" onClick={() => applyPeriod(opt.id)} style={{ padding: "7px 12px", borderRadius: "8px", border: `1.5px solid ${period === opt.id ? theme.accent : theme.border}`, backgroundColor: period === opt.id ? theme.accentLight : "white", color: period === opt.id ? theme.accent : theme.textSecondary, fontSize: "12px", fontWeight: "600", cursor: "pointer", fontFamily: font.body }}>
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+        <div>
+          <label style={styles.label}>Start Date</label>
+          <input style={styles.input} type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPeriod("custom"); }} />
+        </div>
+        <div>
+          <label style={styles.label}>End Date</label>
+          <input style={styles.input} type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPeriod("custom"); }} />
+        </div>
+      </div>
+      <label style={styles.label}>{T.project} (optional)</label>
+      <select style={{ ...styles.input, marginBottom: "14px" }} value={jobId} onChange={e => setJobId(e.target.value)}>
+        <option value="">All {T.projects.toLowerCase()}</option>
+        {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+      </select>
+      {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginBottom: "10px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
+      <button onClick={downloadReport} disabled={loading} style={{ ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", maxWidth: "240px" }}>
+        {loading ? <><Spinner /> Exporting...</> : "Download CSV Report"}
       </button>
     </>
   );
@@ -5445,7 +5690,10 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   // Checklist persists in dashboard until explicitly dismissed (per browser)
   const [showChecklist, setShowChecklist] = useState(() => !localStorage.getItem("vl_checklist_done"));
-  function dismissChecklist() { localStorage.setItem("vl_checklist_done", "1"); setShowChecklist(false); }
+  const dismissChecklist = useCallback(() => {
+    localStorage.setItem("vl_checklist_done", "1");
+    setShowChecklist(false);
+  }, []);
   const [mobile, setMobile] = useState(isMobile());
 
   // Parse one-time auth URL params (?verify=... or ?reset=...) once on load
@@ -5619,11 +5867,11 @@ export default function App() {
           {(role === "owner" || role === "admin") && view === "dashboard" && (
             <>
               {showChecklist && (
-                <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "18px 18px 0" }}>
+                <div style={{ maxWidth: "1080px", margin: "0 auto", padding: mobile ? "58px 14px 0 18px" : "66px 24px 0 18px" }}>
                   <OnboardingChecklist token={token} onDismiss={dismissChecklist} onNavigate={(v) => { setView(v); }} />
                 </div>
               )}
-              <Dashboard token={token} readonly={subStatus === "expired"} />
+              <Dashboard token={token} readonly={subStatus === "expired"} topOffset={showChecklist ? 0 : (mobile ? 58 : 66)} />
             </>
           )}
           {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} readonly={subStatus === "expired"} />}
