@@ -1,7 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Body, status
 from pydantic import BaseModel
+from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import JSONResponse
 from sqlalchemy.orm import Session
 from database import get_db, engine
 from datetime import datetime, timedelta
@@ -135,6 +138,60 @@ app.add_middleware(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def _cors_headers(request: Request) -> dict:
+    origin = request.headers.get("origin")
+    if origin in CORS_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
+    return {}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_with_cors(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+        headers=_cors_headers(request),
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_with_cors(request: Request, exc: StarletteHTTPException):
+    headers = {**(exc.headers or {}), **_cors_headers(request)}
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_with_cors(request: Request, exc: Exception):
+    print(f"Unhandled error: {exc}")
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=_cors_headers(request),
+    )
+
+
+def _attr(obj, name, default=None):
+    return getattr(obj, name, default) if obj is not None else default
+
+
+def _company_track_overtime(company) -> bool:
+    return bool(_attr(company, "track_overtime", False))
+
+
+def _company_ot_multiplier(company) -> float:
+    val = _attr(company, "overtime_rate_multiplier", None)
+    return float(val) if val else 1.5
+
+
+def _timesheet_ot_hours(ts) -> float:
+    return float(_attr(ts, "overtime_hours", 0) or 0)
 
 
 def send_welcome_email(to_email: str, company_name: str):
@@ -566,8 +623,8 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     "employee_id": current_user.employee_id,
     "first_name": current_user.first_name,
     "last_name": current_user.last_name,
-    "track_overtime": bool(company.track_overtime) if company else False,
-    "overtime_rate_multiplier": float(company.overtime_rate_multiplier) if company and company.overtime_rate_multiplier else 1.5,
+    "track_overtime": _company_track_overtime(company),
+    "overtime_rate_multiplier": _company_ot_multiplier(company),
 }
 
 @app.get("/users")
@@ -961,7 +1018,7 @@ def get_job_timesheets(
             "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
             "shift_date": str(t.shift_date),
             "hours_worked": float(t.hours_worked),
-            "overtime_hours": float(t.overtime_hours or 0),
+            "overtime_hours": _timesheet_ot_hours(t),
             "field_notes": t.field_notes,
         })
     return result
@@ -1666,8 +1723,10 @@ def update_company(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     if company_name is not None: company.company_name = company_name
-    if track_overtime is not None: company.track_overtime = track_overtime
-    if overtime_rate_multiplier is not None: company.overtime_rate_multiplier = overtime_rate_multiplier
+    if track_overtime is not None and hasattr(company, "track_overtime"):
+        company.track_overtime = track_overtime
+    if overtime_rate_multiplier is not None and hasattr(company, "overtime_rate_multiplier"):
+        company.overtime_rate_multiplier = overtime_rate_multiplier
     db.commit()
     return {"message": "Company updated"}
 
@@ -1708,7 +1767,8 @@ def update_timesheet(
     if cost_code_id is not None: ts.cost_code_id = cost_code_id
     if shift_date is not None: ts.shift_date = shift_date
     if hours_worked is not None: ts.hours_worked = hours_worked
-    if overtime_hours is not None: ts.overtime_hours = overtime_hours
+    if overtime_hours is not None and hasattr(ts, "overtime_hours"):
+        ts.overtime_hours = overtime_hours
     if field_notes is not None: ts.field_notes = field_notes
     db.commit()
     db.refresh(ts)
@@ -1972,7 +2032,7 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
     ).all()
 
     company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
-    ot_multiplier = float(company.overtime_rate_multiplier) if company and company.overtime_rate_multiplier else 1.5
+    ot_multiplier = _company_ot_multiplier(company)
 
     result = []
     for job in jobs:
@@ -1984,7 +2044,7 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
         ).all()
 
         total_hours = sum(float(t.hours_worked or 0) for t in timesheets)
-        total_overtime = sum(float(t.overtime_hours or 0) for t in timesheets)
+        total_overtime = sum(_timesheet_ot_hours(t) for t in timesheets)
         total_materials_cost = sum(float(m.total_cost or 0) for m in materials)
 
         labour_cost = 0
@@ -2002,7 +2062,7 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
                 else:
                     rate = 0
                 labour_cost += float(t.hours_worked or 0) * rate
-                labour_cost += float(t.overtime_hours or 0) * rate * ot_multiplier
+                labour_cost += _timesheet_ot_hours(t) * rate * ot_multiplier
 
         total_cost = labour_cost + total_materials_cost
         contract_value = float(job.contract_value or 0)
@@ -2044,18 +2104,20 @@ def create_schedule(
     current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
 ):
-    schedule = models.Schedule(
+    schedule_kwargs = dict(
         company_id=current_user.company_id,
         employee_id=employee_id,
         job_id=job_id,
         scheduled_date=scheduled_date,
         scheduled_hours=scheduled_hours,
         cost_code_id=cost_code_id,
-        start_time=start_time or None,
-        end_time=end_time or None,
         notes=notes,
-        color=color
+        color=color,
     )
+    if hasattr(models.Schedule, "start_time"):
+        schedule_kwargs["start_time"] = start_time or None
+        schedule_kwargs["end_time"] = end_time or None
+    schedule = models.Schedule(**schedule_kwargs)
     db.add(schedule)
     db.commit()
     db.refresh(schedule)
@@ -2087,8 +2149,8 @@ def get_schedules(
             "job_name": job.job_name if job else "Unknown",
             "scheduled_date": str(s.scheduled_date),
             "scheduled_hours": float(s.scheduled_hours) if s.scheduled_hours else None,
-            "start_time": s.start_time,
-            "end_time": s.end_time,
+            "start_time": _attr(s, "start_time"),
+            "end_time": _attr(s, "end_time"),
             "notes": s.notes,
             "color": s.color
         })
@@ -2132,8 +2194,10 @@ def update_schedule(
     if job_id is not None: s.job_id = job_id
     if cost_code_id is not None: s.cost_code_id = cost_code_id
     if scheduled_hours is not None: s.scheduled_hours = scheduled_hours
-    s.start_time = start_time or None
-    s.end_time = end_time or None
+    if hasattr(s, "start_time"):
+        s.start_time = start_time or None
+    if hasattr(s, "end_time"):
+        s.end_time = end_time or None
     s.notes = notes or None
     s.color = color or None
     db.commit()
@@ -2163,12 +2227,15 @@ def create_shift_template(
     current_user: models.User = Depends(require_owner),
     db: Session = Depends(get_db)
 ):
-    tpl = models.ShiftTemplate(
+    tpl_kwargs = dict(
         company_id=current_user.company_id,
         name=name, job_id=job_id, cost_code_id=cost_code_id,
-        hours=hours, start_time=start_time or None, end_time=end_time or None,
-        color=color, notes=notes
+        hours=hours, color=color, notes=notes,
     )
+    if hasattr(models.ShiftTemplate, "start_time"):
+        tpl_kwargs["start_time"] = start_time or None
+        tpl_kwargs["end_time"] = end_time or None
+    tpl = models.ShiftTemplate(**tpl_kwargs)
     db.add(tpl)
     db.commit()
     db.refresh(tpl)
@@ -2201,8 +2268,10 @@ def update_shift_template(
     if hours is not None: tpl.hours = hours
     if color is not None: tpl.color = color
     if notes is not None: tpl.notes = notes
-    if start_time is not None: tpl.start_time = start_time
-    if end_time is not None: tpl.end_time = end_time
+    if start_time is not None and hasattr(tpl, "start_time"):
+        tpl.start_time = start_time
+    if end_time is not None and hasattr(tpl, "end_time"):
+        tpl.end_time = end_time
     db.commit()
     db.refresh(tpl)
     return tpl
