@@ -2031,9 +2031,6 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
         models.Job.company_id == current_user.company_id
     ).all()
 
-    company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
-    ot_multiplier = _company_ot_multiplier(company)
-
     result = []
     for job in jobs:
         timesheets = db.query(models.Timesheet).filter(
@@ -2044,7 +2041,6 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
         ).all()
 
         total_hours = sum(float(t.hours_worked or 0) for t in timesheets)
-        total_overtime = sum(_timesheet_ot_hours(t) for t in timesheets)
         total_materials_cost = sum(float(m.total_cost or 0) for m in materials)
 
         labour_cost = 0
@@ -2062,7 +2058,6 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
                 else:
                     rate = 0
                 labour_cost += float(t.hours_worked or 0) * rate
-                labour_cost += _timesheet_ot_hours(t) * rate * ot_multiplier
 
         total_cost = labour_cost + total_materials_cost
         contract_value = float(job.contract_value or 0)
@@ -2076,7 +2071,6 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
             "contract_value": contract_value,
             "budgeted_hours": float(job.budgeted_hours or 0),
             "total_hours": total_hours,
-            "total_overtime": total_overtime,
             "labour_cost": round(labour_cost, 2),
             "materials_cost": round(total_materials_cost, 2),
             "total_cost": round(total_cost, 2),
