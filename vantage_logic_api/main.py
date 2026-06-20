@@ -84,6 +84,27 @@ with engine.connect() as _conn:
         _conn.commit()
     except Exception:
         pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS track_overtime BOOLEAN DEFAULT FALSE"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS overtime_rate_multiplier NUMERIC(4,2) DEFAULT 1.5"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS overtime_hours NUMERIC DEFAULT 0"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
 
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
@@ -534,7 +555,8 @@ def create_user(
     return {"user_id": user.user_id, "email": user.email, "role": user.role}
 
 @app.get("/me")
-def get_me(current_user: models.User = Depends(get_current_user)):
+def get_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
     return {
     "user_id": current_user.user_id,
     "email": current_user.email,
@@ -543,6 +565,8 @@ def get_me(current_user: models.User = Depends(get_current_user)):
     "employee_id": current_user.employee_id,
     "first_name": current_user.first_name,
     "last_name": current_user.last_name,
+    "track_overtime": bool(company.track_overtime) if company else False,
+    "overtime_rate_multiplier": float(company.overtime_rate_multiplier) if company and company.overtime_rate_multiplier else 1.5,
 }
 
 @app.get("/users")
@@ -1698,7 +1722,9 @@ def update_me(
 
 @app.patch("/me/update-company")
 def update_company(
-    company_name: str,
+    company_name: str = None,
+    track_overtime: bool = None,
+    overtime_rate_multiplier: float = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1709,7 +1735,9 @@ def update_company(
     ).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    company.company_name = company_name
+    if company_name is not None: company.company_name = company_name
+    if track_overtime is not None: company.track_overtime = track_overtime
+    if overtime_rate_multiplier is not None: company.overtime_rate_multiplier = overtime_rate_multiplier
     db.commit()
     return {"message": "Company updated"}
 
@@ -1735,6 +1763,7 @@ def update_timesheet(
     cost_code_id: int = None,
     shift_date: str = None,
     hours_worked: float = None,
+    overtime_hours: float = None,
     field_notes: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1749,6 +1778,7 @@ def update_timesheet(
     if cost_code_id is not None: ts.cost_code_id = cost_code_id
     if shift_date is not None: ts.shift_date = shift_date
     if hours_worked is not None: ts.hours_worked = hours_worked
+    if overtime_hours is not None: ts.overtime_hours = overtime_hours
     if field_notes is not None: ts.field_notes = field_notes
     db.commit()
     db.refresh(ts)
@@ -2011,6 +2041,9 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
         models.Job.company_id == current_user.company_id
     ).all()
 
+    company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
+    ot_multiplier = float(company.overtime_rate_multiplier) if company and company.overtime_rate_multiplier else 1.5
+
     result = []
     for job in jobs:
         timesheets = db.query(models.Timesheet).filter(
@@ -2031,11 +2064,15 @@ def get_dashboard(current_user: models.User = Depends(get_current_user), db: Ses
             ).first()
             if emp:
                 if emp.worker_type == "contractor" and emp.hourly_rate:
-                    labour_cost += float(t.hours_worked or 0) * float(emp.hourly_rate)
+                    rate = float(emp.hourly_rate)
                 elif emp.burden_rate:
-                    labour_cost += float(t.hours_worked or 0) * float(emp.burden_rate)
+                    rate = float(emp.burden_rate)
                 elif emp.hourly_rate:
-                    labour_cost += float(t.hours_worked or 0) * float(emp.hourly_rate)
+                    rate = float(emp.hourly_rate)
+                else:
+                    rate = 0
+                labour_cost += float(t.hours_worked or 0) * rate
+                labour_cost += float(t.overtime_hours or 0) * rate * ot_multiplier
 
         total_cost = labour_cost + total_materials_cost
         contract_value = float(job.contract_value or 0)
@@ -2234,8 +2271,8 @@ def update_shift_template(
     if hours is not None: tpl.hours = hours
     if color is not None: tpl.color = color
     if notes is not None: tpl.notes = notes
-    if start_time is not None: tpl.start_time = start_time or None
-    if end_time is not None: tpl.end_time = end_time or None
+    if start_time is not None: tpl.start_time = start_time
+    if end_time is not None: tpl.end_time = end_time
     db.commit()
     db.refresh(tpl)
     return tpl

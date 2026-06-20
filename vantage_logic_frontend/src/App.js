@@ -1407,7 +1407,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
 
 
 // ─── ENTRY HISTORY ────────────────────────────────────────────
-function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCodes, onEditSaved }) {
+function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCodes, onEditSaved, trackOvertime = false }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -1443,7 +1443,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
   function startEdit(entry) {
     const id = entry.timesheet_id || entry.material_id || entry.mileage_id;
     setEditingId(id);
-    if (type === "timesheet") setEditForm({ job_id: entry.job_id, cost_code_id: entry.cost_code_id, shift_date: entry.shift_date, hours_worked: entry.hours_worked, field_notes: entry.field_notes || "" });
+    if (type === "timesheet") setEditForm({ job_id: entry.job_id, cost_code_id: entry.cost_code_id, shift_date: entry.shift_date, hours_worked: entry.hours_worked, overtime_hours: entry.overtime_hours || 0, field_notes: entry.field_notes || "" });
     else if (type === "material") setEditForm({ job_id: entry.job_id, description: entry.description, supplier: entry.supplier || "", total_cost: entry.total_cost, purchase_date: entry.purchase_date, notes: entry.notes || "" });
     else setEditForm({ job_id: entry.job_id, trip_date: entry.trip_date, km_driven: entry.km_driven, purpose: entry.purpose || "", notes: entry.notes || "" });
   }
@@ -1522,6 +1522,9 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
                       <div><label style={styles.label}>Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.hours_worked} onChange={e => setEditForm({...editForm, hours_worked: e.target.value})} /></div>
                       <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.shift_date} onChange={e => setEditForm({...editForm, shift_date: e.target.value})} /></div>
                       <div><label style={styles.label}>Cost Code</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>{costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code}</option>)}</select></div>
+                      {trackOvertime && (
+                        <div><label style={styles.label}>Overtime Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.overtime_hours} onChange={e => setEditForm({...editForm, overtime_hours: e.target.value})} /></div>
+                      )}
                     </div>
                   )}
                   {type === "material" && (
@@ -1565,7 +1568,9 @@ function LogBackButton({ setView }) {
 }
 
 function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
-  const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", field_notes: "" });
+  const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" });
+  const [addOvertime, setAddOvertime] = useState(false);
+  const [trackOvertime, setTrackOvertime] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -1587,6 +1592,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
       apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()),
       apiFetch(`${API}/my-schedule-to-log`, { headers: h }).then(r => r.json()).catch(() => []),
     ]).then(([me, emps, jobs, ccs, schedToLog]) => {
+      setTrackOvertime(!!me.track_overtime);
       if (me.employee_id) {
         setLinkedEmployeeId(me.employee_id);
         setFormData(prev => ({ ...prev, employee_id: me.employee_id }));
@@ -1648,6 +1654,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
     if (!formData.hours_worked) e.hours_worked = "Hours are required";
     else if (parseFloat(formData.hours_worked) <= 0) e.hours_worked = "Must be greater than 0";
     else if (parseFloat(formData.hours_worked) > 24) e.hours_worked = "Hours can't exceed 24";
+    if (addOvertime && (!formData.overtime_hours || parseFloat(formData.overtime_hours) <= 0)) e.overtime_hours = "Enter overtime hours, or uncheck the box";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -1671,7 +1678,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
           </div>
           <h2 style={{ fontSize: "24px", fontWeight: "700", color: theme.primary, fontFamily: font.display, margin: "0 0 8px", letterSpacing: "-0.3px" }}>Hours logged</h2>
           <p style={{ color: theme.textSecondary, fontSize: "14px", margin: "0 0 32px" }}>Entry saved successfully.</p>
-          <button style={styles.button} onClick={() => { setSubmitted(false); setFormData({ employee_id: linkedEmployeeId || "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", field_notes: "" }); }}>Log Another</button>
+          <button style={styles.button} onClick={() => { setSubmitted(false); setAddOvertime(false); setFormData({ employee_id: linkedEmployeeId || "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" }); }}>Log Another</button>
         </div>
       </div>
     );
@@ -1758,9 +1765,25 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
           <input style={errors.shift_date ? styles.inputError : styles.input} name="shift_date" type="date" value={formData.shift_date} onChange={handleChange} />
           {errors.shift_date && <p style={styles.errorMsg}>{errors.shift_date}</p>}
 
-          <label style={styles.label}>Hours Worked</label>
+          <label style={styles.label}>{trackOvertime ? "Regular Hours" : "Hours Worked"}</label>
           <input style={errors.hours_worked ? styles.inputError : styles.input} name="hours_worked" type="number" step="0.5" placeholder="e.g. 8.5" value={formData.hours_worked} onChange={handleChange} />
           {errors.hours_worked && <p style={styles.errorMsg}>{errors.hours_worked}</p>}
+
+          {trackOvertime && (
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px", color: theme.textSecondary, fontWeight: "600", marginTop: "4px" }}>
+                <input type="checkbox" checked={addOvertime} onChange={e => { setAddOvertime(e.target.checked); if (!e.target.checked) setFormData(f => ({...f, overtime_hours: "0"})); }} style={{ width: "16px", height: "16px", accentColor: theme.accent, cursor: "pointer" }} />
+                Add overtime hours
+              </label>
+              {addOvertime && (
+                <>
+                  <label style={{...styles.label, marginTop: "10px"}}>Overtime Hours</label>
+                  <input style={errors.overtime_hours ? styles.inputError : styles.input} name="overtime_hours" type="number" step="0.5" placeholder="e.g. 2" value={formData.overtime_hours} onChange={handleChange} />
+                  {errors.overtime_hours && <p style={styles.errorMsg}>{errors.overtime_hours}</p>}
+                </>
+              )}
+            </div>
+          )}
 
           <label style={styles.label}>Field Notes</label>
           <textarea style={styles.textarea} name="field_notes" placeholder="What did you work on today? (optional)" value={formData.field_notes} onChange={handleChange} />
@@ -1772,7 +1795,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
           </button>
         </form>
       </div>
-      <EntryHistory token={token} type="timesheet" linkedEmployeeId={linkedEmployeeId} jobs={jobs} employees={employees} costCodes={costCodes} />
+      <EntryHistory token={token} type="timesheet" linkedEmployeeId={linkedEmployeeId} jobs={jobs} employees={employees} costCodes={costCodes} trackOvertime={trackOvertime} />
     </div>
   );
 }
@@ -4418,6 +4441,16 @@ function AdminScreen({ token, readonly = false, subTier = null, crewCount = null
           >
             <ProfileSettingsForm token={token} showCompany={true} />
           </SetupSection>
+
+          {/* ── OVERTIME ── */}
+          <SetupSection
+            number="⏱"
+            title="Overtime"
+            subtitle="Decide whether your crew can log overtime hours separately, and at what rate it's costed."
+            complete={true}
+          >
+            <OvertimeSettingsForm token={token} />
+          </SetupSection>
         </>
       )}
     </div>
@@ -4457,7 +4490,10 @@ function EmpTimesheetGroup({ empName, empData, token, onDelete }) {
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked} h</div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{t.hours_worked} h</div>
+                  {Number(t.overtime_hours) > 0 && <div style={{ fontSize: "10px", fontWeight: "700", color: theme.gold }}>+{t.overtime_hours} OT</div>}
+                </div>
                 {token && onDelete && (
                   <button onClick={async (e) => {
                     e.stopPropagation();
@@ -5117,6 +5153,53 @@ function LogHub({ setView }) {
   );
 }
 
+function OvertimeSettingsForm({ token }) {
+  const [form, setForm] = useState({ track_overtime: false, overtime_rate_multiplier: "1.5" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const h = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    apiFetch(`${API}/me`, { headers: h }).then(r => r.json()).then(me => {
+      setForm({ track_overtime: !!me.track_overtime, overtime_rate_multiplier: String(me.overtime_rate_multiplier || 1.5) });
+      setLoading(false);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  async function save() {
+    setSaving(true);
+    const params = new URLSearchParams({ track_overtime: form.track_overtime, overtime_rate_multiplier: form.overtime_rate_multiplier || "1.5" });
+    const res = await apiFetch(`${API}/me/update-company?${params}`, { method: "PATCH", headers: h });
+    setSaving(false);
+    if (res.ok) { setMessage("Overtime settings saved."); setTimeout(() => setMessage(""), 3000); }
+    else setMessage("Could not save. Please try again.");
+  }
+
+  if (loading) return <Skeleton width="100%" height="100px" radius="12px" />;
+
+  return (
+    <>
+      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", marginBottom: form.track_overtime ? "16px" : "4px" }}>
+        <input type="checkbox" checked={form.track_overtime} onChange={e => setForm({...form, track_overtime: e.target.checked})} style={{ width: "17px", height: "17px", accentColor: theme.accent, cursor: "pointer" }} />
+        <span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>Track overtime hours separately</span>
+      </label>
+      {form.track_overtime && (
+        <>
+          <p style={{ fontSize: "12px", color: theme.textSecondary, marginBottom: "10px" }}>When this is on, crew can log overtime hours separately from regular hours when logging time. Overtime is costed at the multiplier below.</p>
+          <label style={styles.label}>Overtime Multiplier</label>
+          <input style={{ ...styles.input, maxWidth: "120px" }} type="number" step="0.1" min="1" value={form.overtime_rate_multiplier} onChange={e => setForm({...form, overtime_rate_multiplier: e.target.value})} />
+          <p style={{ fontSize: "11px", color: theme.textLight, marginTop: "4px" }}>1.5 means overtime hours cost 1.5x the regular hourly rate. BC's standard rate is 1.5x.</p>
+        </>
+      )}
+      {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "10px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
+      <button onClick={save} disabled={saving} style={{ ...styles.button, marginTop: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+        {saving ? <><Spinner /> Saving...</> : "Save Overtime Settings"}
+      </button>
+    </>
+  );
+}
 
 function ProfileSettingsForm({ token, role, showCompany = false }) {
   const [form, setForm] = useState({ first_name: "", last_name: "", email: "", company_name: "" });
