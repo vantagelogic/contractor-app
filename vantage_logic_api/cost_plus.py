@@ -117,6 +117,33 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "total_with_tax": round(subtotal + tax_amount, 2),
         }
 
+    def _pdf_company_lines(company) -> list[str]:
+        lines = []
+        addr = getattr(company, "company_address", None)
+        if addr:
+            lines.append(addr.replace("\n", "<br/>"))
+        phone = getattr(company, "company_phone", None)
+        email = getattr(company, "company_email", None)
+        if phone:
+            lines.append(f"Phone: {phone}")
+        if email:
+            lines.append(f"Email: {email}")
+        tax_num = getattr(company, "tax_number", None)
+        if tax_num:
+            lines.append(f"Tax / Business #: {tax_num}")
+        return lines
+
+    def _pdf_add_header(story, styles, company, title: str, meta_lines: list[str]):
+        from reportlab.platypus import Paragraph, Spacer
+        story.append(Paragraph(f"<b>{company.company_name}</b>", styles["Title"]))
+        for line in _pdf_company_lines(company):
+            story.append(Paragraph(line, styles["Normal"]))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"<b>{title}</b>", styles["Heading2"]))
+        for line in meta_lines:
+            story.append(Paragraph(line, styles["Normal"]))
+        story.append(Spacer(1, 14))
+
     def _recalc_estimate_totals(db: Session, estimate: models.Estimate, company_id: int | None = None):
         company = None
         if company_id:
@@ -300,15 +327,14 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         doc = SimpleDocTemplate(path, pagesize=letter, topMargin=0.75 * inch)
         story = []
 
-        story.append(Paragraph(f"<b>{company.company_name}</b>", styles["Title"]))
-        story.append(Paragraph(f"Cost-Plus Invoice {invoice.invoice_number}", styles["Heading2"]))
-        story.append(Spacer(1, 12))
-        story.append(Paragraph(f"Project: <b>{job.job_name}</b>", styles["Normal"]))
-        if job.city:
-            story.append(Paragraph(f"Location: {job.city}", styles["Normal"]))
         created = invoice.created_at.strftime("%Y-%m-%d") if invoice.created_at else ""
-        story.append(Paragraph(f"Date: {created}", styles["Normal"]))
-        story.append(Spacer(1, 20))
+        meta = [f"Invoice #: <b>{invoice.invoice_number}</b>", f"Date: {created}"]
+        meta.append(f"Project: <b>{job.job_name}</b>")
+        if job.city:
+            meta.append(f"Location: {job.city}")
+        if job.street:
+            meta.append(f"Site: {job.street}")
+        _pdf_add_header(story, styles, company, "Cost-Plus Invoice", meta)
 
         markup_pct = float(invoice.markup_percent or 0)
         table_data = [["Description", "Cost", f"+{markup_pct}% Markup", "Amount"]]
@@ -366,22 +392,26 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         doc = SimpleDocTemplate(path, pagesize=letter, topMargin=0.75 * inch)
         story = []
 
-        story.append(Paragraph(f"<b>{company.company_name}</b>", styles["Title"]))
-        story.append(Paragraph(f"Project Estimate", styles["Heading2"]))
-        story.append(Spacer(1, 12))
-        story.append(Paragraph(f"Project: <b>{job.job_name}</b>", styles["Normal"]))
-        if job.city:
-            story.append(Paragraph(f"Location: {job.city}", styles["Normal"]))
         created = estimate.created_at.strftime("%Y-%m-%d") if estimate.created_at else ""
-        story.append(Paragraph(f"Date: {created}", styles["Normal"]))
-        story.append(Spacer(1, 8))
+        meta = [f"Estimate #: <b>EST-{estimate.estimate_id:04d}</b>", f"Date: {created}"]
+        meta.append(f"Project: <b>{job.job_name}</b>")
+        if job.city:
+            meta.append(f"Location: {job.city}")
+        if job.street:
+            meta.append(f"Site: {job.street}")
+        if estimate.customer_email:
+            meta.append(f"Prepared for: {estimate.customer_email}")
+        _pdf_add_header(story, styles, company, "Project Estimate", meta)
         story.append(Paragraph(
             "<i>This is a proposal for customer review. Work begins after written approval.</i>",
             styles["Normal"],
         ))
-        story.append(Spacer(1, 16))
+        if estimate.notes:
+            story.append(Spacer(1, 6))
+            story.append(Paragraph(f"<b>Notes:</b> {estimate.notes}", styles["Normal"]))
+        story.append(Spacer(1, 12))
 
-        table_data = [["Work category", "Hours", "Materials", "Subtotal"]]
+        table_data = [["Work type", "Hours", "Labor", "Materials", "Subtotal"]]
         for ln in lines:
             hrs = float(ln.estimated_hours or 0) * float(ln.quantity or 1)
             mat = float(ln.material_cost or 0) * float(ln.quantity or 1)
@@ -390,6 +420,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             table_data.append([
                 ln.description,
                 f"{hrs:,.1f}",
+                f"${lab:,.2f}",
                 f"${mat:,.2f}",
                 f"${row_total:,.2f}",
             ])
@@ -398,20 +429,20 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         if km > 0:
             rate = float(getattr(company, "mileage_rate_per_km", None) or MILEAGE_RATE_DEFAULT)
             mi_cost = round(km * rate, 2)
-            table_data.append(["Mileage / travel", "—", f"{km:,.0f} km", f"${mi_cost:,.2f}"])
+            table_data.append(["Mileage / travel", "—", "—", f"{km:,.0f} km", f"${mi_cost:,.2f}"])
 
         subtotal = float(estimate.total_cost or 0)
         tax_info = _estimate_tax(company, subtotal)
-        table_data.append(["", "", "Subtotal", f"${subtotal:,.2f}"])
+        table_data.append(["", "", "", "Subtotal", f"${subtotal:,.2f}"])
         if tax_info["tax_rate_percent"] > 0:
             table_data.append([
-                "", "",
+                "", "", "",
                 f"{tax_info['tax_label']} ({tax_info['tax_rate_percent']:g}%)",
                 f"${tax_info['tax_amount']:,.2f}",
             ])
-        table_data.append(["", "", "TOTAL", f"${tax_info['total_with_tax']:,.2f}"])
+        table_data.append(["", "", "", "TOTAL", f"${tax_info['total_with_tax']:,.2f}"])
 
-        t = Table(table_data, colWidths=[3.0 * inch, 0.9 * inch, 1.2 * inch, 1.2 * inch])
+        t = Table(table_data, colWidths=[2.2 * inch, 0.7 * inch, 0.85 * inch, 0.95 * inch, 0.95 * inch])
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a3d2b")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -424,7 +455,13 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         story.append(t)
         story.append(Spacer(1, 24))
         story.append(Paragraph(f"<b>Estimated hours:</b> {float(estimate.total_hours or 0):,.1f}", styles["Normal"]))
-        story.append(Spacer(1, 32))
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(
+            "<i>Payment terms and schedule to be confirmed upon approval. "
+            "This estimate is valid for 30 days from the date above.</i>",
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 24))
         story.append(Paragraph("Customer approval: _________________________  Date: __________", styles["Normal"]))
 
         doc.build(story)
@@ -905,30 +942,13 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
             estimate.customer_email = body.customer_email.strip()
         db.commit()
 
-        email_sent = False
-        if body.customer_email and os.environ.get("RESEND_API_KEY"):
-            try:
-                import resend
-                import base64
-                with open(path, "rb") as f:
-                    pdf_b64 = base64.b64encode(f.read()).decode()
-                resend.Emails.send({
-                    "from": os.environ.get("RESEND_FROM", "Vantage Logic <onboarding@resend.dev>"),
-                    "to": body.customer_email.strip(),
-                    "subject": f"Estimate — {job.job_name if job else 'Your project'}",
-                    "html": f"<p>Please find your project estimate attached for <strong>{job.job_name if job else 'review'}</strong>.</p><p>Reply to confirm approval before work begins.</p>",
-                    "attachments": [{"filename": f"estimate_{estimate_id}.pdf", "content": pdf_b64}],
-                })
-                email_sent = True
-            except Exception as e:
-                print(f"Estimate email error: {e}")
-
         return {
-            "message": "Customer estimate generated",
+            "message": "Estimate marked as shared with customer",
             "status": "sent",
             "estimate_id": estimate_id,
             "pdf_url": f"/estimates/{estimate_id}/pdf",
-            "email_sent": email_sent,
+            "email_sent": False,
+            "email_status": "manual",
             "customer_email": estimate.customer_email,
         }
 

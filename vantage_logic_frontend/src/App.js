@@ -84,11 +84,27 @@ const T = {
   project: "Project",
   projects: "Projects",
   selectProject: "Select project",
-  workCategory: "Work Category",
-  workCategories: "Work Categories",
-  selectWorkCategory: "Select work category",
-  workCategoryHint: "The type of work being done — e.g. Framing, Electrical, Labour",
+  workCategory: "Work type",
+  workCategories: "Work types",
+  selectWorkCategory: "Select work type",
+  workCategoryHint: "Labels for where time and money go on a job — e.g. Framing, Electrical, Demo. Crew pick one when logging hours; estimates and invoices use the same list.",
 };
+
+function workTypeLabel(cc) {
+  return (cc?.description || cc?.code || "").trim();
+}
+
+function workTypeToCode(name) {
+  const cleaned = name.trim();
+  if (!cleaned) return "";
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    const initials = words.map(w => w[0]).join("").toUpperCase();
+    return initials.slice(0, 6) || cleaned.slice(0, 4).toUpperCase();
+  }
+  const slug = cleaned.replace(/[^a-zA-Z0-9]/g, "");
+  return (slug.slice(0, 6) || cleaned.slice(0, 4)).toUpperCase();
+}
 
 function calcHours(start, end) {
   if (!start || !end) return null;
@@ -633,7 +649,7 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
       desc: `Add a ${T.project.toLowerCase()} with a budget and contract value`,
       done: hasJob,
       view: "settings",
-      settingsTab: "company",
+      settingsTab: "projects",
       color: "#2d6a4f",
     },
     {
@@ -1296,13 +1312,13 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.workCategory}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedCCLabel || voiceResult.cost_code || "?"}</span></div>
                     {voiceResult.cost_code_confidence === "low" && (
                       <div style={{ marginTop: "4px" }}>
-                        <label style={{ fontSize: "11px", color: theme.warning, fontWeight: "600", display: "block", marginBottom: "4px" }}>Cost code unclear — pick one:</label>
+                        <label style={{ fontSize: "11px", color: theme.warning, fontWeight: "600", display: "block", marginBottom: "4px" }}>Work type unclear — pick one:</label>
                         <select style={{ ...styles.input, marginTop: 0, fontSize: "13px" }} value={voiceResult._matchedCCId || ""} onChange={e => {
                           const cc = costCodes.find(c => String(c.cost_code_id) === e.target.value);
-                          setVoiceResult(prev => ({ ...prev, _matchedCCId: e.target.value, _matchedCCLabel: cc ? `${cc.code} ${cc.description}` : "" }));
+                          setVoiceResult(prev => ({ ...prev, _matchedCCId: e.target.value, _matchedCCLabel: cc ? workTypeLabel(cc) : "" }));
                         }}>
-                          <option value="">Select work category</option>
-                          {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                          <option value="">{T.selectWorkCategory}</option>
+                          {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
                         </select>
                       </div>
                     )}
@@ -1396,7 +1412,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
                             _matchedJobId: matchedJob ? String(matchedJob.job_id) : "",
                             _matchedJobName: matchedJob ? matchedJob.job_name : (data.job_name || ""),
                             _matchedCCId: matchedCC ? String(matchedCC.cost_code_id) : "",
-                            _matchedCCLabel: matchedCC ? `${matchedCC.code} ${matchedCC.description}` : (data.cost_code || ""),
+                            _matchedCCLabel: matchedCC ? workTypeLabel(matchedCC) : (data.cost_code || ""),
                           });
                         } else {
                           setVoiceError(data.message || "Could not parse. Try again.");
@@ -1683,7 +1699,7 @@ function EntryHistory({ token, type, linkedEmployeeId, jobs, employees, costCode
                       <div><label style={styles.label}>{T.project}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.job_id} onChange={e => setEditForm({...editForm, job_id: e.target.value})}>{jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}</select></div>
                       <div><label style={styles.label}>Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.hours_worked} onChange={e => setEditForm({...editForm, hours_worked: e.target.value})} /></div>
                       <div><label style={styles.label}>Date</label><input style={{...styles.input, marginTop: "4px"}} type="date" value={editForm.shift_date} onChange={e => setEditForm({...editForm, shift_date: e.target.value})} /></div>
-                      <div><label style={styles.label}>{T.workCategory}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>{costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code}</option>)}</select></div>
+                      <div><label style={styles.label}>{T.workCategory}</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>{costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}</select></div>
                       {trackOvertime && (
                         <div><label style={styles.label}>Overtime Hours</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.5" value={editForm.overtime_hours} onChange={e => setEditForm({...editForm, overtime_hours: e.target.value})} /></div>
                       )}
@@ -1933,8 +1949,8 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 
           <label style={styles.label}>{T.workCategory}</label>
           <select style={errors.cost_code_id ? styles.inputError : styles.input} name="cost_code_id" value={formData.cost_code_id} onChange={handleChange}>
-            <option value="">Select work category</option>
-            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+            <option value="">{T.selectWorkCategory}</option>
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
 
@@ -2817,7 +2833,7 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
           <label style={styles.label}>{T.workCategory} (optional)</label>
           <select style={styles.input} value={assignForm.cost_code_id} onChange={e => setAssignForm({...assignForm, cost_code_id: e.target.value})}>
             <option value="">{T.selectWorkCategory}</option>
-            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
           </select>
           <label style={styles.label}>Quantity</label>
           <input style={assignErrors.quantity ? styles.inputError : styles.input} type="number" step="0.01" placeholder="0" value={assignForm.quantity} onChange={e => { setAssignForm({...assignForm, quantity: e.target.value}); setAssignErrors({...assignErrors, quantity: ""}); }} />
@@ -3626,7 +3642,7 @@ function ScheduleScreen({ token, readonly = false }) {
     const e = {};
     if (!form.employee_id) e.employee_id = "Select an employee";
     if (!form.job_id) e.job_id = "Select a job";
-    if (!form.cost_code_id) e.cost_code_id = "Select a cost code";
+    if (!form.cost_code_id) e.cost_code_id = `Select a ${T.workCategory.toLowerCase()}`;
     if (!form.scheduled_date) e.scheduled_date = "Date is required";
     if (!form.scheduled_hours || parseFloat(form.scheduled_hours) <= 0) e.scheduled_hours = "Enter hours";
     setErrors(e);
@@ -3694,7 +3710,7 @@ function ScheduleScreen({ token, readonly = false }) {
     const h = { Authorization: `Bearer ${token}` };
     if (dragItem.type === "template") {
       const tpl = dragItem.data;
-      if (!tpl.job_id || !tpl.cost_code_id) { showMsg("Template is missing job or cost code."); return; }
+      if (!tpl.job_id || !tpl.cost_code_id) { showMsg("Template is missing project or work type."); return; }
       const params = new URLSearchParams({ employee_id: employeeId, job_id: tpl.job_id, cost_code_id: tpl.cost_code_id, scheduled_date: dateStr, scheduled_hours: tpl.hours });
       if (tpl.start_time) params.append("start_time", tpl.start_time);
       if (tpl.end_time) params.append("end_time", tpl.end_time);
@@ -3835,7 +3851,7 @@ function ScheduleScreen({ token, readonly = false }) {
                       >
                         <div style={{ fontWeight: "700", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</div>
                         <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{job?.job_name || "?"}</div>
-                        <div style={{ fontSize: "10px", opacity: 0.75 }}>{cc?.code || "?"} · {tpl.hours}h</div>
+                        <div style={{ fontSize: "10px", opacity: 0.75 }}>{workTypeLabel(cc) || "?"} · {tpl.hours}h</div>
                       </div>
                     );
                   })}
@@ -3957,7 +3973,7 @@ function ScheduleScreen({ token, readonly = false }) {
                     >
                       <div style={{ fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tpl.name}</div>
                       <div style={{ fontSize: "10px", opacity: 0.9, marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tplJob?.job_name || "?"}</div>
-                      <div style={{ fontSize: "10px", opacity: 0.75 }}>{tplCc?.code || "?"} · {tpl.hours}h</div>
+                      <div style={{ fontSize: "10px", opacity: 0.75 }}>{workTypeLabel(tplCc) || "?"} · {tpl.hours}h</div>
                     </button>
                   );
                 })}
@@ -3981,8 +3997,8 @@ function ScheduleScreen({ token, readonly = false }) {
           {errors.job_id && <p style={styles.errorMsg}>{errors.job_id}</p>}
           <label style={styles.label}>{T.workCategory}</label>
           <select style={errors.cost_code_id ? styles.inputError : styles.input} value={form.cost_code_id} onChange={e => { setForm({...form, cost_code_id: e.target.value}); setErrors({...errors, cost_code_id: ""}); }}>
-            <option value="">Select work category</option>
-            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+            <option value="">{T.selectWorkCategory}</option>
+            {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
           </select>
           {errors.cost_code_id && <p style={styles.errorMsg}>{errors.cost_code_id}</p>}
           <label style={styles.label}>Date</label>
@@ -4055,8 +4071,8 @@ function ScheduleScreen({ token, readonly = false }) {
                 <div>
                   <label style={styles.label}>{T.workCategory}</label>
                   <select style={styles.input} value={templateForm.cost_code_id} onChange={e => setTemplateForm({...templateForm, cost_code_id: e.target.value})}>
-                    <option value="">Select work category</option>
-                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                    <option value="">{T.selectWorkCategory}</option>
+                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
                   </select>
                 </div>
               </div>
@@ -4100,7 +4116,7 @@ function ScheduleScreen({ token, readonly = false }) {
                   <div style={{ display: "inline-block", backgroundColor: templateForm.color, color: "white", borderRadius: "8px", padding: "9px 12px", minWidth: "130px" }}>
                     <div style={{ fontWeight: "700", fontSize: "12px" }}>{templateForm.name}</div>
                     <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px" }}>{jobs.find(j => String(j.job_id) === String(templateForm.job_id))?.job_name || "Job"}</div>
-                    <div style={{ fontSize: "10px", opacity: 0.75 }}>{costCodes.find(c => String(c.cost_code_id) === String(templateForm.cost_code_id))?.code || "CC"} · {templateForm.hours}h</div>
+                    <div style={{ fontSize: "10px", opacity: 0.75 }}>{workTypeLabel(costCodes.find(c => String(c.cost_code_id) === String(templateForm.cost_code_id))) || "Work type"} · {templateForm.hours}h</div>
                   </div>
                 </div>
               )}
@@ -4128,7 +4144,7 @@ function ScheduleScreen({ token, readonly = false }) {
                   <div style={{ backgroundColor: tpl.color || theme.primary, color: "white", padding: "14px 16px" }}>
                     <div style={{ fontWeight: "700", fontSize: "14px" }}>{tpl.name}</div>
                     <div style={{ fontSize: "11px", opacity: 0.88, marginTop: "2px" }}>{job?.job_name || "Unknown job"}</div>
-                    <div style={{ fontSize: "11px", opacity: 0.75 }}>{cc ? `${cc.code} ${cc.description}` : "Unknown cost code"} · {tpl.hours}h</div>
+                    <div style={{ fontSize: "11px", opacity: 0.75 }}>{cc ? workTypeLabel(cc) : "Unknown work type"} · {tpl.hours}h</div>
                     {tpl.notes && <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "2px", fontStyle: "italic" }}>{tpl.notes}</div>}
                   </div>
                   {!readonly && (
@@ -4166,8 +4182,8 @@ function ScheduleScreen({ token, readonly = false }) {
 
             <label style={styles.label}>{T.workCategory}</label>
             <select style={styles.input} value={editForm.cost_code_id} onChange={e => setEditForm({...editForm, cost_code_id: e.target.value})}>
-              <option value="">Select work category</option>
-              {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+              <option value="">{T.selectWorkCategory}</option>
+              {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
             </select>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
@@ -4331,7 +4347,7 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
                   <label style={styles.label}>{T.workCategory}</label>
                   <select style={styles.input} value={a.cost_code_id} onChange={e => setSchedAssignments(prev => prev.map((x, i) => i === idx ? {...x, cost_code_id: e.target.value} : x))}>
                     <option value="">Select</option>
-                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} {cc.description}</option>)}
+                    {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
                   </select>
                 </div>
                 <div>
@@ -4414,7 +4430,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
   const [showJobFlow, setShowJobFlow] = useState(false);
   const [empForm, setEmpForm] = useState({ first_name: "", last_name: "", role: "", hourly_rate: "", burden_rate: "", worker_type: "employee" });
   const [jobForm, setJobForm] = useState({ job_name: "", job_code: "", city: "", contract_value: "", budgeted_hours: "" });
-  const [ccForm, setCcForm] = useState({ code: "", description: "", category: "" });
+  const [ccForm, setCcForm] = useState({ name: "" });
   const [loginForm, setLoginForm] = useState({ email: "", password: "", confirm_password: "", employee_role: "crew", employee_id: "" });
   const [loginError, setLoginError] = useState("");
   const [userRefresh, setUserRefresh] = useState(0);
@@ -4422,8 +4438,9 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
 
   const settingsTabs = [
     { id: "company", label: "Company Profile" },
+    { id: "projects", label: T.projects },
     { id: "crew", label: "Crew Management" },
-    { id: "categories", label: "Work Categories" },
+    { id: "categories", label: T.workCategories },
     { id: "estimating", label: "Estimating" },
     { id: "financials", label: "Financials" },
     { id: "exports", label: "Data Exports" },
@@ -4476,15 +4493,22 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
   }
 
   async function addCostCode() {
-    const res = await apiFetch(`${API}/cost-codes?${new URLSearchParams(ccForm)}`, { method: "POST", headers });
-    if (res.ok) { showMsg("Cost code added."); setCcForm({ code: "", description: "", category: "" }); refresh(); }
-    else showMsg("Error adding cost code.");
+    const name = ccForm.name.trim();
+    if (!name) { showMsg("Enter a name — e.g. Framing"); return; }
+    const params = new URLSearchParams({ code: workTypeToCode(name), description: name });
+    const res = await apiFetch(`${API}/cost-codes?${params}`, { method: "POST", headers });
+    if (res.ok) { showMsg("Work type added."); setCcForm({ name: "" }); refresh(); }
+    else showMsg("Could not add work type.");
   }
 
   async function updateCostCode() {
-    const res = await apiFetch(`${API}/cost-codes/${editingCc.cost_code_id}?${new URLSearchParams(ccForm)}`, { method: "PATCH", headers });
-    if (res.ok) { showMsg("Cost code updated."); setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); refresh(); }
-    else showMsg("Error updating cost code.");
+    const name = ccForm.name.trim();
+    if (!name) { showMsg("Enter a name — e.g. Framing"); return; }
+    const params = new URLSearchParams({ description: name });
+    if (editingCc?.code) params.set("code", editingCc.code);
+    const res = await apiFetch(`${API}/cost-codes/${editingCc.cost_code_id}?${params}`, { method: "PATCH", headers });
+    if (res.ok) { showMsg("Work type updated."); setEditingCc(null); setCcForm({ name: "" }); refresh(); }
+    else showMsg("Could not update work type.");
   }
 
   async function createLogin() {
@@ -4511,17 +4535,17 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
 
   function startEditEmp(emp) { setEditingEmp(emp); setEmpForm({ first_name: emp.first_name, last_name: emp.last_name, role: emp.role || "", hourly_rate: emp.hourly_rate || "", burden_rate: emp.burden_rate || "", worker_type: emp.worker_type || "employee" }); }
   function startEditJob(job) { setEditingJob(job); setJobForm({ job_name: job.job_name, job_code: job.job_code || "", city: job.city || "", contract_value: job.contract_value || "", budgeted_hours: job.budgeted_hours || "" }); }
-  function startEditCc(cc) { setEditingCc(cc); setCcForm({ code: cc.code, description: cc.description, category: cc.category || "" }); }
+  function startEditCc(cc) { setEditingCc(cc); setCcForm({ name: workTypeLabel(cc) }); }
 
   async function deleteCostCode(cc) {
-    if (!window.confirm(`Delete cost code "${cc.code}"? This only works if it is not used on any job, timesheet, or material.`)) return;
+    if (!window.confirm(`Delete "${workTypeLabel(cc)}"? Only works if it is not used on any timesheet, estimate, or material.`)) return;
     const res = await apiFetch(`${API}/cost-codes/${cc.cost_code_id}`, { method: "DELETE", headers });
     if (res.ok) {
-      showMsg(`Cost code "${cc.code}" deleted.`);
+      showMsg(`"${workTypeLabel(cc)}" deleted.`);
       refresh();
     } else {
       const d = await res.json().catch(() => ({}));
-      showMsg(d.detail || "Could not delete this cost code.");
+      showMsg(d.detail || "Could not delete this work type.");
     }
   }
 
@@ -4546,14 +4570,8 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
 
   /* Btn and Row moved to module scope */
 
-  const projectsPanel = (
-    <SetupSection
-      number="1"
-      title={T.projects}
-      subtitle={`Add a ${T.project.toLowerCase()} and assign your crew. Approved estimates can set the budget baseline on the dashboard.`}
-      complete={activeJobs.length > 0}
-      completeLabel={`${activeJobs.length} active ${T.project.toLowerCase()}${activeJobs.length !== 1 ? "s" : ""}`}
-    >
+  const projectsTabContent = (
+    <>
       {editingJob ? (
         <>
           <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingJob.job_name}</p>
@@ -4594,7 +4612,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
         <div style={{ marginTop: "10px" }}>
           <p style={{ fontSize: "11px", color: theme.accent, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Completed</p>
           {completedJobs.map(job => (
-            <Row key={job.job_id} main={job.job_name} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
+            <Row key={job.job_id} main={job.job_name} sub={job.city || ""} actions={[<Btn key="r" label="Reactivate" bg={theme.accentLight} color={theme.accent} onClick={() => setJobStatus(job, "active")} />]} />
           ))}
         </div>
       )}
@@ -4608,13 +4626,13 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
           ))}
         </div>
       )}
-    </SetupSection>
+    </>
   );
 
   return (
     <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
       <h1 style={styles.title}>Settings & Configuration</h1>
-      <p style={styles.subtitle}>Company setup, crew, categories, and financial defaults</p>
+      <p style={styles.subtitle}>Company profile, projects, crew, and financial defaults</p>
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -4645,19 +4663,21 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
               <div style={styles.card}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 16px", fontFamily: font.display }}>Company Profile</h2>
                 <ProfileSettingsForm token={token} showCompany={true} />
-                <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${theme.border}` }}>
-                  <label style={styles.label}>Primary Phone</label>
-                  <input style={styles.input} placeholder="e.g. (604) 555-0100" disabled title="Coming soon" />
-                  <label style={styles.label}>Primary Location</label>
-                  <input style={styles.input} placeholder="e.g. Vancouver, BC" disabled title="Coming soon" />
-                  <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>Phone and location fields will sync to your company profile in a future update.</p>
-                </div>
-                <div style={{ marginTop: 24 }}>{projectsPanel}</div>
-                <div style={{ marginTop: 16, padding: 16, backgroundColor: theme.bg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
+                <div style={{ marginTop: 24, padding: 16, backgroundColor: theme.bg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>Demo Data</div>
                   <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>Load sample jobs and crew to explore the app.</p>
                   <button style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, maxWidth: 220 }} onClick={loadDemoData} disabled={readonly}>Load Demo Data</button>
                 </div>
+              </div>
+            )}
+
+            {settingsTab === "projects" && (
+              <div style={styles.card}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>{T.projects}</h2>
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 16, lineHeight: 1.5 }}>
+                  Manage active jobs, mark them complete when done, or archive old ones. Approved estimates set the dashboard budget baseline.
+                </p>
+                {projectsTabContent}
               </div>
             )}
 
@@ -4750,35 +4770,32 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
 
             {settingsTab === "categories" && (
               <div style={styles.card}>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 16px", fontFamily: font.display }}>{T.workCategories}</h2>
-                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 16 }}>{T.workCategoryHint}</p>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>{T.workCategories}</h2>
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 8, lineHeight: 1.55 }}>{T.workCategoryHint}</p>
+                <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 16, fontStyle: "italic" }}>
+                  Examples: Framing · Electrical · Plumbing · Demo · Tile
+                </p>
             {editingCc ? (
               <>
-                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {editingCc.code}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
-                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
-                </div>
-                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
+                <p style={{ fontSize: "12px", fontWeight: "600", color: theme.primary, marginBottom: "10px" }}>Editing: {workTypeLabel(editingCc)}</p>
+                <label style={styles.label}>Name</label>
+                <input style={{...styles.input, marginBottom: "8px"}} placeholder="e.g. Framing" value={ccForm.name} onChange={e => setCcForm({ name: e.target.value })} />
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button style={{...styles.button, flex: 1, marginTop: 0}} onClick={updateCostCode}>Save</button>
-                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ code: "", description: "", category: "" }); }}>Cancel</button>
+                  <button style={{...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0}} onClick={() => { setEditingCc(null); setCcForm({ name: "" }); }}>Cancel</button>
                 </div>
               </>
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                  <input style={styles.input} placeholder="Code (e.g. LAB)" value={ccForm.code} onChange={e => setCcForm({...ccForm, code: e.target.value})} />
-                  <input style={styles.input} placeholder="Category" value={ccForm.category} onChange={e => setCcForm({...ccForm, category: e.target.value})} />
-                </div>
-                <input style={{...styles.input, marginBottom: "8px"}} placeholder="Description (e.g. General Labour)" value={ccForm.description} onChange={e => setCcForm({...ccForm, description: e.target.value})} />
-                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add {T.workCategory}</button>
+                <label style={styles.label}>Name</label>
+                <input style={{...styles.input, marginBottom: "8px"}} placeholder="e.g. Framing" value={ccForm.name} onChange={e => setCcForm({ name: e.target.value })} />
+                <button style={{...styles.button, marginTop: 0}} onClick={addCostCode}>Add work type</button>
               </>
             )}
             {costCodes.length > 0 && (
               <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
                 {costCodes.map(cc => (
-                  <Row key={cc.cost_code_id} main={`${cc.code}  ${cc.description}`} sub={cc.category} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />, <Btn key="d" label="Delete" bg={theme.dangerLight} color={theme.danger} onClick={() => deleteCostCode(cc)} />]} />
+                  <Row key={cc.cost_code_id} main={workTypeLabel(cc)} actions={[<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditCc(cc)} />, <Btn key="d" label="Delete" bg={theme.dangerLight} color={theme.danger} onClick={() => deleteCostCode(cc)} />]} />
                 ))}
               </div>
             )}
@@ -5735,7 +5752,10 @@ function ExportReportForm({ token }) {
 }
 
 function ProfileSettingsForm({ token, role, showCompany = false }) {
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", company_name: "" });
+  const [form, setForm] = useState({
+    first_name: "", last_name: "", email: "", company_name: "",
+    company_email: "", company_phone: "", company_address: "", tax_number: "",
+  });
   const [pwForm, setPwForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -5749,14 +5769,16 @@ function ProfileSettingsForm({ token, role, showCompany = false }) {
     const hInner = { Authorization: `Bearer ${token}` };
     Promise.all([
       apiFetch(`${API}/me`, { headers: hInner }).then(r => r.json()),
-      showCompany ? apiFetch(`${API}/companies`, { headers: hInner }).then(r => r.json()).catch(() => []) : Promise.resolve([]),
-    ]).then(([me, companies]) => {
-      const company = Array.isArray(companies) ? companies.find(c => c.company_id === me.company_id) : null;
+    ]).then(([me]) => {
       setForm({
         first_name: me.first_name || "",
         last_name: me.last_name || "",
         email: me.email || "",
-        company_name: company?.company_name || "",
+        company_name: me.company_name || "",
+        company_email: me.company_email || "",
+        company_phone: me.company_phone || "",
+        company_address: me.company_address || "",
+        tax_number: me.tax_number || "",
       });
       setLoading(false);
     });
@@ -5768,7 +5790,14 @@ function ProfileSettingsForm({ token, role, showCompany = false }) {
     const params = new URLSearchParams({ first_name: form.first_name, last_name: form.last_name });
     const res = await apiFetch(`${API}/me/update?${params}`, { method: "PATCH", headers: h });
     if (showCompany && form.company_name) {
-      await apiFetch(`${API}/me/update-company?${new URLSearchParams({ company_name: form.company_name })}`, { method: "PATCH", headers: h }).catch(() => {});
+      const companyParams = new URLSearchParams({
+        company_name: form.company_name,
+        company_email: form.company_email || "",
+        company_phone: form.company_phone || "",
+        company_address: form.company_address || "",
+        tax_number: form.tax_number || "",
+      });
+      await apiFetch(`${API}/me/update-company?${companyParams}`, { method: "PATCH", headers: h }).catch(() => {});
     }
     setSaving(false);
     if (res.ok) { setMessage("Profile updated."); setTimeout(() => setMessage(""), 3000); }
@@ -5815,6 +5844,20 @@ function ProfileSettingsForm({ token, role, showCompany = false }) {
         <>
           <label style={styles.label}>Company Name</label>
           <input style={styles.input} value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} placeholder="Your company name" />
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 8, fontFamily: font.display }}>Business details</div>
+            <p style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
+              Shown on estimates and invoices. Send PDFs from this address using your own email app.
+            </p>
+            <label style={styles.label}>Business email</label>
+            <input style={styles.input} type="email" value={form.company_email} onChange={e => setForm({...form, company_email: e.target.value})} placeholder="e.g. hello@yourcompany.ca" />
+            <label style={styles.label}>Phone</label>
+            <input style={styles.input} value={form.company_phone} onChange={e => setForm({...form, company_phone: e.target.value})} placeholder="e.g. (604) 555-0100" />
+            <label style={styles.label}>Address</label>
+            <input style={styles.input} value={form.company_address} onChange={e => setForm({...form, company_address: e.target.value})} placeholder="e.g. 123 Main St, Vancouver, BC" />
+            <label style={styles.label}>Tax / Business number (optional)</label>
+            <input style={styles.input} value={form.tax_number} onChange={e => setForm({...form, tax_number: e.target.value})} placeholder="e.g. GST/HST #" />
+          </div>
         </>
       )}
       {message && <div style={{ color: theme.accent, fontSize: "13px", fontWeight: "600", marginTop: "8px", padding: "10px 14px", backgroundColor: theme.accentLight, borderRadius: "8px" }}>{message}</div>}
@@ -6346,7 +6389,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
 
       <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Job Types</h3>
       <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
-        A <strong>job type</strong> is a starter kit for new estimates. Pick a name and which work categories belong on that job — when you create an estimate, those rows appear empty (you fill in hours and materials after).
+        A <strong>job type</strong> is a starter kit for new estimates. Pick a name and which work types belong on that job — when you create an estimate, those rows appear empty (you fill in hours and materials after).
       </p>
       <p style={{ fontSize: 12, color: theme.textLight, margin: "0 0 12px", fontStyle: "italic" }}>
         Example: &quot;Bathroom Reno&quot; → Demo, Plumbing, Tile rows (no numbers yet).
@@ -6369,9 +6412,9 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
         </>
       )}
 
-      <label style={styles.label}>Work categories on this job type</label>
+      <label style={styles.label}>Work types on this job type</label>
       {costCodes.length === 0 ? (
-        <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 8 }}>Add work categories first (Work Categories tab).</p>
+        <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 8 }}>Add work types first ({T.workCategories} tab).</p>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
           {costCodes.map(cc => (
@@ -6380,7 +6423,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
               border: `1.5px solid ${jtHasCostCode(cc.cost_code_id) ? theme.accent : theme.border}`,
               backgroundColor: jtHasCostCode(cc.cost_code_id) ? theme.accentLight : "white",
               color: jtHasCostCode(cc.cost_code_id) ? theme.primary : theme.textSecondary,
-            }}>{cc.code}</button>
+            }}>{workTypeLabel(cc)}</button>
           ))}
         </div>
       )}
@@ -6402,7 +6445,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
             <Row
               key={jt.job_type_id}
               main={jt.name}
-              sub={[jt.hint, `${(jt.cost_code_ids || []).length} categories`].filter(Boolean).join(" · ")}
+              sub={[jt.hint, `${(jt.cost_code_ids || []).length} work types`].filter(Boolean).join(" · ")}
               actions={!readonly ? [<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJobType(jt)} />] : []}
             />
           ))}
@@ -6427,7 +6470,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
         <label style={styles.label}>{T.workCategory}</label>
         <select style={styles.input} value={tplForm.cost_code_id} onChange={e => setTplForm({ ...tplForm, cost_code_id: e.target.value })} disabled={readonly}>
           <option value="">Select…</option>
-          {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+          {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
         </select>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
           <div>
@@ -6604,7 +6647,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         const cc = costCodes.find(c => String(c.cost_code_id) === String(r.cost_code_id));
         return {
           cost_code_id: parseInt(r.cost_code_id, 10),
-          description: cc ? `${cc.code} — ${cc.description}` : "Work",
+          description: cc ? workTypeLabel(cc) : "Work",
           quantity: 1,
           estimated_hours: parseFloat(r.hours) || 0,
           material_cost: parseFloat(r.materials) || 0,
@@ -6716,7 +6759,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     setPhase("review");
   }
 
-  async function sendToCustomer() {
+  async function markSharedWithCustomer() {
     if (!savedEstimate) return;
     setSaving(true);
     setError("");
@@ -6732,18 +6775,29 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     setSaving(false);
     if (!sendRes.ok) {
       const d = await sendRes.json().catch(() => ({}));
-      setError(typeof d.detail === "string" ? d.detail : "Could not send estimate to customer");
+      setError(typeof d.detail === "string" ? d.detail : "Could not save estimate status");
       return;
     }
-    const data = await sendRes.json();
     setSavedEstimate(prev => prev ? { ...prev, status: "sent" } : prev);
     setPhase("sent");
-    if (data.email_sent) {
-      setSendMsg(`Estimate sent to ${customerEmail.trim()}`);
-    } else if (customerEmail.trim()) {
-      setSendMsg("Estimate marked sent — email not configured; download and send the PDF manually");
-    } else {
-      setSendMsg("Estimate marked sent — download the PDF and share it with your customer");
+    setSendMsg("When your customer approves, come back and set your dashboard baseline.");
+  }
+
+  async function downloadAndOpenEmail() {
+    if (!savedEstimate || !savedJob) return;
+    setSaving(true);
+    setError("");
+    const ok = await downloadEstimatePdf(savedEstimate.estimate_id);
+    setSaving(false);
+    if (!ok) {
+      setError("Could not download PDF");
+      return;
+    }
+    const to = customerEmail.trim();
+    const subject = `Estimate — ${savedJob.job_name}`;
+    const body = `Hi,\n\nPlease find our estimate attached for ${savedJob.job_name}.\n\nReply to confirm approval before we begin work.\n\nThank you`;
+    if (to) {
+      window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
   }
 
@@ -6785,16 +6839,32 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     return (
       <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
         <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
-        <h1 style={styles.title}>Review before sending</h1>
-        <p style={styles.subtitle}>{savedJob.job_name} — check the PDF, then send to your customer.</p>
+        <h1 style={styles.title}>Review your estimate</h1>
+        <p style={styles.subtitle}>{savedJob.job_name} — download the PDF and send it from your business email.</p>
         {error && <p style={styles.errorMsg}>{error}</p>}
+
+        <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>How to send this to your customer</div>
+          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
+            <li>Download the PDF below.</li>
+            <li>Email it from <strong>your</strong> business account (Outlook, Gmail, etc.) — attach the PDF.</li>
+            <li>When they approve, tap <strong>I've shared it — continue</strong> and set your dashboard baseline.</li>
+          </ol>
+          <p style={{ fontSize: 11, color: theme.textLight, marginTop: 10, marginBottom: 0 }}>
+            In-app email from your domain is coming later. Customers should always hear from your company, not Vantage Logic.
+          </p>
+        </div>
 
         <div style={{ ...styles.card, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Summary</div>
           {estimateSummaryGrid()}
-          <label style={{ ...styles.label, marginTop: 12 }}>Customer email (optional)</label>
+          <label style={{ ...styles.label, marginTop: 12 }}>Customer email (optional — for your records)</label>
           <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
-          <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>Leave blank to download and send the PDF yourself.</p>
+          {customerEmail.trim() && (
+            <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>
+              After download, we can open a draft email to this address — you attach the PDF and send from your inbox.
+            </p>
+          )}
         </div>
 
         <div style={{ ...styles.card, marginBottom: 16, padding: 0, overflow: "hidden" }}>
@@ -6819,11 +6889,16 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           <button type="button" disabled={saving} onClick={backToEdit} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888", flex: isMobile() ? undefined : "0 0 auto" }}>
             Back to edit
           </button>
-          <button type="button" disabled={saving} onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accentLight, color: theme.primary, flex: isMobile() ? undefined : "0 0 auto" }}>
-            Download PDF
+          <button type="button" disabled={saving} onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, flex: isMobile() ? 1 : "0 0 auto" }}>
+            {saving ? "Downloading…" : "Download PDF"}
           </button>
-          <button type="button" disabled={saving} onClick={sendToCustomer} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, flex: 1 }}>
-            {saving ? "Sending…" : customerEmail.trim() ? "Send to customer" : "Mark sent & continue"}
+          {customerEmail.trim() && (
+            <button type="button" disabled={saving} onClick={downloadAndOpenEmail} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accentLight, color: theme.primary, flex: isMobile() ? 1 : "0 0 auto" }}>
+              Download &amp; draft email
+            </button>
+          )}
+          <button type="button" disabled={saving} onClick={markSharedWithCustomer} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold, flex: 1 }}>
+            {saving ? "Saving…" : "I've shared it — continue"}
           </button>
         </div>
       </div>
@@ -6834,13 +6909,13 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     return (
       <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
         <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
-        <h1 style={styles.title}>Customer estimate sent</h1>
-        <p style={styles.subtitle}>{savedJob.job_name} — waiting for customer approval before internal tracking starts.</p>
+        <h1 style={styles.title}>Waiting for customer approval</h1>
+        <p style={styles.subtitle}>{savedJob.job_name} — you shared the PDF from your business email.</p>
         {sendMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{sendMsg}</div>}
         {error && <p style={styles.errorMsg}>{error}</p>}
         <div style={{ ...styles.card, marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: theme.textSecondary, lineHeight: 1.6 }}>
-            Customer reviews PDF → approves → you set dashboard baseline.
+            Customer reviews your PDF → approves → you set dashboard baseline to start tracking budget vs actual.
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 360 }}>
@@ -6855,7 +6930,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           </button>
         </div>
         <p style={{ fontSize: 12, color: theme.textLight, marginTop: 14 }}>
-          Need changes? Tap <strong>Adjust</strong>, edit rows, send updated PDF.
+          Need changes? Tap <strong>Adjust</strong>, edit rows, download an updated PDF, and send again from your email.
         </p>
       </div>
     );
@@ -6866,7 +6941,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
       <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
       <h1 style={styles.title}>{isEditMode || savedEstimate ? "Edit Estimate" : "New Estimate"}</h1>
       <p style={{ ...styles.subtitle, maxWidth: 640 }}>
-        Build the estimate, review the PDF, then send to your customer.
+        Build the estimate, review the PDF, then download and email it from your business account.
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -6906,6 +6981,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         <div style={{ marginTop: 12 }}>
           <label style={styles.label}>Customer email (optional)</label>
           <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
+          <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>For your records — helps draft an email after you download the PDF.</p>
         </div>
       </div>
 
@@ -6935,7 +7011,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
                   <td style={{ padding: "4px 6px" }}>
                     <select style={{ ...styles.input, margin: 0, fontSize: 13 }} value={row.cost_code_id} onChange={e => updateRow(i, "cost_code_id", e.target.value)}>
                       <option value="">Select…</option>
-                      {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+                      {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
                     </select>
                   </td>
                   <td style={{ padding: "4px 6px" }}>
@@ -6977,7 +7053,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         {saving ? "Preparing preview…" : savedEstimate ? "Save changes & review" : "Continue to review"}
       </button>
       <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 12 }}>
-        Preview the PDF before you email your customer.
+        You will download the PDF and send it from your own Outlook or Gmail.
       </p>
     </div>
   );

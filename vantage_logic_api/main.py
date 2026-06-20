@@ -173,6 +173,10 @@ with engine.connect() as _conn:
         ("estimate_labor_rate_per_hour", "NUMERIC(10,2) DEFAULT 75"),
         ("tax_rate_percent", "NUMERIC(5,2) DEFAULT 0"),
         ("tax_label", "VARCHAR(30) DEFAULT 'HST'"),
+        ("company_email", "VARCHAR(255)"),
+        ("company_phone", "VARCHAR(50)"),
+        ("company_address", "VARCHAR(500)"),
+        ("tax_number", "VARCHAR(50)"),
     ]:
         try:
             _conn.execute(__import__("sqlalchemy").text(
@@ -562,6 +566,7 @@ def health_features():
     return {
         "estimating": _has_route("/job-types"),
         "estimate_templates": _has_route("/estimate-templates"),
+        "email_configured": bool(os.environ.get("RESEND_API_KEY")),
     }
 
 # =============================================
@@ -837,6 +842,7 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     "employee_id": current_user.employee_id,
     "first_name": current_user.first_name,
     "last_name": current_user.last_name,
+    "company_name": company.company_name if company else "",
     "track_overtime": _company_track_overtime(company),
     "overtime_rate_multiplier": _company_ot_multiplier(company),
     "overtime_rules": _company_overtime_rules(company),
@@ -845,6 +851,11 @@ def get_me(current_user: models.User = Depends(get_current_user), db: Session = 
     "tax_rate_percent": float(getattr(company, "tax_rate_percent", None) or 0),
     "tax_label": getattr(company, "tax_label", None) or "HST",
     "default_markup_percent": float(getattr(company, "default_markup_percent", None) or 15),
+    "company_email": getattr(company, "company_email", None) or "",
+    "company_phone": getattr(company, "company_phone", None) or "",
+    "company_address": getattr(company, "company_address", None) or "",
+    "tax_number": getattr(company, "tax_number", None) or "",
+    "email_configured": bool(os.environ.get("RESEND_API_KEY")),
 }
 
 @app.get("/users")
@@ -1946,6 +1957,10 @@ def update_company(
     tax_rate_percent: float = None,
     tax_label: str = None,
     default_markup_percent: float = None,
+    company_email: str = None,
+    company_phone: str = None,
+    company_address: str = None,
+    tax_number: str = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1977,6 +1992,14 @@ def update_company(
         company.tax_label = (tax_label or "HST").strip()[:30]
     if default_markup_percent is not None and hasattr(company, "default_markup_percent"):
         company.default_markup_percent = default_markup_percent
+    if company_email is not None and hasattr(company, "company_email"):
+        company.company_email = (company_email or "").strip()[:255] or None
+    if company_phone is not None and hasattr(company, "company_phone"):
+        company.company_phone = (company_phone or "").strip()[:50] or None
+    if company_address is not None and hasattr(company, "company_address"):
+        company.company_address = (company_address or "").strip()[:500] or None
+    if tax_number is not None and hasattr(company, "tax_number"):
+        company.tax_number = (tax_number or "").strip()[:50] or None
     db.commit()
     return {"message": "Company updated"}
 

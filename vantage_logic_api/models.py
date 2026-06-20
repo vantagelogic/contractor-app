@@ -24,6 +24,10 @@ class Company(Base):
     estimate_labor_rate_per_hour = Column(Numeric(10, 2), default=75)
     tax_rate_percent = Column(Numeric(5, 2), default=0)
     tax_label = Column(String(30), default="HST")
+    company_email = Column(String(255))
+    company_phone = Column(String(50))
+    company_address = Column(String(500))
+    tax_number = Column(String(50))
 
 class User(Base):
     __tablename__ = "users"
