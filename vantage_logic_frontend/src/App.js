@@ -6006,10 +6006,31 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
   const [editingJt, setEditingJt] = useState(null);
   const [tplForm, setTplForm] = useState({ name: "", cost_code_id: "", estimated_hours: "", estimated_material_cost: "" });
   const [editingTpl, setEditingTpl] = useState(null);
+  const [apiReady, setApiReady] = useState(null);
+  const [apiIssue, setApiIssue] = useState(null);
 
   function load() {
-    apiFetch(`${API}/job-types`, { headers }).then(r => r.ok ? r.json() : []).then(setJobTypes).catch(() => setJobTypes([]));
-    apiFetch(`${API}/estimate-templates`, { headers }).then(r => r.ok ? r.json() : []).then(setTemplates).catch(() => setTemplates([]));
+    apiFetch(`${API}/job-types`, { headers })
+      .then(async r => {
+        if (r.status === 404) {
+          setApiReady(false);
+          setApiIssue("missing");
+          setJobTypes([]);
+          return;
+        }
+        setApiReady(true);
+        setApiIssue(null);
+        setJobTypes(r.ok ? await r.json() : []);
+      })
+      .catch(() => {
+        setApiReady(false);
+        setApiIssue("unreachable");
+        setJobTypes([]);
+      });
+    apiFetch(`${API}/estimate-templates`, { headers })
+      .then(r => r.ok ? r.json() : [])
+      .then(setTemplates)
+      .catch(() => setTemplates([]));
   }
   useEffect(() => { load(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -6017,8 +6038,8 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
 
   function parseApiError(res, detail, fallback) {
     if (res.status === 403) return "Owner or admin access required.";
-    if (res.status === 404 && detail === "Not Found") return "Could not reach save — try again in a minute.";
-    if (typeof detail === "string") return detail;
+    if (res.status === 404) return "Estimating is not on this server yet — use the local API (restart npm after it is running).";
+    if (typeof detail === "string" && detail !== "Not Found") return detail;
     return fallback;
   }
 
@@ -6166,6 +6187,21 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
       {msg && <div style={{ color: theme.accent, fontWeight: 600, marginBottom: 12, fontSize: 13 }}>{msg}</div>}
       {err && <p style={styles.errorMsg}>{err}</p>}
 
+      {apiReady === false && (
+        <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: theme.danger, marginBottom: 8 }}>
+            {apiIssue === "unreachable" ? "Can't reach the API" : "Estimating not on this server"}
+          </div>
+          <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>
+            {apiIssue === "unreachable"
+              ? <>Local API should be running on port 8000. Open this app at <strong>http://localhost:3001</strong> (your npm session moved off 3000). Refresh after the API is up.</>
+              : <>The live server has not been updated with Estimating yet. Run the API locally in <code style={{ fontSize: 12 }}>vantage_logic_api</code>, then restart <code style={{ fontSize: 12 }}>npm start</code>.</>}
+          </p>
+        </div>
+      )}
+
+      {apiReady !== false && (
+        <>
       <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Job Types</h3>
       <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
         A <strong>job type</strong> is a starter kit for new estimates. Pick a name and which work categories belong on that job — when you create an estimate, those rows appear empty (you fill in hours and materials after).
@@ -6286,6 +6322,8 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
