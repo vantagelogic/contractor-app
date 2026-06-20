@@ -1248,6 +1248,7 @@ Return ONLY a JSON object with this exact structure, no other text:
 {{
   "type": "timesheet|material|mileage|request",
   "hours": 0.0,
+  "overtime_hours": 0.0,
   "job_name": "closest matching job name from the list or empty string",
   "cost_code": "closest matching cost code label from the list or empty string",
   "cost_code_confidence": "high|low",
@@ -1263,82 +1264,8 @@ Rules:
 - cost_code_confidence is "high" if you are confident in the match, "low" if uncertain
 - For materials, amount is the dollar value if mentioned
 - Convert phrases like "half a day" to 4.0, "six and a half hours" to 6.5
-- Match job_name to the closest option from the list"""
-
-        from google.genai import types
-        response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[prompt]
-        )
-
-        raw = response.text.strip()
-        raw = re.sub(r"```json\s*", "", raw)
-        raw = re.sub(r"```\s*", "", raw)
-        raw = raw.strip()
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            raw = match.group(0)
-
-        parsed = json.loads(raw)
-        return {"success": True, **parsed}
-
-    except json.JSONDecodeError:
-        return {"success": False, "message": "Could not parse. Please try again."}
-    except Exception as e:
-        print(f"Voice parse error: {e}")
-        return {"success": False, "message": "Something went wrong. Please try again."}
-    
-@app.post("/voice/parse-entry")
-def parse_voice_entry(
-    body: VoiceRequest,
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    try:
-        jobs = db.query(models.Job).filter(
-            models.Job.company_id == current_user.company_id,
-            models.Job.status == "active"
-        ).all()
-        cost_codes = db.query(models.CostCode).filter(
-            models.CostCode.company_id == current_user.company_id
-        ).all()
-
-        job_names = [j.job_name for j in jobs]
-        cc_list = [{"id": c.cost_code_id, "label": f"{c.code} {c.description}"} for c in cost_codes]
-        cc_names = [c["label"] for c in cc_list]
-
-        prompt = f"""You are a field entry assistant for a trades contractor app.
-Analyze this voice note and extract a structured entry: "{body.transcript}"
-
-Available jobs: {job_names}
-Available cost codes: {cc_names}
-
-Determine the entry type based on what was said:
-- "timesheet": if they mention hours worked, time on a job, or a shift
-- "material": if they mention buying something, a purchase, a supply, or a cost
-- "mileage": if they mention driving, km, distance, or travel
-- "request": if they mention needing something, reporting an issue, a safety concern, or asking for approval
-
-Return ONLY a JSON object with this exact structure, no other text:
-{{
-  "type": "timesheet|material|mileage|request",
-  "hours": 0.0,
-  "job_name": "closest matching job name from the list or empty string",
-  "cost_code": "closest matching cost code label from the list or empty string",
-  "cost_code_confidence": "high|low",
-  "amount": 0.0,
-  "description": "what was bought or description of request",
-  "km": 0.0,
-  "request_type": "Additional Materials|Equipment Issue|Safety Concern|Scope Change|Other",
-  "notes": "brief 1-sentence summary of any extra context. Empty string if nothing extra."
-}}
-
-Rules:
-- Only fill fields relevant to the detected type
-- cost_code_confidence is "high" if you are confident in the match, "low" if uncertain
-- For materials, amount is the dollar value if mentioned
-- Convert phrases like "half a day" to 4.0, "six and a half hours" to 6.5
-- Match job_name to the closest option from the list"""
+- Match job_name to the closest option from the list
+- For overtime: if they mention overtime as part of a larger total (e.g. "10 hours today, 2 of those were overtime"), put the regular portion in "hours" and the overtime portion in "overtime_hours". If overtime is mentioned as its own standalone statement (e.g. "log 4 hours overtime on the Johnson job"), put 0 in "hours" and the full amount in "overtime_hours" unless regular hours were also stated separately. If overtime isn't mentioned at all, "overtime_hours" should be 0.0"""
 
         from google.genai import types
         response = gemini_client.models.generate_content(
@@ -1396,9 +1323,9 @@ Margin: Contract Value minus Total Cost (labour + materials). Positive = profita
 
 Burden Rate: An additional cost per hour on top of the employee's base hourly rate, covering things like payroll taxes, CPP, EI, and benefits. Optional — leave blank if not used.
 
-Shift Template: A reusable preset that admins create to save time scheduling. A template stores: a name, job, cost code, hours, and a color. On the schedule calendar, admins drag templates onto crew member rows to assign shifts quickly.
+Shift Template: A reusable preset that admins create to save time scheduling. A template stores: a name, job, cost code, hours, start/end time, and a color. On the schedule calendar, admins drag templates onto crew member rows to assign shifts quickly.
 
-Timesheet: A record of hours worked. Fields: Employee, Job, Cost Code, Date, Hours Worked, Overtime Hours (optional), Field Notes (optional).
+Timesheet: A record of hours worked. Fields: Employee, Job, Cost Code, Date, Hours Worked, Field Notes (optional). If your owner has turned on overtime tracking in Setup, you'll also see a checkbox to add Overtime Hours separately.
 
 Material Log: A record of a purchase made for a job. Fields: Employee, Job, Cost Code, Description of item, Supplier, Quantity, Unit Cost (app calculates total), Purchase Date, Notes.
 
@@ -1409,6 +1336,8 @@ Request: A message from a crew member to their admin asking for something — ma
 Inventory: A list of the company's tools, equipment, and stock items with quantities and prices. Crew can request inventory items through the Requests screen.
 
 Change Order: An addition or deduction to a job's contract value. Admins can log these from the Dashboard when scope changes.
+
+Overtime Tracking: An optional company-wide setting (Setup → Overtime). When turned on, crew see a checkbox to log overtime hours separately from regular hours on every timesheet. The owner sets a multiplier (default 1.5x) that determines how overtime hours are costed on the Dashboard.
 
 ---
 NAVIGATION:
@@ -1424,7 +1353,7 @@ ADMIN/OWNER (left sidebar on desktop, bottom bar on mobile):
 - Dashboard: Live profitability for all jobs. Filter by All/Active/Completed. Tap a job to expand and see timesheets, materials, and change orders.
 - Inventory: Manage stock items. Add, edit, or deactivate items. See current quantities.
 - Requests: Review all crew requests. Approve or deny with an optional reason. Reply via comment threads.
-- Setup (Admin): Four tabs — Jobs, Employees, Cost Codes, Crew Access.
+- Setup (Admin): Jobs, Your Crew, Cost Codes, Crew App Access, Your Account (name, company name, password), and Overtime (toggle and rate).
 
 ---
 HOW TO DO COMMON TASKS:
@@ -1437,7 +1366,7 @@ LOG HOURS (crew):
 5. Select the Cost Code (type of work)
 6. Set the Date (defaults to today)
 7. Enter Hours Worked
-8. Enter Overtime Hours if applicable
+8. If your owner has turned on overtime tracking, check "Add overtime hours" and enter the amount
 9. Add Field Notes if needed (optional)
 10. Tap Submit Timesheet
 You'll see a confirmation. Tap "Log Another" to add another entry.

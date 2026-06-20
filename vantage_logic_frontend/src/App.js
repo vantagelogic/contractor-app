@@ -488,6 +488,14 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [linkShared, setLinkShared] = useState(() => {
+    try { return localStorage.getItem("vl_link_shared") === "1"; } catch { return false; }
+  });
+
+  function markLinkShared() {
+    setLinkShared(true);
+    try { localStorage.setItem("vl_link_shared", "1"); } catch {}
+  }
 
   useEffect(() => {
     const h = { Authorization: `Bearer ${token}` };
@@ -513,7 +521,7 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
     {
       label: "Give crew app access",
       desc: "Share your app link so crew can log time from their phones",
-      done: false,
+      done: linkShared,
       copyLink: window.location.origin,
       color: "#2563eb",
     },
@@ -555,7 +563,7 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
               <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                 {typeof navigator !== "undefined" && navigator.share && (
                   <button
-                    onClick={() => navigator.share({ title: "Vantage Logic", text: "Log your hours and materials here:", url: step.copyLink }).catch(() => {})}
+                    onClick={() => navigator.share({ title: "Vantage Logic", text: "Log your hours and materials here:", url: step.copyLink }).then(markLinkShared).catch(() => {})}
                     aria-label="Share link"
                     style={{ fontSize: "11px", padding: "5px 9px", borderRadius: "6px", border: `1px solid ${theme.accent}`, cursor: "pointer", backgroundColor: "white", color: theme.accent, fontWeight: "700", fontFamily: font.body, display: "flex", alignItems: "center", justifyContent: "center" }}
                   >
@@ -563,7 +571,7 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
                   </button>
                 )}
                 <button
-                  onClick={() => { navigator.clipboard.writeText(step.copyLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  onClick={() => { navigator.clipboard.writeText(step.copyLink); setCopied(true); markLinkShared(); setTimeout(() => setCopied(false), 2000); }}
                   style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", whiteSpace: "nowrap", fontFamily: font.body }}
                 >
                   {copied ? "Copied!" : "Copy link"}
