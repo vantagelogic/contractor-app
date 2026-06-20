@@ -4479,6 +4479,58 @@ function EmpTimesheetGroup({ empName, empData, token, onDelete }) {
   );
 }
 
+const CHART_DEFS = [
+  { id: "portfolio_overview", label: "Portfolio Overview" },
+];
+
+function DonutChart({ segments, size = 140, strokeWidth = 16, centerContent }) {
+  const r = (size - strokeWidth) / 2;
+  const c = 2 * Math.PI * r;
+  const total = segments.reduce((s, seg) => s + Math.max(seg.value, 0), 0);
+  let offset = 0;
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={theme.border} strokeWidth={strokeWidth} />
+        {total > 0 && segments.map((seg, i) => {
+          if (seg.value <= 0) return null;
+          const len = (seg.value / total) * c;
+          const dashOffset = -offset;
+          offset += len;
+          return (
+            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={seg.color} strokeWidth={strokeWidth}
+              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={dashOffset}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: "stroke-dasharray 0.4s ease" }} />
+          );
+        })}
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+        {centerContent}
+      </div>
+    </div>
+  );
+}
+
+const [chartPrefs, setChartPrefs] = useState(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("vl_dashboard_charts") || "{}");
+    const merged = {};
+    CHART_DEFS.forEach(c => { merged[c.id] = saved[c.id] !== false; });
+    return merged;
+  } catch {
+    const d = {}; CHART_DEFS.forEach(c => { d[c.id] = true; }); return d;
+  }
+});
+const [showChartMenu, setShowChartMenu] = useState(false);
+
+function toggleChart(id) {
+  setChartPrefs(prev => {
+    const next = { ...prev, [id]: !prev[id] };
+    try { localStorage.setItem("vl_dashboard_charts", JSON.stringify(next)); } catch {}
+    return next;
+  });
+}
+
 function Dashboard({ token, readonly = false }) {
   const [jobs, setJobs] = useState([]);
   const [mileage, setMileage] = useState([]);
@@ -4607,6 +4659,74 @@ function Dashboard({ token, readonly = false }) {
       </div>
 
       <div style={{ padding: "18px", maxWidth: "1080px", margin: "0 auto" }}>
+
+        {!loading && sorted.length > 0 && Object.values(chartPrefs).some(Boolean) && (
+          <div style={{ position: "relative", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+              <button onClick={() => setShowChartMenu(s => !s)} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: theme.textSecondary, background: "white", border: `1px solid ${theme.border}`, borderRadius: "7px", padding: "5px 10px", cursor: "pointer", fontFamily: font.body, fontWeight: "600" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Customize charts
+              </button>
+            </div>
+
+            {showChartMenu && (
+              <div onClick={() => setShowChartMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }}>
+                <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "34px", right: 0, backgroundColor: "white", borderRadius: "10px", border: `1px solid ${theme.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: "10px", width: "200px", zIndex: 100 }}>
+                  <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.5px", padding: "2px 6px 8px" }}>Show on dashboard</div>
+                  {CHART_DEFS.map(c => (
+                    <label key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 6px", cursor: "pointer", fontSize: "13px", color: theme.textPrimary, borderRadius: "6px" }}>
+                      <input type="checkbox" checked={chartPrefs[c.id]} onChange={() => toggleChart(c.id)} style={{ width: "15px", height: "15px", accentColor: theme.accent, cursor: "pointer" }} />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {chartPrefs.portfolio_overview && (
+              <div style={{ backgroundColor: "white", borderRadius: "14px", border: `1px solid ${theme.border}`, padding: "20px", display: "flex", alignItems: "center", gap: "24px", flexWrap: "wrap" }}>
+                <DonutChart
+                  size={140}
+                  strokeWidth={16}
+                  segments={[
+                    { value: totals.labour, color: theme.primary },
+                    { value: totals.materials, color: theme.gold },
+                  ]}
+                  centerContent={
+                    <>
+                      <div style={{ fontSize: "9px", fontWeight: "700", color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.5px" }}>Margin</div>
+                      <div style={{ fontSize: "17px", fontWeight: "800", color: totals.margin >= 0 ? theme.accent : theme.danger, fontFamily: font.display }}>
+                        {totals.margin >= 0 ? "" : "-"}${fmt(Math.abs(totals.margin))}
+                      </div>
+                      <div style={{ fontSize: "10px", fontWeight: "600", color: totals.margin >= 0 ? theme.accent : theme.danger }}>
+                        {totals.revenue > 0 ? `${((totals.margin / totals.revenue) * 100).toFixed(0)}% of contract` : ""}
+                      </div>
+                    </>
+                  }
+                />
+                <div style={{ flex: 1, minWidth: "200px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: theme.primary, marginBottom: "10px" }}>Where the cost is going</div>
+                  {[
+                    { label: "Labour", value: totals.labour, color: theme.primary },
+                    { label: "Materials", value: totals.materials, color: theme.gold },
+                  ].map(row => (
+                    <div key={row.label} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                      <span style={{ width: "10px", height: "10px", borderRadius: "3px", backgroundColor: row.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: "12px", color: theme.textSecondary, flex: 1 }}>{row.label}</span>
+                      <span style={{ fontSize: "12px", fontWeight: "700", color: theme.textPrimary }}>${fmt(row.value)}</span>
+                      <span style={{ fontSize: "11px", color: theme.textLight, width: "36px", textAlign: "right" }}>{totals.cost > 0 ? `${Math.round((row.value / totals.cost) * 100)}%` : "0%"}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${theme.border}` }}>
+                    <span style={{ fontSize: "12px", color: theme.textSecondary, flex: 1, fontWeight: "600" }}>Contract Value</span>
+                    <span style={{ fontSize: "13px", fontWeight: "800", color: theme.primary }}>${fmt(totals.revenue)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {!loading && sorted.length > 0 && (() => {
           let onTrack = 0, watch = 0, overBudget = 0;
           sorted.forEach(j => {
