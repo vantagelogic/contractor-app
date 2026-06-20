@@ -4388,33 +4388,6 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
   );
 }
 
-// ─── SETUP SECTION ──────────────────────────────────────────────
-function SetupSection({ number, title, subtitle, complete, completeLabel, children }) {
-  const [open, setOpen] = useState(!complete);
-  return (
-    <div style={{ marginBottom: "10px", borderRadius: "12px", border: `1.5px solid ${complete ? theme.accent : theme.border}`, overflow: "hidden", backgroundColor: "white" }}>
-      <div onClick={() => setOpen(o => !o)} style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", backgroundColor: complete ? theme.accentLight : "white" }}>
-        <div style={{ width: "28px", height: "28px", borderRadius: "50%", backgroundColor: complete ? theme.accent : theme.primary, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "700", flexShrink: 0 }}>
-          {complete ? "✓" : number}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary }}>{title}</div>
-          {complete && completeLabel && (
-            <div style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", marginTop: "1px" }}>{completeLabel}</div>
-          )}
-        </div>
-        <span style={{ fontSize: "11px", color: theme.textLight, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
-      </div>
-      {open && (
-        <div style={{ padding: "16px", borderTop: `1px solid ${theme.border}` }}>
-          {subtitle && <p style={{ fontSize: "13px", color: theme.textSecondary, marginTop: 0, marginBottom: "14px", lineHeight: 1.5 }}>{subtitle}</p>}
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function SettingsHub({ token, readonly = false, initialTab = "company", subTier = null, crewCount = null, tierLimit = null, onPlanPicker = null, onSubRefresh = null }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [employees, setEmployees] = useState([]);
