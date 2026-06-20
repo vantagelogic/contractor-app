@@ -552,12 +552,23 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
           </div>
           {!step.done && (
             step.copyLink ? (
-              <button
-                onClick={() => { navigator.clipboard.writeText(step.copyLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", flexShrink: 0, fontFamily: font.body, whiteSpace: "nowrap" }}
-              >
-                {copied ? "Copied!" : "Copy link"}
-              </button>
+              <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                {typeof navigator !== "undefined" && navigator.share && (
+                  <button
+                    onClick={() => navigator.share({ title: "Vantage Logic", text: "Log your hours and materials here:", url: step.copyLink }).catch(() => {})}
+                    aria-label="Share link"
+                    style={{ fontSize: "11px", padding: "5px 9px", borderRadius: "6px", border: `1px solid ${theme.accent}`, cursor: "pointer", backgroundColor: "white", color: theme.accent, fontWeight: "700", fontFamily: font.body, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  </button>
+                )}
+                <button
+                  onClick={() => { navigator.clipboard.writeText(step.copyLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  style={{ fontSize: "11px", padding: "5px 11px", borderRadius: "6px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "700", whiteSpace: "nowrap", fontFamily: font.body }}
+                >
+                  {copied ? "Copied!" : "Copy link"}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => onNavigate && onNavigate(step.view)}
@@ -1130,6 +1141,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
                 <div style={{ backgroundColor: theme.bg, borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
                   {voiceResult.type === "timesheet" && <>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Hours</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{voiceResult.hours || "?"}</span></div>
+                    {voiceResult.overtime_hours > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Overtime</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.gold }}>{voiceResult.overtime_hours}</span></div>}
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Cost Code</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedCCLabel || voiceResult.cost_code || "?"}</span></div>
                     {voiceResult.cost_code_confidence === "low" && (
@@ -1607,15 +1619,17 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   useEffect(() => {
     if (!voicePrefill || voicePrefill.type !== "timesheet") return;
-    const today = new Date().toISOString().split("T")[0];
+    const hasOT = Number(voicePrefill.overtime_hours) > 0;
     setFormData(prev => ({
       ...prev,
       hours_worked: voicePrefill.hours ? String(voicePrefill.hours) : prev.hours_worked,
+      overtime_hours: hasOT ? String(voicePrefill.overtime_hours) : prev.overtime_hours,
       job_id: voicePrefill._matchedJobId || prev.job_id,
       cost_code_id: voicePrefill._matchedCCId || prev.cost_code_id,
       field_notes: voicePrefill.notes || prev.field_notes,
-      shift_date: today,
+      shift_date: new Date().toISOString().split("T")[0],
     }));
+    if (hasOT) setAddOvertime(true);
     if (onPrefillConsumed) onPrefillConsumed();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voicePrefill]);
@@ -1626,19 +1640,6 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
       if (emp) setLinkedEmployeeName(`${emp.first_name} ${emp.last_name}`);
     }
   }, [linkedEmployeeId, employees]);
-
-  useEffect(() => {
-    if (!voicePrefill || voicePrefill.type !== "timesheet") return;
-    setFormData(prev => ({
-      ...prev,
-      hours_worked: voicePrefill.hours ? String(voicePrefill.hours) : prev.hours_worked,
-      job_id: voicePrefill._matchedJobId || prev.job_id,
-      cost_code_id: voicePrefill._matchedCCId || prev.cost_code_id,
-      field_notes: voicePrefill.notes || prev.field_notes,
-    }));
-    if (onPrefillConsumed) onPrefillConsumed();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voicePrefill]);
 
   function handleChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
