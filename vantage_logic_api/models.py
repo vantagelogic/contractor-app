@@ -247,6 +247,19 @@ class ShiftTemplate(Base):
     end_time = Column(String(5), nullable=True)
 
 
+class JobType(Base):
+    __tablename__ = "job_types"
+
+    job_type_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    hint = Column(String(500), nullable=True)
+    cost_code_ids = Column(JSONB, nullable=True)
+    sort_order = Column(Integer, default=0)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class WorkCategoryTemplate(Base):
     __tablename__ = "work_category_templates"
 
@@ -275,7 +288,12 @@ class Estimate(Base):
     total_material_cost = Column(Numeric(12, 2), default=0)
     total_labor_cost = Column(Numeric(12, 2), default=0)
     total_cost = Column(Numeric(12, 2), default=0)
+    crew_count = Column(Integer, nullable=True)
+    estimated_mileage_km = Column(Numeric(10, 2), nullable=True)
     notes = Column(Text)
+    pdf_path = Column(String(500), nullable=True)
+    customer_email = Column(String(255), nullable=True)
+    sent_at = Column(DateTime, nullable=True)
     approved_at = Column(DateTime, nullable=True)
     approved_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())

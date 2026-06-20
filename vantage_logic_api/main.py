@@ -169,6 +169,32 @@ with engine.connect() as _conn:
         _conn.commit()
     except Exception:
         pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS crew_count INTEGER"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE estimates ADD COLUMN IF NOT EXISTS estimated_mileage_km NUMERIC(10,2)"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    for _col, _typ in [
+        ("pdf_path", "VARCHAR(500)"),
+        ("customer_email", "VARCHAR(255)"),
+        ("sent_at", "TIMESTAMP"),
+    ]:
+        try:
+            _conn.execute(__import__("sqlalchemy").text(
+                f"ALTER TABLE estimates ADD COLUMN IF NOT EXISTS {_col} {_typ}"
+            ))
+            _conn.commit()
+        except Exception:
+            pass
 
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")

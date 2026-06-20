@@ -4403,6 +4403,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
     { id: "company", label: "Company Profile" },
     { id: "crew", label: "Crew Management" },
     { id: "categories", label: "Work Categories" },
+    { id: "estimating", label: "Estimating" },
     { id: "financials", label: "Financials" },
     { id: "exports", label: "Data Exports" },
     { id: "inventory", label: "Inventory" },
@@ -4760,6 +4761,16 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
                 ))}
               </div>
             )}
+              </div>
+            )}
+
+            {settingsTab === "estimating" && (
+              <div style={styles.card}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>Estimating</h2>
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 16, lineHeight: 1.55 }}>
+                  Define job types (which cost codes to include) and saved templates (default hours &amp; materials). Used when building new estimates.
+                </p>
+                <EstimatingSettingsPanel token={token} costCodes={costCodes} readonly={readonly} />
               </div>
             )}
 
@@ -5979,6 +5990,551 @@ function NotificationBell({ token, role, setView, mobile }) {
 
 // ─── COST-PLUS MODULE ─────────────────────────────────────────
 
+function goToEstimatingSettings() {
+  if (window._navigateToSettings) window._navigateToSettings("estimating");
+  else if (window._setView) window._setView("settings");
+}
+
+function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const [jobTypes, setJobTypes] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [jtForm, setJtForm] = useState({ name: "", hint: "", cost_code_ids: [] });
+  const [editingJt, setEditingJt] = useState(null);
+  const [tplForm, setTplForm] = useState({ name: "", cost_code_id: "", estimated_hours: "", estimated_material_cost: "" });
+  const [editingTpl, setEditingTpl] = useState(null);
+
+  function load() {
+    apiFetch(`${API}/job-types`, { headers }).then(r => r.ok ? r.json() : []).then(setJobTypes).catch(() => setJobTypes([]));
+    apiFetch(`${API}/estimate-templates`, { headers }).then(r => r.ok ? r.json() : []).then(setTemplates).catch(() => setTemplates([]));
+  }
+  useEffect(() => { load(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function flash(m) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
+
+  async function saveJobType() {
+    if (!jtForm.name.trim()) return;
+    const body = { name: jtForm.name.trim(), hint: jtForm.hint || null, cost_code_ids: jtForm.cost_code_ids.map(Number) };
+    const url = editingJt ? `${API}/job-types/${editingJt}` : `${API}/job-types`;
+    const res = await apiFetch(url, { method: editingJt ? "PATCH" : "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (res.ok) { flash(editingJt ? "Job type updated" : "Job type added"); setJtForm({ name: "", hint: "", cost_code_ids: [] }); setEditingJt(null); load(); }
+  }
+
+  async function saveTemplate() {
+    if (!tplForm.name.trim()) return;
+    const body = {
+      name: tplForm.name.trim(),
+      cost_code_id: tplForm.cost_code_id ? parseInt(tplForm.cost_code_id, 10) : null,
+      estimated_hours: parseFloat(tplForm.estimated_hours) || 0,
+      estimated_material_cost: parseFloat(tplForm.estimated_material_cost) || 0,
+      estimated_labor_cost: 0,
+    };
+    const url = editingTpl ? `${API}/estimate-templates/${editingTpl}` : `${API}/estimate-templates`;
+    const res = await apiFetch(url, { method: editingTpl ? "PATCH" : "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (res.ok) { flash(editingTpl ? "Template updated" : "Template added"); setTplForm({ name: "", cost_code_id: "", estimated_hours: "", estimated_material_cost: "" }); setEditingTpl(null); load(); }
+  }
+
+  function toggleJtCostCode(id) {
+    const n = Number(id);
+    setJtForm(f => ({ ...f, cost_code_ids: f.cost_code_ids.includes(n) ? f.cost_code_ids.filter(x => x !== n) : [...f.cost_code_ids, n] }));
+  }
+
+  return (
+    <div>
+      {msg && <div style={{ color: theme.accent, fontWeight: 600, marginBottom: 12, fontSize: 13 }}>{msg}</div>}
+
+      <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Job type vs saved template — what&apos;s the difference?</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 12, fontSize: 13, lineHeight: 1.6 }}>
+          <div style={{ padding: "12px 14px", backgroundColor: "white", borderRadius: 8, border: `1px solid ${theme.border}` }}>
+            <div style={{ fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Job type = the skeleton</div>
+            <p style={{ margin: 0, color: theme.textSecondary }}>
+              <strong>Which rows</strong> show up when you start a new estimate. Example: &quot;Bathroom Reno&quot; adds Demo, Plumbing, Tile rows — hours stay blank until you fill them in. Also helps name the {T.project.toLowerCase()}.
+            </p>
+          </div>
+          <div style={{ padding: "12px 14px", backgroundColor: "white", borderRadius: 8, border: `1px solid ${theme.border}` }}>
+            <div style={{ fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Saved template = a price shortcut</div>
+            <p style={{ margin: 0, color: theme.textSecondary }}>
+              <strong>Default hours &amp; materials</strong> for one piece of work. Example: &quot;Standard demo&quot; → 8h and $150 on the Demo row. Use while building an estimate — tap &quot;Load saved template&quot; on the form.
+            </p>
+          </div>
+        </div>
+        <p style={{ fontSize: 12, color: theme.textLight, margin: "12px 0 0", lineHeight: 1.55 }}>
+          Simple rule: job type sets up <strong>empty rows</strong>. Templates fill in <strong>numbers</strong> on those rows. You can use both, either, or neither.
+        </p>
+      </div>
+
+      <div style={{ ...styles.card, marginBottom: 16 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 8px" }}>Job Types</h3>
+        <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
+          Pick cost codes that belong together for a kind of job. When someone starts an estimate and selects this type, those rows appear automatically (no hours yet).
+        </p>
+        <input style={styles.input} placeholder="Job type name" value={jtForm.name} onChange={e => setJtForm({ ...jtForm, name: e.target.value })} disabled={readonly} />
+        <input style={styles.input} placeholder="Short hint (optional)" value={jtForm.hint} onChange={e => setJtForm({ ...jtForm, hint: e.target.value })} disabled={readonly} />
+        <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSecondary, margin: "10px 0 6px" }}>Cost codes included in this job type</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {costCodes.map(cc => (
+            <button key={cc.cost_code_id} type="button" disabled={readonly} onClick={() => toggleJtCostCode(cc.cost_code_id)} style={{
+              padding: "6px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: font.body,
+              border: `1.5px solid ${jtForm.cost_code_ids.includes(cc.cost_code_id) ? theme.accent : theme.border}`,
+              backgroundColor: jtForm.cost_code_ids.includes(cc.cost_code_id) ? theme.accentLight : "white",
+              color: jtForm.cost_code_ids.includes(cc.cost_code_id) ? theme.primary : theme.textSecondary,
+            }}>{cc.code}</button>
+          ))}
+        </div>
+        {!readonly && <button type="button" onClick={saveJobType} style={{ ...styles.button, marginTop: 0, maxWidth: 200 }}>{editingJt ? "Update" : "Add"} Job Type</button>}
+        {jobTypes.length > 0 && (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+            {jobTypes.map(jt => (
+              <div key={jt.job_type_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{jt.name}</div>
+                  <div style={{ fontSize: 11, color: theme.textSecondary }}>{jt.hint || ""} · {(jt.cost_code_ids || []).length} categories</div>
+                </div>
+                {!readonly && (
+                  <button type="button" onClick={() => { setEditingJt(jt.job_type_id); setJtForm({ name: jt.name, hint: jt.hint || "", cost_code_ids: jt.cost_code_ids || [] }); }} style={{ fontSize: 12, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={styles.card}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 8px" }}>Saved Templates</h3>
+        <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
+          One reusable price for a single task — hours and materials for one cost code. Not a full job; just a shortcut so you don&apos;t re-type &quot;8 hours demo, $150 materials&quot; every time.
+        </p>
+        <input style={styles.input} placeholder="Template name" value={tplForm.name} onChange={e => setTplForm({ ...tplForm, name: e.target.value })} disabled={readonly} />
+        <select style={styles.input} value={tplForm.cost_code_id} onChange={e => setTplForm({ ...tplForm, cost_code_id: e.target.value })} disabled={readonly}>
+          <option value="">Link to cost code (optional)</option>
+          {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+        </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <input style={styles.input} type="number" placeholder="Default hours" value={tplForm.estimated_hours} onChange={e => setTplForm({ ...tplForm, estimated_hours: e.target.value })} disabled={readonly} />
+          <input style={styles.input} type="number" placeholder="Default materials $" value={tplForm.estimated_material_cost} onChange={e => setTplForm({ ...tplForm, estimated_material_cost: e.target.value })} disabled={readonly} />
+        </div>
+        {!readonly && <button type="button" onClick={saveTemplate} style={{ ...styles.button, marginTop: 8, maxWidth: 200 }}>{editingTpl ? "Update" : "Add"} Template</button>}
+        {templates.length > 0 && (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+            {templates.map(t => (
+              <div key={t.template_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: theme.textSecondary }}>{t.estimated_hours}h · ${fmt(t.estimated_material_cost)} mat</div>
+                </div>
+                {!readonly && (
+                  <button type="button" onClick={() => { setEditingTpl(t.template_id); setTplForm({ name: t.name, cost_code_id: t.cost_code_id || "", estimated_hours: String(t.estimated_hours || ""), estimated_material_cost: String(t.estimated_material_cost || "") }); }} style={{ fontSize: 12, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initialEstimate = null }) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const isEditMode = !!(initialJob && initialEstimate);
+  const [jobTypes, setJobTypes] = useState([]);
+  const [costCodes, setCostCodes] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [jobTypeId, setJobTypeId] = useState("");
+  const [client, setClient] = useState("");
+  const [city, setCity] = useState(initialJob?.city || "");
+  const [customerEmail, setCustomerEmail] = useState(initialEstimate?.customer_email || "");
+  const [mileageKm, setMileageKm] = useState(
+    initialEstimate?.estimated_mileage_km ? String(initialEstimate.estimated_mileage_km) : ""
+  );
+  const [rows, setRows] = useState(() => {
+    if (initialEstimate?.line_items?.length) {
+      return initialEstimate.line_items.map(li => ({
+        cost_code_id: li.cost_code_id ? String(li.cost_code_id) : "",
+        hours: li.estimated_hours != null ? String(li.estimated_hours) : "",
+        materials: li.material_cost != null ? String(li.material_cost) : "",
+      }));
+    }
+    return [{ cost_code_id: "", hours: "", materials: "" }];
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [phase, setPhase] = useState(initialEstimate?.status === "sent" ? "sent" : "form");
+  const [savedJob, setSavedJob] = useState(initialJob);
+  const [savedEstimate, setSavedEstimate] = useState(initialEstimate);
+  const [sendMsg, setSendMsg] = useState("");
+
+  useEffect(() => {
+    if (!initialJob) return;
+    const name = initialJob.job_name || "";
+    const dash = name.indexOf(" — ");
+    if (dash >= 0) setClient(name.slice(dash + 3).split(",")[0].trim());
+  }, [initialJob]);
+
+  useEffect(() => {
+    apiFetch(`${API}/job-types`, { headers }).then(r => r.ok ? r.json() : []).then(setJobTypes).catch(() => setJobTypes([]));
+    apiFetch(`${API}/cost-codes`, { headers }).then(r => r.ok ? r.json() : []).then(setCostCodes).catch(() => setCostCodes([]));
+    apiFetch(`${API}/estimate-templates`, { headers }).then(r => r.ok ? r.json() : []).then(setTemplates).catch(() => setTemplates([]));
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (isEditMode || savedEstimate) return;
+    if (!jobTypeId) return;
+    const jt = jobTypes.find(j => String(j.job_type_id) === String(jobTypeId));
+    if (!jt?.cost_code_ids?.length) return;
+    setRows(jt.cost_code_ids.map(id => ({ cost_code_id: String(id), hours: "", materials: "" })));
+  }, [jobTypeId, jobTypes, isEditMode, savedEstimate]);
+
+  const selectedJobType = jobTypes.find(j => String(j.job_type_id) === String(jobTypeId));
+  const projectName = savedJob?.job_name || (selectedJobType
+    ? `${selectedJobType.name}${client.trim() ? ` — ${client.trim()}` : ""}${city.trim() ? `, ${city.trim()}` : ""}`
+    : client.trim() || city.trim() ? `${client.trim() || "Project"}${city.trim() ? `, ${city.trim()}` : ""}` : "");
+
+  function updateRow(i, field, val) {
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+  }
+
+  function addRow() {
+    setRows(prev => [...prev, { cost_code_id: "", hours: "", materials: "" }]);
+  }
+
+  function removeRow(i) {
+    setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
+  }
+
+  function applyTemplate(templateId) {
+    const t = templates.find(x => String(x.template_id) === String(templateId));
+    if (!t) return;
+    const ccId = t.cost_code_id ? String(t.cost_code_id) : "";
+    setRows(prev => {
+      const idx = prev.findIndex(r => r.cost_code_id === ccId && ccId);
+      const row = { cost_code_id: ccId, hours: String(t.estimated_hours || ""), materials: String(t.estimated_material_cost || "") };
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = row;
+        return next;
+      }
+      return [...prev, row];
+    });
+  }
+
+  const totalHours = rows.reduce((s, r) => s + (parseFloat(r.hours) || 0), 0);
+  const totalMaterials = rows.reduce((s, r) => s + (parseFloat(r.materials) || 0), 0);
+
+  function buildLineItems() {
+    return rows
+      .filter(r => r.cost_code_id && (parseFloat(r.hours) > 0 || parseFloat(r.materials) > 0))
+      .map(r => {
+        const cc = costCodes.find(c => String(c.cost_code_id) === String(r.cost_code_id));
+        return {
+          cost_code_id: parseInt(r.cost_code_id, 10),
+          description: cc ? `${cc.code} — ${cc.description}` : "Work",
+          quantity: 1,
+          estimated_hours: parseFloat(r.hours) || 0,
+          material_cost: parseFloat(r.materials) || 0,
+          labor_cost: 0,
+        };
+      });
+  }
+
+  async function downloadEstimatePdf(estimateId) {
+    const res = await apiFetch(`${API}/estimates/${estimateId}/pdf`, { headers });
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `estimate_${estimateId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  }
+
+  async function saveEstimateDraft() {
+    setError("");
+    const lineItems = buildLineItems();
+    if (!lineItems.length) { setError("Add at least one row with hours or materials"); return null; }
+
+    let job = savedJob;
+    let est = savedEstimate;
+
+    if (!job) {
+      if (!projectName.trim()) { setError("Add client name or city so we can name this project"); return null; }
+      const jobParams = { job_name: projectName.trim() };
+      if (city.trim()) jobParams.city = city.trim();
+      const jobRes = await apiFetch(`${API}/jobs?${new URLSearchParams(jobParams)}`, { method: "POST", headers });
+      if (!jobRes.ok) {
+        const d = await jobRes.json().catch(() => ({}));
+        setError(typeof d.detail === "string" ? d.detail : `Could not create ${T.project.toLowerCase()}`);
+        return null;
+      }
+      job = await jobRes.json();
+      setSavedJob(job);
+    }
+
+    const payload = {
+      title: selectedJobType ? `${selectedJobType.name} Estimate` : (est?.title || "Estimate"),
+      estimated_mileage_km: parseFloat(mileageKm) || null,
+      line_items: lineItems,
+    };
+
+    if (!est) {
+      const estRes = await apiFetch(`${API}/jobs/${job.job_id}/estimates`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!estRes.ok) {
+        const d = await estRes.json().catch(() => ({}));
+        setError(typeof d.detail === "string" ? d.detail : "Could not save estimate");
+        return null;
+      }
+      est = await estRes.json();
+      setSavedEstimate(est);
+    } else {
+      const patchRes = await apiFetch(`${API}/estimates/${est.estimate_id}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!patchRes.ok) {
+        const d = await patchRes.json().catch(() => ({}));
+        setError(typeof d.detail === "string" ? d.detail : "Could not update estimate");
+        return null;
+      }
+      est = await patchRes.json();
+      setSavedEstimate(est);
+    }
+
+    return { job, est };
+  }
+
+  async function generateAndSend() {
+    setSaving(true);
+    setError("");
+    setSendMsg("");
+    const saved = await saveEstimateDraft();
+    if (!saved) { setSaving(false); return; }
+    const { job, est } = saved;
+    setSavedJob(job);
+    setSavedEstimate(est);
+
+    const sendRes = await apiFetch(`${API}/estimates/${est.estimate_id}/send-customer`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_email: customerEmail.trim() || null,
+        customer_name: client.trim() || null,
+      }),
+    });
+    setSaving(false);
+    if (!sendRes.ok) {
+      const d = await sendRes.json().catch(() => ({}));
+      setError(typeof d.detail === "string" ? d.detail : "Could not generate customer estimate");
+      return;
+    }
+    const data = await sendRes.json();
+    await downloadEstimatePdf(est.estimate_id);
+    setPhase("sent");
+    if (data.email_sent) {
+      setSendMsg(`PDF downloaded and emailed to ${customerEmail.trim()}`);
+    } else if (customerEmail.trim()) {
+      setSendMsg("PDF downloaded — email not configured; send the PDF to your customer manually");
+    } else {
+      setSendMsg("PDF downloaded — email or hand it to your customer for approval");
+    }
+  }
+
+  async function setDashboardBaseline() {
+    if (!savedEstimate) return;
+    if (!window.confirm("Has the customer approved this estimate? This sets your internal dashboard baseline (budget vs actual tracking).")) return;
+    setSaving(true);
+    setError("");
+    const res = await apiFetch(`${API}/estimates/${savedEstimate.estimate_id}/approve`, { method: "PATCH", headers });
+    setSaving(false);
+    if (res.ok) {
+      onDone(savedJob);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setError(typeof d.detail === "string" ? d.detail : "Could not set dashboard baseline");
+    }
+  }
+
+  function adjustForNegotiations() {
+    setPhase("form");
+    setSendMsg("");
+    setError("");
+  }
+
+  if (phase === "sent" && savedEstimate && savedJob) {
+    return (
+      <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
+        <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
+        <h1 style={styles.title}>Customer estimate sent</h1>
+        <p style={styles.subtitle}>{savedJob.job_name} — waiting for customer approval before internal tracking starts.</p>
+        {sendMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{sendMsg}</div>}
+        {error && <p style={styles.errorMsg}>{error}</p>}
+        <div style={{ ...styles.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>What happens next</div>
+          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
+            <li>Customer reviews the PDF (hours, materials, total)</li>
+            <li>They sign off — email, text, or in person</li>
+            <li><strong>Then</strong> you set the dashboard baseline to track budget vs actual as crew log work</li>
+          </ol>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 360 }}>
+          <button type="button" onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent }}>
+            Download PDF again
+          </button>
+          <button type="button" disabled={saving} onClick={adjustForNegotiations} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888" }}>
+            Adjust for negotiations
+          </button>
+          <button type="button" disabled={saving} onClick={setDashboardBaseline} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold }}>
+            {saving ? "Setting baseline…" : "Customer approved — set dashboard baseline"}
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: theme.textLight, marginTop: 14, lineHeight: 1.5 }}>
+          Customer wants changes? Use <strong>Adjust for negotiations</strong> — remove rows, change hours/materials, then generate an updated PDF. Dashboard baseline stays separate until they approve.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
+      <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
+      <h1 style={styles.title}>{isEditMode || savedEstimate ? "Edit Estimate" : "New Estimate"}</h1>
+      <p style={{ ...styles.subtitle, maxWidth: 640 }}>
+        Step 1: build the quote for your <strong>customer</strong>. Step 2: after they approve, set the <strong>dashboard baseline</strong>. Remove rows or change numbers anytime before sending — use × on a row or set hours/materials to zero.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <button type="button" onClick={goToEstimatingSettings} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, fontSize: 13, padding: "10px 16px" }}>
+          Manage job types &amp; templates
+        </button>
+      </div>
+
+      {error && <p style={styles.errorMsg}>{error}</p>}
+
+      <div style={{ ...styles.card, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 12 }}>1 — Project info</div>
+        <label style={styles.label}>Job type <span style={{ fontWeight: 400, color: theme.textLight }}>(optional — adds empty rows)</span></label>
+        <select style={styles.input} value={jobTypeId} onChange={e => setJobTypeId(e.target.value)} disabled={!!savedEstimate}>
+          <option value="">None — add rows manually</option>
+          {jobTypes.map(jt => <option key={jt.job_type_id} value={jt.job_type_id}>{jt.name}</option>)}
+        </select>
+        {savedEstimate ? (
+          <p style={{ fontSize: 11, color: theme.textLight, margin: "6px 0 0", lineHeight: 1.45 }}>
+            Job type is locked when editing an existing estimate — change the rows below instead.
+          </p>
+        ) : (
+          <p style={{ fontSize: 11, color: theme.textLight, margin: "6px 0 0", lineHeight: 1.45 }}>
+            Skeleton only: picks which {T.workCategories.toLowerCase()} appear as rows. Does not set hours or prices — use saved templates or type numbers yourself.
+          </p>
+        )}
+        {selectedJobType?.hint && <p style={{ fontSize: 12, color: theme.textSecondary, margin: "6px 0 0" }}>{selectedJobType.hint}</p>}
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10, marginTop: 12 }}>
+          <div>
+            <label style={styles.label}>Client name</label>
+            <input style={styles.input} placeholder="e.g. Johnson" value={client} onChange={e => setClient(e.target.value)} />
+          </div>
+          <div>
+            <label style={styles.label}>City / area</label>
+            <input style={styles.input} placeholder="e.g. Burnaby" value={city} onChange={e => setCity(e.target.value)} />
+          </div>
+        </div>
+        {projectName && (
+          <div style={{ marginTop: 12, padding: "10px 12px", backgroundColor: theme.accentLight, borderRadius: 8, fontSize: 13 }}>
+            <span style={{ fontWeight: 600, color: theme.accent }}>{T.project} name: </span>{projectName}
+          </div>
+        )}
+        <div style={{ marginTop: 12 }}>
+          <label style={styles.label}>Customer email (optional — for sending PDF)</label>
+          <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ ...styles.card, marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary }}>2 — Budget by {T.workCategory.toLowerCase()}</div>
+          {templates.length > 0 && (
+            <select style={{ ...styles.input, margin: 0, maxWidth: 240, fontSize: 13 }} defaultValue="" onChange={e => { if (e.target.value) { applyTemplate(e.target.value); e.target.value = ""; } }}>
+              <option value="">Load price shortcut…</option>
+              {templates.map(t => <option key={t.template_id} value={t.template_id}>{t.name}</option>)}
+            </select>
+          )}
+        </div>
+        <p style={{ fontSize: 11, color: theme.textLight, margin: "0 0 10px", lineHeight: 1.45 }}>
+          Saved templates fill hours &amp; materials on one row — different from job type, which only decides which rows exist.
+        </p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: theme.textSecondary, fontSize: 11, textTransform: "uppercase" }}>
+                <th style={{ padding: "8px 6px" }}>{T.workCategory}</th>
+                <th style={{ padding: "8px 6px", width: 90 }}>Hours</th>
+                <th style={{ padding: "8px 6px", width: 110 }}>Materials $</th>
+                <th style={{ width: 36 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i}>
+                  <td style={{ padding: "4px 6px" }}>
+                    <select style={{ ...styles.input, margin: 0, fontSize: 13 }} value={row.cost_code_id} onChange={e => updateRow(i, "cost_code_id", e.target.value)}>
+                      <option value="">Select…</option>
+                      {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ padding: "4px 6px" }}>
+                    <input style={{ ...styles.input, margin: 0 }} type="number" min="0" step="0.5" placeholder="0" value={row.hours} onChange={e => updateRow(i, "hours", e.target.value)} />
+                  </td>
+                  <td style={{ padding: "4px 6px" }}>
+                    <input style={{ ...styles.input, margin: 0 }} type="number" min="0" step="1" placeholder="0" value={row.materials} onChange={e => updateRow(i, "materials", e.target.value)} />
+                  </td>
+                  <td style={{ padding: "4px 6px" }}>
+                    <button type="button" onClick={() => removeRow(i)} style={{ background: "none", border: "none", color: theme.danger, cursor: "pointer", fontSize: 16 }}>×</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 8, lineHeight: 1.45 }}>
+          Hours = <strong>total project hours</strong> for each cost code (all crew combined). Actual crew size changes daily — the dashboard compares logged hours to this budget, not headcount.
+        </p>
+        <button type="button" onClick={addRow} style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: theme.accent, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>+ Add row</button>
+      </div>
+
+      <div style={{ ...styles.card, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>3 — Mileage (optional)</div>
+        <label style={styles.label}>Estimated km for this job</label>
+        <input style={{ ...styles.input, maxWidth: 160 }} type="number" min="0" placeholder="0" value={mileageKm} onChange={e => setMileageKm(e.target.value)} />
+        <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>Added to contract value at your company mileage rate when approved.</p>
+      </div>
+
+      <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>Estimate summary</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
+          <div>Total hours: <strong>{totalHours.toFixed(1)}h</strong></div>
+          <div>Materials: <strong>${fmt(totalMaterials)}</strong></div>
+          <div>Mileage: <strong>{mileageKm || "0"} km</strong></div>
+        </div>
+      </div>
+
+      <button type="button" disabled={saving} onClick={generateAndSend} style={{ ...styles.button, backgroundColor: theme.accent }}>
+        {saving ? "Generating PDF…" : savedEstimate ? "Save changes & send updated PDF" : "Generate customer estimate & send"}
+      </button>
+      <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 12, lineHeight: 1.55 }}>
+        Saves your changes, downloads a PDF, and optionally emails your customer. Negotiating scope? Remove lines or adjust hours, then send again — dashboard baseline only after final approval.
+      </p>
+    </div>
+  );
+}
+
 function QuickJobForm({ token, onCreated, onCancel, compact = false }) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
@@ -6078,14 +6634,64 @@ function useActiveJobs(token) {
 }
 
 function EstimateHub({ token, readonly = false }) {
+  const headers = { Authorization: `Bearer ${token}` };
   const [jobs, refreshJobs] = useActiveJobs(token);
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [estimates, setEstimates] = useState([]);
-  const [building, setBuilding] = useState(false);
-  const [showNewJob, setShowNewJob] = useState(false);
-  const [hint, setHint] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [actionMsg, setActionMsg] = useState("");
+  const [actionErr, setActionErr] = useState("");
+  const [busyId, setBusyId] = useState(null);
 
   const selectedJob = jobs.find(j => j.job_id === selectedJobId) || null;
+
+  async function downloadEstimatePdf(estimateId) {
+    const res = await apiFetch(`${API}/estimates/${estimateId}/pdf`, { headers });
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `estimate_${estimateId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  }
+
+  async function openEstimateEditor(estimateId, jobId) {
+    setActionErr("");
+    setBusyId(estimateId);
+    const res = await apiFetch(`${API}/estimates/${estimateId}`, { headers });
+    setBusyId(null);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setActionErr(typeof d.detail === "string" ? d.detail : "Could not load estimate");
+      return;
+    }
+    const estimate = await res.json();
+    const job = jobs.find(j => j.job_id === jobId) || selectedJob;
+    if (job) setEditTarget({ job, estimate });
+  }
+
+  async function approveBaseline(estimateId, jobId) {
+    if (!window.confirm("Has the customer approved this estimate? This sets your internal dashboard baseline.")) return;
+    setBusyId(estimateId);
+    setActionErr("");
+    setActionMsg("");
+    const res = await apiFetch(`${API}/estimates/${estimateId}/approve`, { method: "PATCH", headers });
+    setBusyId(null);
+    if (res.ok) {
+      setActionMsg("Dashboard baseline set — track budget vs actual on the Dashboard.");
+      loadEstimates(jobId);
+      refreshJobs();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setActionErr(typeof d.detail === "string" ? d.detail : "Could not set dashboard baseline");
+    }
+  }
 
   function loadEstimates(jobId) {
     apiFetch(`${API}/jobs/${jobId}/estimates`, { headers: { Authorization: `Bearer ${token}` } })
@@ -6095,44 +6701,30 @@ function EstimateHub({ token, readonly = false }) {
   }
 
   useEffect(() => {
-    if (selectedJobId && !building) loadEstimates(selectedJobId);
-    else setEstimates([]);
-  }, [token, selectedJobId, building]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selectedJobId && !formOpen && !editTarget) loadEstimates(selectedJobId);
+    else if (!selectedJobId) setEstimates([]);
+  }, [token, selectedJobId, formOpen, editTarget]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedJobId && !jobs.some(j => j.job_id === selectedJobId)) setSelectedJobId(null);
   }, [jobs, selectedJobId]);
 
-  function startEstimate() {
-    if (readonly) return;
-    setHint("");
-    if (!selectedJobId) {
-      if (jobs.length === 0) {
-        setShowNewJob(true);
-        return;
-      }
-      setHint(`Select a ${T.project.toLowerCase()} above, or create a new one.`);
-      return;
-    }
-    setBuilding(true);
-  }
-
-  function onJobCreated(job) {
-    refreshJobs();
-    setSelectedJobId(job.job_id);
-    setShowNewJob(false);
-    setBuilding(true);
-  }
-
-  if (building && selectedJob) {
+  if (formOpen || editTarget) {
+    const job = editTarget?.job || null;
+    const estimate = editTarget?.estimate || null;
     return (
-      <EstimateBuilder
+      <CreateEstimateForm
         token={token}
-        jobId={selectedJob.job_id}
-        jobName={selectedJob.job_name}
-        backLabel="Estimate"
-        onApproved={() => { setBuilding(false); loadEstimates(selectedJob.job_id); refreshJobs(); }}
-        onClose={() => setBuilding(false)}
+        initialJob={job}
+        initialEstimate={estimate}
+        onDone={(j) => {
+          refreshJobs();
+          setSelectedJobId(j.job_id);
+          setFormOpen(false);
+          setEditTarget(null);
+          loadEstimates(j.job_id);
+        }}
+        onCancel={() => { setFormOpen(false); setEditTarget(null); }}
       />
     );
   }
@@ -6142,56 +6734,103 @@ function EstimateHub({ token, readonly = false }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
           <h1 style={{ ...styles.title, marginBottom: 4 }}>Estimates</h1>
-          <p style={{ ...styles.subtitle, marginBottom: 0 }}>Tap templates to build fast. Approving sets the dashboard baseline.</p>
+          <p style={{ ...styles.subtitle, marginBottom: 0 }}>Customer quotes first — dashboard baseline only after they approve.</p>
         </div>
         {!readonly && (
-          <button type="button" onClick={startEstimate} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold, whiteSpace: "nowrap", minWidth: 160 }}>
+          <button type="button" onClick={() => setFormOpen(true)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold, whiteSpace: "nowrap", minWidth: 160 }}>
             + New Estimate
           </button>
         )}
       </div>
 
-      {hint && <p style={{ ...styles.errorMsg, color: theme.gold, backgroundColor: theme.goldLight, padding: "10px 14px", borderRadius: 8, marginBottom: 12 }}>{hint}</p>}
+      <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>How estimates work</div>
+        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
+          <li><strong>Generate &amp; send</strong> — PDF quote for the customer (hours, materials, total)</li>
+          <li><strong>Customer approves</strong> — sign-off before work is locked in</li>
+          <li><strong>Set dashboard baseline</strong> — internal budget for tracking actual crew logs vs plan</li>
+        </ol>
+      </div>
 
-      <ProjectSelectBar
-        token={token}
-        jobs={jobs}
-        selectedJobId={selectedJobId}
-        onSelectJob={(id) => { setSelectedJobId(id); setHint(""); }}
-        onJobsChange={refreshJobs}
-        readonly={readonly}
-      />
+      <div style={{ ...styles.card, marginBottom: 16, border: `1.5px solid ${theme.accent}`, backgroundColor: theme.accentLight }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>How to edit a past estimate</div>
+        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: theme.textSecondary, lineHeight: 1.65 }}>
+          <li>Select the {T.project.toLowerCase()} below (same one the estimate belongs to)</li>
+          <li>Click <strong>Open &amp; edit</strong> on the estimate you want to change</li>
+          <li>Remove rows (×), change hours/materials, then <strong>Save changes &amp; send updated PDF</strong></li>
+        </ol>
+        <p style={{ fontSize: 12, color: theme.textLight, margin: "10px 0 0", lineHeight: 1.55 }}>
+          Only draft and sent estimates can be edited. Once you set the dashboard baseline (approved), the quote is locked — use change orders for mid-job scope changes later.
+        </p>
+      </div>
 
-      {showNewJob && jobs.length === 0 && (
-        <QuickJobForm token={token} onCreated={onJobCreated} onCancel={() => setShowNewJob(false)} />
+      {actionMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{actionMsg}</div>}
+      {actionErr && <p style={styles.errorMsg}>{actionErr}</p>}
+
+      {jobs.length > 0 ? (
+        <div style={{ marginBottom: 16 }}>
+          <label style={styles.label}>Select {T.project.toLowerCase()} to view or edit estimates</label>
+          <select style={styles.input} value={selectedJobId || ""} onChange={e => setSelectedJobId(e.target.value ? parseInt(e.target.value, 10) : null)}>
+            <option value="">Choose a {T.project.toLowerCase()}…</option>
+            {jobs.map(j => (
+              <option key={j.job_id} value={j.job_id}>{j.job_name}{j.city ? ` — ${j.city}` : ""}</option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div style={{ ...styles.card, marginBottom: 16, fontSize: 13, color: theme.textSecondary, textAlign: "center", padding: "20px 16px" }}>
+          No {T.projects.toLowerCase()} yet. Use <strong>+ New Estimate</strong> to create your first one.
+        </div>
+      )}
+
+      {!selectedJob && jobs.length > 0 && (
+        <div style={{ ...styles.card, fontSize: 13, color: theme.textSecondary, textAlign: "center", padding: "20px 16px", marginBottom: 16 }}>
+          Pick a {T.project.toLowerCase()} above to see its estimates and edit them.
+        </div>
       )}
 
       {selectedJob && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>
-            Estimate History — {selectedJob.job_name}
-          </div>
           {estimates.length === 0 ? (
             <div style={{ ...styles.card, fontSize: 13, color: theme.textSecondary, textAlign: "center", padding: "24px 16px" }}>
-              No estimates yet. Tap <strong>+ New Estimate</strong> to build one from templates.
+              No estimates yet for {selectedJob.job_name}.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {estimates.map(est => (
                 <div key={est.estimate_id} style={{ ...styles.card, margin: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{est.title || "Cost-Plus Estimate"}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{est.title || "Estimate"}</div>
                       <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>
-                        {est.total_hours?.toFixed?.(1) || est.total_hours}h · ${fmt(est.total_cost || 0)} total
+                        {Number(est.total_hours || 0).toFixed(1)}h · ${fmt(est.total_cost || 0)}
+                        {est.status === "approved" ? " · dashboard baseline" : est.status === "sent" ? " · sent to customer" : " · draft"}
                       </div>
                     </div>
                     <span style={{
                       fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 12, textTransform: "capitalize",
-                      backgroundColor: est.status === "approved" ? theme.accentLight : theme.goldLight,
-                      color: est.status === "approved" ? theme.accent : "#7c5518",
+                      backgroundColor: est.status === "approved" ? theme.accentLight : est.status === "sent" ? theme.goldLight : theme.bg,
+                      color: est.status === "approved" ? theme.accent : est.status === "sent" ? "#7c5518" : theme.textSecondary,
+                      border: est.status === "draft" ? `1px solid ${theme.border}` : "none",
                     }}>{est.status}</span>
                   </div>
+                  {!readonly && est.status !== "approved" && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                      <button type="button" disabled={busyId === est.estimate_id} onClick={() => openEstimateEditor(est.estimate_id, selectedJob.job_id)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 14px", backgroundColor: theme.primary }}>
+                        {busyId === est.estimate_id ? "Opening…" : "Open & edit"}
+                      </button>
+                      {(est.status === "sent" || est.pdf_path || est.pdf_url) && (
+                        <button type="button" disabled={busyId === est.estimate_id} onClick={() => downloadEstimatePdf(est.estimate_id)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 14px", backgroundColor: theme.accent }}>
+                          Download PDF
+                        </button>
+                      )}
+                      {est.status === "sent" && (
+                        <button type="button" disabled={busyId === est.estimate_id} onClick={() => approveBaseline(est.estimate_id, selectedJob.job_id)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 14px", backgroundColor: theme.gold }}>
+                          {busyId === est.estimate_id ? "Setting…" : "Customer approved — set baseline"}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -6297,136 +6936,6 @@ function BillingHub({ token, readonly = false }) {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function EstimateBuilder({ token, jobId, jobName, onApproved, onClose, backLabel = "Dashboard" }) {
-  const [templates, setTemplates] = useState([]);
-  const [cart, setCart] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [estimateId, setEstimateId] = useState(null);
-
-  useEffect(() => {
-    apiFetch(`${API}/estimate-templates`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then(setTemplates)
-      .catch(() => setError("Could not load templates"));
-  }, [token]);
-
-  function tapTemplate(t) {
-    setCart(prev => {
-      const idx = prev.findIndex(c => c.template.template_id === t.template_id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
-        return next;
-      }
-      return [...prev, { template: t, qty: 1 }];
-    });
-  }
-
-  const totals = cart.reduce((acc, { template: t, qty }) => ({
-    hours: acc.hours + t.estimated_hours * qty,
-    materials: acc.materials + t.estimated_material_cost * qty,
-    labor: acc.labor + (t.estimated_labor_cost || 0) * qty,
-  }), { hours: 0, materials: 0, labor: 0 });
-  const totalCost = totals.materials + totals.labor;
-
-  async function saveDraft() {
-    setSaving(true);
-    setError("");
-    const line_items = cart.map(({ template: t, qty }) => ({
-      template_id: t.template_id,
-      cost_code_id: t.cost_code_id,
-      description: t.name,
-      quantity: qty,
-      estimated_hours: t.estimated_hours,
-      material_cost: t.estimated_material_cost,
-      labor_cost: t.estimated_labor_cost || 0,
-    }));
-    const res = await apiFetch(`${API}/jobs/${jobId}/estimates`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Cost-Plus Estimate", line_items }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      const data = await res.json();
-      setEstimateId(data.estimate_id);
-      return data.estimate_id;
-    }
-    const err = await res.json().catch(() => ({}));
-    setError(err.detail || "Could not save estimate");
-    return null;
-  }
-
-  async function approve() {
-    const id = estimateId || await saveDraft();
-    if (!id) return;
-    setSaving(true);
-    const res = await apiFetch(`${API}/estimates/${id}/approve`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setSaving(false);
-    if (res.ok) {
-      onApproved?.();
-      onClose?.();
-    } else {
-      const err = await res.json().catch(() => ({}));
-      setError(err.detail || "Could not approve estimate");
-    }
-  }
-
-  return (
-    <div style={styles.container}>
-      <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to {backLabel}</button>
-      <h1 style={styles.title}>New Estimate</h1>
-      <p style={styles.subtitle}>{jobName} — tap templates to build fast</p>
-      {error && <p style={styles.errorMsg}>{error}</p>}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginBottom: 20 }}>
-        {templates.map(t => {
-          const inCart = cart.find(c => c.template.template_id === t.template_id);
-          return (
-            <button key={t.template_id} type="button" onClick={() => tapTemplate(t)} style={{
-              ...styles.card, margin: 0, textAlign: "left", cursor: "pointer",
-              border: inCart ? `2px solid ${theme.gold}` : `1px solid ${theme.border}`,
-              position: "relative", padding: "16px 14px",
-            }}>
-              {inCart && (
-                <span style={{ position: "absolute", top: 8, right: 8, background: theme.gold, color: "white", borderRadius: 12, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{inCart.qty}×</span>
-              )}
-              <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{t.name}</div>
-              <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4 }}>{t.estimated_hours}h · ${fmt(t.estimated_material_cost)} mat</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {cart.length > 0 && (
-        <div style={{ ...styles.card, marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: theme.textSecondary, textTransform: "uppercase", marginBottom: 10 }}>Estimate Summary</div>
-          {cart.map(({ template: t, qty }) => (
-            <div key={t.template_id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-              <span>{qty}× {t.name}</span>
-              <span style={{ fontWeight: 600 }}>{(t.estimated_hours * qty).toFixed(1)}h · ${fmt((t.estimated_material_cost + (t.estimated_labor_cost || 0)) * qty)}</span>
-            </div>
-          ))}
-          <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: 10, marginTop: 8, fontWeight: 800, color: theme.primary }}>
-            {totals.hours.toFixed(1)} hrs · Baseline ${fmt(totalCost)}
-          </div>
-        </div>
-      )}
-
-      <button style={styles.button} disabled={!cart.length || saving} onClick={approve}>
-        {saving ? "Saving…" : "Approve & Set Project Baseline"}
-      </button>
-      <p style={{ fontSize: 11, color: theme.textLight, textAlign: "center", marginTop: 8 }}>
-        Approving updates contract value and budgeted hours on the dashboard
-      </p>
     </div>
   );
 }
@@ -6708,7 +7217,12 @@ function AuthenticatedApp() {
       localStorage.setItem("vl_settings_tab", tab);
     }
   }
-  useEffect(() => { window._setView = setView; return () => { delete window._setView; }; }, []);
+  useEffect(() => {
+    window._setView = setView;
+    window._navigateToSettings = (tab) => navigateTo("settings", tab || "estimating");
+    return () => { delete window._setView; delete window._navigateToSettings; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   // Checklist persists in dashboard until explicitly dismissed (per browser)

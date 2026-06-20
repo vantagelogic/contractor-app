@@ -38,7 +38,31 @@ class EstimateLineIn(BaseModel):
 class EstimateCreateIn(BaseModel):
     title: str = "Cost-Plus Estimate"
     notes: str | None = None
+    crew_count: int | None = None
+    estimated_mileage_km: float | None = None
     line_items: list[EstimateLineIn]
+
+
+class EstimateUpdateIn(BaseModel):
+    title: str | None = None
+    notes: str | None = None
+    estimated_mileage_km: float | None = None
+    line_items: list[EstimateLineIn] | None = None
+
+
+class JobTypeIn(BaseModel):
+    name: str
+    hint: str | None = None
+    cost_code_ids: list[int] = []
+
+
+class TemplateIn(BaseModel):
+    name: str
+    cost_code_id: int | None = None
+    description: str | None = None
+    estimated_hours: float = 0
+    estimated_material_cost: float = 0
+    estimated_labor_cost: float = 0
 
 
 class InvoiceGenerateIn(BaseModel):
@@ -52,6 +76,16 @@ class MagicLinkCreateIn(BaseModel):
     purpose: str
     subcontractor_name: str | None = None
     expires_days: int = 7
+
+
+class EstimateSuggestIn(BaseModel):
+    description: str
+    job_type: str | None = None
+
+
+class EstimateSendIn(BaseModel):
+    customer_email: str | None = None
+    customer_name: str | None = None
 
 
 def register_cost_plus_routes(app, get_db, get_current_user, require_owner, timesheet_labour_cost):
@@ -76,6 +110,14 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         estimate.total_labor_cost = round(total_lab, 2)
         estimate.total_cost = round(total_mat + total_lab, 2)
 
+    def _add_mileage_to_estimate_total(db: Session, estimate: models.Estimate, company_id: int):
+        km = float(estimate.estimated_mileage_km or 0)
+        if km <= 0:
+            return
+        company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
+        rate = float(getattr(company, "mileage_rate_per_km", None) or MILEAGE_RATE_DEFAULT)
+        estimate.total_cost = round(float(estimate.total_cost or 0) + km * rate, 2)
+
     def _apply_estimate_baseline(db: Session, estimate: models.Estimate, job: models.Job):
         job.contract_value = float(estimate.total_cost or 0)
         job.budgeted_hours = float(estimate.total_hours or 0)
@@ -99,6 +141,11 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "total_material_cost": float(estimate.total_material_cost or 0),
             "total_labor_cost": float(estimate.total_labor_cost or 0),
             "total_cost": float(estimate.total_cost or 0),
+            "estimated_mileage_km": float(estimate.estimated_mileage_km or 0) if estimate.estimated_mileage_km else None,
+            "customer_email": estimate.customer_email,
+            "sent_at": str(estimate.sent_at) if estimate.sent_at else None,
+            "pdf_url": f"/estimates/{estimate.estimate_id}/pdf" if getattr(estimate, "pdf_path", None) else None,
+            "pdf_path": getattr(estimate, "pdf_path", None),
             "line_items": [{
                 "line_item_id": l.line_item_id,
                 "description": l.description,
@@ -261,6 +308,147 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         doc.build(story)
         return path
 
+    def _generate_estimate_pdf(db: Session, estimate: models.Estimate, company, job):
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import inch
+
+        lines = db.query(models.EstimateLineItem).filter(
+            models.EstimateLineItem.estimate_id == estimate.estimate_id
+        ).order_by(models.EstimateLineItem.sort_order).all()
+
+        path = os.path.join(UPLOAD_DIR, f"estimate_{estimate.estimate_id}.pdf")
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(path, pagesize=letter, topMargin=0.75 * inch)
+        story = []
+
+        story.append(Paragraph(f"<b>{company.company_name}</b>", styles["Title"]))
+        story.append(Paragraph(f"Project Estimate", styles["Heading2"]))
+        story.append(Spacer(1, 12))
+        story.append(Paragraph(f"Project: <b>{job.job_name}</b>", styles["Normal"]))
+        if job.city:
+            story.append(Paragraph(f"Location: {job.city}", styles["Normal"]))
+        created = estimate.created_at.strftime("%Y-%m-%d") if estimate.created_at else ""
+        story.append(Paragraph(f"Date: {created}", styles["Normal"]))
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(
+            "<i>This is a proposal for customer review. Work begins after written approval.</i>",
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 16))
+
+        table_data = [["Work category", "Hours", "Materials", "Subtotal"]]
+        for ln in lines:
+            hrs = float(ln.estimated_hours or 0) * float(ln.quantity or 1)
+            mat = float(ln.material_cost or 0) * float(ln.quantity or 1)
+            lab = float(ln.labor_cost or 0) * float(ln.quantity or 1)
+            row_total = mat + lab
+            table_data.append([
+                ln.description,
+                f"{hrs:,.1f}",
+                f"${mat:,.2f}",
+                f"${row_total:,.2f}",
+            ])
+
+        km = float(estimate.estimated_mileage_km or 0)
+        if km > 0:
+            rate = float(getattr(company, "mileage_rate_per_km", None) or MILEAGE_RATE_DEFAULT)
+            mi_cost = round(km * rate, 2)
+            table_data.append(["Mileage / travel", "—", f"{km:,.0f} km", f"${mi_cost:,.2f}"])
+
+        table_data.append(["", "", "TOTAL", f"${float(estimate.total_cost or 0):,.2f}"])
+
+        t = Table(table_data, colWidths=[3.0 * inch, 0.9 * inch, 1.2 * inch, 1.2 * inch])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a3d2b")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, len(lines)), 0.5, colors.grey),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fdf4e3")),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 24))
+        story.append(Paragraph(f"<b>Estimated hours:</b> {float(estimate.total_hours or 0):,.1f}", styles["Normal"]))
+        story.append(Spacer(1, 32))
+        story.append(Paragraph("Customer approval: _________________________  Date: __________", styles["Normal"]))
+
+        doc.build(story)
+        return path
+
+    @app.get("/job-types")
+    def list_job_types(
+        current_user: models.User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ):
+        types = db.query(models.JobType).filter(
+            models.JobType.company_id == current_user.company_id,
+            models.JobType.active == True,
+        ).order_by(models.JobType.sort_order, models.JobType.name).all()
+        return [{
+            "job_type_id": j.job_type_id,
+            "name": j.name,
+            "hint": j.hint,
+            "cost_code_ids": j.cost_code_ids or [],
+        } for j in types]
+
+    @app.post("/job-types")
+    def create_job_type(
+        body: JobTypeIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        if not body.name.strip():
+            raise HTTPException(status_code=400, detail="Name is required")
+        jt = models.JobType(
+            company_id=current_user.company_id,
+            name=body.name.strip(),
+            hint=body.hint,
+            cost_code_ids=body.cost_code_ids or [],
+        )
+        db.add(jt)
+        db.commit()
+        db.refresh(jt)
+        return {"job_type_id": jt.job_type_id, "name": jt.name, "hint": jt.hint, "cost_code_ids": jt.cost_code_ids or []}
+
+    @app.patch("/job-types/{job_type_id}")
+    def update_job_type(
+        job_type_id: int,
+        body: JobTypeIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        jt = db.query(models.JobType).filter(
+            models.JobType.job_type_id == job_type_id,
+            models.JobType.company_id == current_user.company_id,
+        ).first()
+        if not jt:
+            raise HTTPException(status_code=404, detail="Job type not found")
+        jt.name = body.name.strip()
+        jt.hint = body.hint
+        jt.cost_code_ids = body.cost_code_ids or []
+        db.commit()
+        return {"job_type_id": jt.job_type_id, "name": jt.name, "hint": jt.hint, "cost_code_ids": jt.cost_code_ids or []}
+
+    @app.delete("/job-types/{job_type_id}")
+    def delete_job_type(
+        job_type_id: int,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        jt = db.query(models.JobType).filter(
+            models.JobType.job_type_id == job_type_id,
+            models.JobType.company_id == current_user.company_id,
+        ).first()
+        if not jt:
+            raise HTTPException(status_code=404, detail="Job type not found")
+        jt.active = False
+        db.commit()
+        return {"message": "Job type removed"}
+
     @app.get("/estimate-templates")
     def list_estimate_templates(
         current_user: models.User = Depends(get_current_user),
@@ -294,6 +482,12 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
                 models.WorkCategoryTemplate.active == True,
             ).all()
 
+        cc_map = {
+            c.cost_code_id: c
+            for c in db.query(models.CostCode).filter(
+                models.CostCode.company_id == current_user.company_id
+            ).all()
+        }
         return [{
             "template_id": t.template_id,
             "cost_code_id": t.cost_code_id,
@@ -302,7 +496,120 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "estimated_hours": float(t.estimated_hours or 0),
             "estimated_material_cost": float(t.estimated_material_cost or 0),
             "estimated_labor_cost": float(t.estimated_labor_cost or 0),
+            "category": cc_map[t.cost_code_id].category if t.cost_code_id and t.cost_code_id in cc_map else None,
+            "cost_code_label": cc_map[t.cost_code_id].description if t.cost_code_id and t.cost_code_id in cc_map else None,
         } for t in templates]
+
+    @app.post("/estimate-templates")
+    def create_estimate_template(
+        body: TemplateIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        if not body.name.strip():
+            raise HTTPException(status_code=400, detail="Template name is required")
+        t = models.WorkCategoryTemplate(
+            company_id=current_user.company_id,
+            cost_code_id=body.cost_code_id,
+            name=body.name.strip(),
+            description=body.description,
+            estimated_hours=body.estimated_hours,
+            estimated_material_cost=body.estimated_material_cost,
+            estimated_labor_cost=body.estimated_labor_cost,
+        )
+        db.add(t)
+        db.commit()
+        db.refresh(t)
+        return {"template_id": t.template_id, "name": t.name}
+
+    @app.patch("/estimate-templates/{template_id}")
+    def update_estimate_template(
+        template_id: int,
+        body: TemplateIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        t = db.query(models.WorkCategoryTemplate).filter(
+            models.WorkCategoryTemplate.template_id == template_id,
+            models.WorkCategoryTemplate.company_id == current_user.company_id,
+        ).first()
+        if not t:
+            raise HTTPException(status_code=404, detail="Template not found")
+        t.name = body.name.strip()
+        t.cost_code_id = body.cost_code_id
+        t.description = body.description
+        t.estimated_hours = body.estimated_hours
+        t.estimated_material_cost = body.estimated_material_cost
+        t.estimated_labor_cost = body.estimated_labor_cost
+        db.commit()
+        return {"template_id": t.template_id, "name": t.name}
+
+    @app.post("/estimates/suggest")
+    def suggest_estimate(
+        body: EstimateSuggestIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        import json
+        from main import get_gemini_client
+
+        if not body.description or len(body.description.strip()) < 8:
+            raise HTTPException(status_code=400, detail="Describe the job in a few words first")
+
+        templates = db.query(models.WorkCategoryTemplate).filter(
+            models.WorkCategoryTemplate.company_id == current_user.company_id,
+            models.WorkCategoryTemplate.active == True,
+        ).order_by(models.WorkCategoryTemplate.sort_order, models.WorkCategoryTemplate.name).all()
+
+        if not templates:
+            raise HTTPException(status_code=400, detail="No estimate templates yet — add work categories in Settings first")
+
+        template_list = [{
+            "template_id": t.template_id,
+            "name": t.name,
+            "estimated_hours": float(t.estimated_hours or 0),
+            "estimated_material_cost": float(t.estimated_material_cost or 0),
+        } for t in templates]
+
+        job_type_line = f"Job type: {body.job_type}\n" if body.job_type else ""
+        prompt = f"""You are a construction estimator. Pick work packages from the template list for this job.
+
+{job_type_line}Description: {body.description.strip()}
+
+Templates (use template_id values exactly as shown):
+{json.dumps(template_list)}
+
+Return ONLY valid JSON, no markdown:
+{{"items": [{{"template_id": <int>, "quantity": <int>}}], "summary": "<one short sentence>"}}
+
+Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repeats (e.g. two bathrooms)."""
+
+        try:
+            response = get_gemini_client().models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+            raw = (response.text or "").strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            parsed = json.loads(raw.strip())
+            valid_ids = {t.template_id for t in templates}
+            items = [
+                {"template_id": int(i["template_id"]), "quantity": max(1, int(i.get("quantity") or 1))}
+                for i in parsed.get("items", [])
+                if int(i.get("template_id", 0)) in valid_ids
+            ]
+            return {
+                "items": items,
+                "summary": parsed.get("summary", ""),
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Estimate suggest error: {e}")
+            raise HTTPException(status_code=503, detail="Could not generate suggestion — try tapping templates manually")
 
     @app.post("/jobs/{job_id}/estimates")
     def create_estimate(
@@ -325,17 +632,21 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             job_id=job_id,
             title=body.title,
             notes=body.notes,
+            crew_count=body.crew_count,
+            estimated_mileage_km=body.estimated_mileage_km,
             status="draft",
         )
         db.add(estimate)
         db.flush()
 
         for i, ln in enumerate(body.line_items):
+            cc = db.query(models.CostCode).filter(models.CostCode.cost_code_id == ln.cost_code_id).first() if ln.cost_code_id else None
+            desc = ln.description or (cc.description if cc else "Line item")
             db.add(models.EstimateLineItem(
                 estimate_id=estimate.estimate_id,
                 template_id=ln.template_id,
                 cost_code_id=ln.cost_code_id,
-                description=ln.description,
+                description=desc,
                 quantity=ln.quantity,
                 estimated_hours=ln.estimated_hours,
                 material_cost=ln.material_cost,
@@ -343,6 +654,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
                 sort_order=i,
             ))
         _recalc_estimate_totals(db, estimate)
+        _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
         db.commit()
         db.refresh(estimate)
         return _serialize_estimate(db, estimate)
@@ -359,6 +671,148 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         ).order_by(models.Estimate.created_at.desc()).all()
         return [_serialize_estimate(db, e) for e in estimates]
 
+    @app.get("/estimates/{estimate_id}")
+    def get_estimate(
+        estimate_id: int,
+        current_user: models.User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ):
+        estimate = db.query(models.Estimate).filter(
+            models.Estimate.estimate_id == estimate_id,
+            models.Estimate.company_id == current_user.company_id,
+        ).first()
+        if not estimate:
+            raise HTTPException(status_code=404, detail="Estimate not found")
+        return _serialize_estimate(db, estimate)
+
+    @app.patch("/estimates/{estimate_id}")
+    def update_estimate(
+        estimate_id: int,
+        body: EstimateUpdateIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        estimate = db.query(models.Estimate).filter(
+            models.Estimate.estimate_id == estimate_id,
+            models.Estimate.company_id == current_user.company_id,
+        ).first()
+        if not estimate:
+            raise HTTPException(status_code=404, detail="Estimate not found")
+        if estimate.status == "approved":
+            raise HTTPException(status_code=400, detail="Approved estimates cannot be edited — use a change order")
+
+        if body.title is not None:
+            estimate.title = body.title
+        if body.notes is not None:
+            estimate.notes = body.notes
+        if body.estimated_mileage_km is not None:
+            estimate.estimated_mileage_km = body.estimated_mileage_km if body.estimated_mileage_km > 0 else None
+
+        if body.line_items is not None:
+            if not body.line_items:
+                raise HTTPException(status_code=400, detail="At least one line item is required")
+            db.query(models.EstimateLineItem).filter(
+                models.EstimateLineItem.estimate_id == estimate_id
+            ).delete()
+            for i, ln in enumerate(body.line_items):
+                cc = db.query(models.CostCode).filter(models.CostCode.cost_code_id == ln.cost_code_id).first() if ln.cost_code_id else None
+                desc = ln.description or (cc.description if cc else "Line item")
+                db.add(models.EstimateLineItem(
+                    estimate_id=estimate.estimate_id,
+                    template_id=ln.template_id,
+                    cost_code_id=ln.cost_code_id,
+                    description=desc,
+                    quantity=ln.quantity,
+                    estimated_hours=ln.estimated_hours,
+                    material_cost=ln.material_cost,
+                    labor_cost=ln.labor_cost,
+                    sort_order=i,
+                ))
+
+        _recalc_estimate_totals(db, estimate)
+        _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
+        if estimate.status == "sent":
+            estimate.status = "draft"
+            estimate.sent_at = None
+        estimate.pdf_path = None
+        db.commit()
+        db.refresh(estimate)
+        return _serialize_estimate(db, estimate)
+
+    @app.get("/estimates/{estimate_id}/pdf")
+    def download_estimate_pdf(
+        estimate_id: int,
+        current_user: models.User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ):
+        estimate = db.query(models.Estimate).filter(
+            models.Estimate.estimate_id == estimate_id,
+            models.Estimate.company_id == current_user.company_id,
+        ).first()
+        if not estimate:
+            raise HTTPException(status_code=404, detail="Estimate not found")
+        job = db.query(models.Job).filter(models.Job.job_id == estimate.job_id).first()
+        company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
+        path = estimate.pdf_path
+        if not path or not os.path.exists(path):
+            path = _generate_estimate_pdf(db, estimate, company, job)
+            estimate.pdf_path = path
+            db.commit()
+        return FileResponse(path, media_type="application/pdf", filename=f"estimate_{estimate_id}.pdf")
+
+    @app.post("/estimates/{estimate_id}/send-customer")
+    def send_estimate_to_customer(
+        estimate_id: int,
+        body: EstimateSendIn = Body(default_factory=EstimateSendIn),
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        estimate = db.query(models.Estimate).filter(
+            models.Estimate.estimate_id == estimate_id,
+            models.Estimate.company_id == current_user.company_id,
+        ).first()
+        if not estimate:
+            raise HTTPException(status_code=404, detail="Estimate not found")
+        if estimate.status == "approved":
+            raise HTTPException(status_code=400, detail="Estimate already approved for dashboard baseline")
+
+        job = db.query(models.Job).filter(models.Job.job_id == estimate.job_id).first()
+        company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
+        path = _generate_estimate_pdf(db, estimate, company, job)
+        estimate.pdf_path = path
+        estimate.status = "sent"
+        estimate.sent_at = datetime.utcnow()
+        if body.customer_email:
+            estimate.customer_email = body.customer_email.strip()
+        db.commit()
+
+        email_sent = False
+        if body.customer_email and os.environ.get("RESEND_API_KEY"):
+            try:
+                import resend
+                import base64
+                with open(path, "rb") as f:
+                    pdf_b64 = base64.b64encode(f.read()).decode()
+                resend.Emails.send({
+                    "from": os.environ.get("RESEND_FROM", "Vantage Logic <onboarding@resend.dev>"),
+                    "to": body.customer_email.strip(),
+                    "subject": f"Estimate — {job.job_name if job else 'Your project'}",
+                    "html": f"<p>Please find your project estimate attached for <strong>{job.job_name if job else 'review'}</strong>.</p><p>Reply to confirm approval before work begins.</p>",
+                    "attachments": [{"filename": f"estimate_{estimate_id}.pdf", "content": pdf_b64}],
+                })
+                email_sent = True
+            except Exception as e:
+                print(f"Estimate email error: {e}")
+
+        return {
+            "message": "Customer estimate generated",
+            "status": "sent",
+            "estimate_id": estimate_id,
+            "pdf_url": f"/estimates/{estimate_id}/pdf",
+            "email_sent": email_sent,
+            "customer_email": estimate.customer_email,
+        }
+
     @app.patch("/estimates/{estimate_id}/approve")
     def approve_estimate(
         estimate_id: int,
@@ -373,6 +827,8 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             raise HTTPException(status_code=404, detail="Estimate not found")
         if estimate.status == "approved":
             raise HTTPException(status_code=400, detail="Already approved")
+        if estimate.status not in ("draft", "sent"):
+            raise HTTPException(status_code=400, detail="Estimate cannot be approved in its current state")
 
         job = db.query(models.Job).filter(models.Job.job_id == estimate.job_id).first()
         estimate.status = "approved"
@@ -381,7 +837,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         _apply_estimate_baseline(db, estimate, job)
         db.commit()
         return {
-            "message": "Estimate approved — project baseline updated",
+            "message": "Dashboard baseline updated from approved estimate",
             "contract_value": float(job.contract_value),
             "budgeted_hours": float(job.budgeted_hours),
             "estimate_id": estimate.estimate_id,
