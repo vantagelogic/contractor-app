@@ -140,6 +140,35 @@ with engine.connect() as _conn:
         _conn.commit()
     except Exception:
         pass
+    for _tbl in ("timesheets", "materials", "mileage"):
+        try:
+            _conn.execute(__import__("sqlalchemy").text(
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS billed BOOLEAN DEFAULT FALSE"
+            ))
+            _conn.commit()
+        except Exception:
+            pass
+        try:
+            _conn.execute(__import__("sqlalchemy").text(
+                f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS invoice_id INTEGER"
+            ))
+            _conn.commit()
+        except Exception:
+            pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS default_markup_percent NUMERIC(5,2) DEFAULT 15"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
+    try:
+        _conn.execute(__import__("sqlalchemy").text(
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS mileage_rate_per_km NUMERIC(6,3) DEFAULT 0.70"
+        ))
+        _conn.commit()
+    except Exception:
+        pass
 
 import resend
 resend.api_key = os.environ.get("RESEND_API_KEY", "")
@@ -3181,3 +3210,6 @@ def seed_demo(
     if result.get("skipped"):
         raise HTTPException(status_code=409, detail=result["message"])
     return result
+
+from cost_plus import register_cost_plus_routes
+register_cost_plus_routes(app, get_db, get_current_user, require_owner, _timesheet_labour_cost)

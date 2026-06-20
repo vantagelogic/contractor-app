@@ -4809,7 +4809,7 @@ function EmpTimesheetGroup({ empName, empData, token, onDelete }) {
   );
 }
 
-function Dashboard({ token, readonly = false, topOffset = 0 }) {
+function Dashboard({ token, readonly = false, topOffset = 0, onStartEstimate = null }) {
   const [jobs, setJobs] = useState([]);
   const [mileage, setMileage] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5184,6 +5184,19 @@ function Dashboard({ token, readonly = false, topOffset = 0 }) {
                         </div>
                       ))
                   ) : <p style={{ fontSize: "12px", color: theme.textSecondary }}>Loading...</p>}
+
+                  {!readonly && onStartEstimate && (
+                    <button
+                      type="button"
+                      onClick={() => onStartEstimate({ id: job.job_id, name: job.job_name })}
+                      style={{ ...styles.button, marginTop: 14, backgroundColor: theme.gold, width: "100%" }}
+                    >
+                      + New Cost-Plus Estimate
+                    </button>
+                  )}
+
+                  {!readonly && <CostPlusInvoicePanel token={token} jobId={job.job_id} onGenerated={loadDashboard} />}
+                  {!readonly && <MagicLinkActions token={token} jobId={job.job_id} />}
 
                   <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginTop: "16px", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Hours by Person</div>
                   {det ? (
@@ -5937,8 +5950,361 @@ function NotificationBell({ token, role, setView, mobile }) {
   );
 }
 
+// ─── COST-PLUS MODULE ─────────────────────────────────────────
+
+function EstimateBuilder({ token, jobId, jobName, onApproved, onClose }) {
+  const [templates, setTemplates] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [estimateId, setEstimateId] = useState(null);
+
+  useEffect(() => {
+    apiFetch(`${API}/estimate-templates`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(setTemplates)
+      .catch(() => setError("Could not load templates"));
+  }, [token]);
+
+  function tapTemplate(t) {
+    setCart(prev => {
+      const idx = prev.findIndex(c => c.template.template_id === t.template_id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
+        return next;
+      }
+      return [...prev, { template: t, qty: 1 }];
+    });
+  }
+
+  const totals = cart.reduce((acc, { template: t, qty }) => ({
+    hours: acc.hours + t.estimated_hours * qty,
+    materials: acc.materials + t.estimated_material_cost * qty,
+    labor: acc.labor + (t.estimated_labor_cost || 0) * qty,
+  }), { hours: 0, materials: 0, labor: 0 });
+  const totalCost = totals.materials + totals.labor;
+
+  async function saveDraft() {
+    setSaving(true);
+    setError("");
+    const line_items = cart.map(({ template: t, qty }) => ({
+      template_id: t.template_id,
+      cost_code_id: t.cost_code_id,
+      description: t.name,
+      quantity: qty,
+      estimated_hours: t.estimated_hours,
+      material_cost: t.estimated_material_cost,
+      labor_cost: t.estimated_labor_cost || 0,
+    }));
+    const res = await apiFetch(`${API}/jobs/${jobId}/estimates`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Cost-Plus Estimate", line_items }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      const data = await res.json();
+      setEstimateId(data.estimate_id);
+      return data.estimate_id;
+    }
+    const err = await res.json().catch(() => ({}));
+    setError(err.detail || "Could not save estimate");
+    return null;
+  }
+
+  async function approve() {
+    const id = estimateId || await saveDraft();
+    if (!id) return;
+    setSaving(true);
+    const res = await apiFetch(`${API}/estimates/${id}/approve`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setSaving(false);
+    if (res.ok) {
+      onApproved?.();
+      onClose?.();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setError(err.detail || "Could not approve estimate");
+    }
+  }
+
+  return (
+    <div style={styles.container}>
+      <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Dashboard</button>
+      <h1 style={styles.title}>New Estimate</h1>
+      <p style={styles.subtitle}>{jobName} — tap templates to build fast</p>
+      {error && <p style={styles.errorMsg}>{error}</p>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginBottom: 20 }}>
+        {templates.map(t => {
+          const inCart = cart.find(c => c.template.template_id === t.template_id);
+          return (
+            <button key={t.template_id} type="button" onClick={() => tapTemplate(t)} style={{
+              ...styles.card, margin: 0, textAlign: "left", cursor: "pointer",
+              border: inCart ? `2px solid ${theme.gold}` : `1px solid ${theme.border}`,
+              position: "relative", padding: "16px 14px",
+            }}>
+              {inCart && (
+                <span style={{ position: "absolute", top: 8, right: 8, background: theme.gold, color: "white", borderRadius: 12, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{inCart.qty}×</span>
+              )}
+              <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{t.name}</div>
+              <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4 }}>{t.estimated_hours}h · ${fmt(t.estimated_material_cost)} mat</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {cart.length > 0 && (
+        <div style={{ ...styles.card, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: theme.textSecondary, textTransform: "uppercase", marginBottom: 10 }}>Estimate Summary</div>
+          {cart.map(({ template: t, qty }) => (
+            <div key={t.template_id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+              <span>{qty}× {t.name}</span>
+              <span style={{ fontWeight: 600 }}>{(t.estimated_hours * qty).toFixed(1)}h · ${fmt((t.estimated_material_cost + (t.estimated_labor_cost || 0)) * qty)}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: 10, marginTop: 8, fontWeight: 800, color: theme.primary }}>
+            {totals.hours.toFixed(1)} hrs · Baseline ${fmt(totalCost)}
+          </div>
+        </div>
+      )}
+
+      <button style={styles.button} disabled={!cart.length || saving} onClick={approve}>
+        {saving ? "Saving…" : "Approve & Set Project Baseline"}
+      </button>
+      <p style={{ fontSize: 11, color: theme.textLight, textAlign: "center", marginTop: 8 }}>
+        Approving updates contract value and budgeted hours on the dashboard
+      </p>
+    </div>
+  );
+}
+
+function CostPlusInvoicePanel({ token, jobId, onGenerated }) {
+  const [markup, setMarkup] = useState("15");
+  const [includeReceipts, setIncludeReceipts] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  async function downloadPdf(invoiceId, invoiceNumber) {
+    const res = await apiFetch(`${API}/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${invoiceNumber}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function generate() {
+    setGenerating(true);
+    setError("");
+    setResult(null);
+    const res = await apiFetch(`${API}/jobs/${jobId}/invoices/generate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markup_percent: parseFloat(markup) || 15,
+        include_receipts: includeReceipts,
+      }),
+    });
+    setGenerating(false);
+    if (res.ok) {
+      const data = await res.json();
+      setResult(data);
+      onGenerated?.();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setError(typeof err.detail === "string" ? err.detail : "Could not generate invoice");
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 16, padding: 16, backgroundColor: theme.goldLight, borderRadius: 10, border: `1.5px solid ${theme.gold}` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#7c5518", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>
+        Cost-Plus Invoicing
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div>
+          <label style={styles.label}>Markup %</label>
+          <input style={styles.input} type="number" value={markup} onChange={e => setMarkup(e.target.value)} />
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 22, fontSize: 13, cursor: "pointer" }}>
+          <input type="checkbox" checked={includeReceipts} onChange={e => setIncludeReceipts(e.target.checked)} />
+          Append receipt images
+        </label>
+      </div>
+      <button
+        type="button"
+        onClick={generate}
+        disabled={generating}
+        style={{ ...styles.button, marginTop: 0, width: "100%", backgroundColor: theme.primary }}
+      >
+        {generating ? "Sweeping unbilled costs…" : "Generate Cost-Plus Invoice"}
+      </button>
+      {error && <p style={{ ...styles.errorMsg, marginTop: 8 }}>{error}</p>}
+      {result && (
+        <div style={{ marginTop: 12, fontSize: 13 }}>
+          <div style={{ fontWeight: 700, color: theme.primary }}>{result.invoice_number} — ${fmt(result.total)}</div>
+          {(result.line_items || []).map((li, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", color: theme.textSecondary, marginTop: 4 }}>
+              <span>{li.description}</span>
+              <span>${fmt(li.billed)}</span>
+            </div>
+          ))}
+          {result.pdf_url && (
+            <button
+              type="button"
+              onClick={() => downloadPdf(result.invoice_id, result.invoice_number)}
+              style={{ marginTop: 10, background: "none", border: "none", color: theme.accent, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: font.body }}
+            >
+              Download PDF →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MagicLinkActions({ token, jobId }) {
+  const [msg, setMsg] = useState("");
+
+  async function shareLink(purpose) {
+    setMsg("");
+    const res = await apiFetch(`${API}/jobs/${jobId}/magic-links`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ purpose, expires_days: 14 }),
+    });
+    if (!res.ok) {
+      setMsg("Could not create link");
+      return;
+    }
+    const { url } = await res.json();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Vantage Logic", text: purpose === "lien_waiver" ? "Sign lien waiver" : "Submit your invoice", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setMsg("Link copied — text it to your sub");
+      }
+    } catch {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setMsg("Link copied — text it to your sub");
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Subcontractor Links</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" onClick={() => shareLink("invoice_upload")} style={{ ...styles.button, marginTop: 0, padding: "10px 14px", fontSize: 12, flex: 1, minWidth: 140 }}>Sub Invoice Link</button>
+        <button type="button" onClick={() => shareLink("lien_waiver")} style={{ ...styles.button, marginTop: 0, padding: "10px 14px", fontSize: 12, flex: 1, minWidth: 140, backgroundColor: theme.accent }}>Lien Waiver Link</button>
+      </div>
+      {msg && <p style={{ fontSize: 12, color: theme.accent, marginTop: 8, fontWeight: 600 }}>{msg}</p>}
+    </div>
+  );
+}
+
+function MagicLinkScreen({ token: linkToken }) {
+  const [info, setInfo] = useState(null);
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [signature, setSignature] = useState("");
+  const [file, setFile] = useState(null);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/magic-link/${linkToken}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => { setInfo(d); setName(d.subcontractor_name || ""); })
+      .catch(() => setError("This link is invalid or has expired."));
+  }, [linkToken]);
+
+  async function submit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    const fd = new FormData();
+    if (name) fd.append("subcontractor_name", name);
+    if (amount) fd.append("amount", amount);
+    if (description) fd.append("description", description);
+    if (signature) fd.append("signature_name", signature);
+    if (file) fd.append("file", file);
+    const res = await fetch(`${API}/magic-link/${linkToken}/submit`, { method: "POST", body: fd });
+    setSubmitting(false);
+    if (res.ok) setDone(true);
+    else {
+      const err = await res.json().catch(() => ({}));
+      setError(typeof err.detail === "string" ? err.detail : "Submit failed");
+    }
+  }
+
+  if (error && !info) return <div style={styles.container}><GlobalStyles /><p style={styles.errorMsg}>{error}</p></div>;
+  if (!info) return <div style={styles.container}><GlobalStyles /><p style={styles.subtitle}>Loading…</p></div>;
+  if (done) return (
+    <div style={styles.container}>
+      <GlobalStyles />
+      <div style={styles.card}>
+        <h2 style={{ ...styles.title, fontSize: 20 }}>Submitted</h2>
+        <p style={styles.subtitle}>Your {info.purpose === "lien_waiver" ? "lien waiver" : "invoice"} was received for {info.job_name}.</p>
+      </div>
+    </div>
+  );
+
+  const isWaiver = info.purpose === "lien_waiver";
+
+  return (
+    <div style={styles.container}>
+      <GlobalStyles />
+      <VantageLogo size={36} centered />
+      <h1 style={{ ...styles.title, marginTop: 16, fontSize: 22 }}>{info.company_name}</h1>
+      <p style={styles.subtitle}>{info.job_name} — {isWaiver ? "Sign Lien Waiver" : "Submit Invoice"}</p>
+      {error && <p style={styles.errorMsg}>{error}</p>}
+
+      <form onSubmit={submit} style={styles.form}>
+        <label style={styles.label}>Your Name</label>
+        <input style={styles.input} value={name} onChange={e => setName(e.target.value)} required />
+
+        {!isWaiver && (
+          <>
+            <label style={styles.label}>Invoice Amount ($)</label>
+            <input style={styles.input} type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
+            <label style={styles.label}>Description</label>
+            <input style={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. Plumbing rough-in" />
+            <label style={styles.label}>Upload Invoice / Receipt</label>
+            <input style={styles.input} type="file" accept="image/*,.pdf" onChange={e => setFile(e.target.files?.[0] || null)} />
+          </>
+        )}
+
+        {isWaiver && (
+          <>
+            <label style={styles.label}>Type Full Name to Sign</label>
+            <input style={styles.input} value={signature} onChange={e => setSignature(e.target.value)} required placeholder="Legal signature" />
+            <label style={styles.label}>Optional: attach signed PDF</label>
+            <input style={styles.input} type="file" accept="image/*,.pdf" onChange={e => setFile(e.target.files?.[0] || null)} />
+          </>
+        )}
+
+        <button style={styles.button} type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Submit"}</button>
+      </form>
+    </div>
+  );
+}
+
 // ─── APP ROOT ─────────────────────────────────────────────────
-export default function App() {
+function AuthenticatedApp() {
   const stored = getStoredAuth();
   const [token, setToken] = useState(stored.token);
   const [role, setRole] = useState(stored.role);
@@ -5981,6 +6347,7 @@ export default function App() {
   const [tierLimit, setTierLimit] = useState(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [voicePrefill, setVoicePrefill] = useState(null);
+  const [estimateJob, setEstimateJob] = useState(null);
   useEffect(() => { window._setVoicePrefill = setVoicePrefill; return () => { delete window._setVoicePrefill; }; }, [setVoicePrefill]);
   const [paymentMsg, setPaymentMsg] = useState(() => {
     try {
@@ -6132,14 +6499,23 @@ export default function App() {
           {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}
-          {(role === "owner" || role === "admin") && view === "dashboard" && (
+          {(role === "owner" || role === "admin") && view === "dashboard" && estimateJob && (
+            <EstimateBuilder
+              token={token}
+              jobId={estimateJob.id}
+              jobName={estimateJob.name}
+              onApproved={() => { setEstimateJob(null); }}
+              onClose={() => setEstimateJob(null)}
+            />
+          )}
+          {(role === "owner" || role === "admin") && view === "dashboard" && !estimateJob && (
             <>
               {showChecklist && (
                 <div style={{ maxWidth: "1080px", margin: "0 auto", padding: mobile ? "58px 14px 0 18px" : "66px 24px 0 18px" }}>
                   <OnboardingChecklist token={token} onDismiss={dismissChecklist} onNavigate={(v) => { setView(v); }} />
                 </div>
               )}
-              <Dashboard token={token} readonly={subStatus === "expired"} topOffset={showChecklist ? 0 : (mobile ? 58 : 66)} />
+              <Dashboard token={token} readonly={subStatus === "expired"} topOffset={showChecklist ? 0 : (mobile ? 58 : 66)} onStartEstimate={setEstimateJob} />
             </>
           )}
           {(role === "owner" || role === "admin") && view === "inventory" && <InventoryScreen token={token} readonly={subStatus === "expired"} />}
@@ -6157,4 +6533,16 @@ export default function App() {
       </div>
     </>
   );
+}
+
+export default function App() {
+  const magicToken = (() => {
+    try {
+      return window.location.pathname.match(/^\/magic-link\/([^/]+)/)?.[1] || null;
+    } catch { return null; }
+  })();
+  if (magicToken) {
+    return <MagicLinkScreen token={magicToken} />;
+  }
+  return <AuthenticatedApp />;
 }

@@ -19,6 +19,8 @@ class Company(Base):
     track_overtime = Column(Boolean, default=False)
     overtime_rate_multiplier = Column(Numeric(4, 2), default=1.5)
     overtime_rules = Column(JSONB, nullable=True)
+    default_markup_percent = Column(Numeric(5, 2), default=15)
+    mileage_rate_per_km = Column(Numeric(6, 3), default=0.70)
 
 class User(Base):
     __tablename__ = "users"
@@ -104,6 +106,8 @@ class Timesheet(Base):
     overtime_hours = Column(Numeric(5, 2), default=0)
     premium_hours = Column(JSONB, nullable=True)
     field_notes = Column(Text)
+    billed = Column(Boolean, default=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Material(Base):
@@ -122,6 +126,8 @@ class Material(Base):
     purchase_date = Column(Date)
     receipt_image_url = Column(String(500))
     notes = Column(Text)
+    billed = Column(Boolean, default=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Mileage(Base):
@@ -135,6 +141,8 @@ class Mileage(Base):
     km_driven = Column(Numeric(8, 2), nullable=False)
     purpose = Column(String(255))
     notes = Column(Text)
+    billed = Column(Boolean, default=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
 class Schedule(Base):
@@ -237,3 +245,117 @@ class ShiftTemplate(Base):
     created_at = Column(DateTime, server_default=func.now())
     start_time = Column(String(5), nullable=True)
     end_time = Column(String(5), nullable=True)
+
+
+class WorkCategoryTemplate(Base):
+    __tablename__ = "work_category_templates"
+
+    template_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"), nullable=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    estimated_hours = Column(Numeric(8, 2), default=0)
+    estimated_material_cost = Column(Numeric(12, 2), default=0)
+    estimated_labor_cost = Column(Numeric(12, 2), default=0)
+    sort_order = Column(Integer, default=0)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Estimate(Base):
+    __tablename__ = "estimates"
+
+    estimate_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    title = Column(String(255), default="Cost-Plus Estimate")
+    status = Column(String(20), default="draft")
+    total_hours = Column(Numeric(10, 2), default=0)
+    total_material_cost = Column(Numeric(12, 2), default=0)
+    total_labor_cost = Column(Numeric(12, 2), default=0)
+    total_cost = Column(Numeric(12, 2), default=0)
+    notes = Column(Text)
+    approved_at = Column(DateTime, nullable=True)
+    approved_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class EstimateLineItem(Base):
+    __tablename__ = "estimate_line_items"
+
+    line_item_id = Column(Integer, primary_key=True, index=True)
+    estimate_id = Column(Integer, ForeignKey("estimates.estimate_id"), nullable=False)
+    template_id = Column(Integer, ForeignKey("work_category_templates.template_id"), nullable=True)
+    cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"), nullable=True)
+    description = Column(String(255), nullable=False)
+    quantity = Column(Numeric(8, 2), default=1)
+    estimated_hours = Column(Numeric(8, 2), default=0)
+    material_cost = Column(Numeric(12, 2), default=0)
+    labor_cost = Column(Numeric(12, 2), default=0)
+    sort_order = Column(Integer, default=0)
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    invoice_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    invoice_number = Column(String(50), nullable=False)
+    status = Column(String(20), default="draft")
+    markup_percent = Column(Numeric(5, 2), default=15)
+    raw_subtotal = Column(Numeric(12, 2), default=0)
+    markup_amount = Column(Numeric(12, 2), default=0)
+    total = Column(Numeric(12, 2), default=0)
+    include_receipts = Column(Boolean, default=False)
+    pdf_path = Column(String(500), nullable=True)
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class InvoiceLineItem(Base):
+    __tablename__ = "invoice_line_items"
+
+    invoice_line_id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.invoice_id"), nullable=False)
+    category = Column(String(50), nullable=False)
+    description = Column(String(255), nullable=False)
+    cost_code_id = Column(Integer, ForeignKey("cost_codes.cost_code_id"), nullable=True)
+    raw_amount = Column(Numeric(12, 2), default=0)
+    billed_amount = Column(Numeric(12, 2), default=0)
+    source_ids = Column(JSONB, nullable=True)
+
+
+class MagicLink(Base):
+    __tablename__ = "magic_links"
+
+    magic_link_id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    purpose = Column(String(50), nullable=False)
+    subcontractor_name = Column(String(255), nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class SubcontractorSubmission(Base):
+    __tablename__ = "subcontractor_submissions"
+
+    submission_id = Column(Integer, primary_key=True, index=True)
+    magic_link_id = Column(Integer, ForeignKey("magic_links.magic_link_id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.job_id"), nullable=False)
+    submission_type = Column(String(50), nullable=False)
+    subcontractor_name = Column(String(255))
+    amount = Column(Numeric(12, 2))
+    description = Column(Text)
+    file_url = Column(String(500))
+    signature_name = Column(String(255))
+    material_id = Column(Integer, ForeignKey("materials.material_id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
