@@ -56,6 +56,10 @@ class JobTypeIn(BaseModel):
     cost_code_ids: list[int] = []
 
 
+class JobTypeSaveIn(JobTypeIn):
+    job_type_id: int | None = None
+
+
 class TemplateIn(BaseModel):
     name: str
     cost_code_id: int | None = None
@@ -63,6 +67,10 @@ class TemplateIn(BaseModel):
     estimated_hours: float = 0
     estimated_material_cost: float = 0
     estimated_labor_cost: float = 0
+
+
+class TemplateSaveIn(TemplateIn):
+    template_id: int | None = None
 
 
 class InvoiceGenerateIn(BaseModel):
@@ -414,6 +422,36 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         db.refresh(jt)
         return {"job_type_id": jt.job_type_id, "name": jt.name, "hint": jt.hint, "cost_code_ids": jt.cost_code_ids or []}
 
+    @app.post("/job-types/save")
+    def save_job_type(
+        body: JobTypeSaveIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        if not body.name.strip():
+            raise HTTPException(status_code=400, detail="Job type name is required")
+        if body.job_type_id:
+            jt = db.query(models.JobType).filter(
+                models.JobType.job_type_id == body.job_type_id,
+                models.JobType.company_id == current_user.company_id,
+            ).first()
+            if not jt:
+                raise HTTPException(status_code=404, detail="Job type not found")
+            jt.name = body.name.strip()
+            jt.hint = body.hint
+            jt.cost_code_ids = body.cost_code_ids or []
+        else:
+            jt = models.JobType(
+                company_id=current_user.company_id,
+                name=body.name.strip(),
+                hint=body.hint,
+                cost_code_ids=body.cost_code_ids or [],
+            )
+            db.add(jt)
+        db.commit()
+        db.refresh(jt)
+        return {"job_type_id": jt.job_type_id, "name": jt.name, "hint": jt.hint, "cost_code_ids": jt.cost_code_ids or []}
+
     @app.patch("/job-types/{job_type_id}")
     @app.put("/job-types/{job_type_id}")
     def update_job_type(
@@ -519,6 +557,42 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             estimated_labor_cost=body.estimated_labor_cost,
         )
         db.add(t)
+        db.commit()
+        db.refresh(t)
+        return {"template_id": t.template_id, "name": t.name}
+
+    @app.post("/estimate-templates/save")
+    def save_estimate_template(
+        body: TemplateSaveIn,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        if not body.name.strip():
+            raise HTTPException(status_code=400, detail="Template name is required")
+        if body.template_id:
+            t = db.query(models.WorkCategoryTemplate).filter(
+                models.WorkCategoryTemplate.template_id == body.template_id,
+                models.WorkCategoryTemplate.company_id == current_user.company_id,
+            ).first()
+            if not t:
+                raise HTTPException(status_code=404, detail="Template not found")
+            t.name = body.name.strip()
+            t.cost_code_id = body.cost_code_id
+            t.description = body.description
+            t.estimated_hours = body.estimated_hours
+            t.estimated_material_cost = body.estimated_material_cost
+            t.estimated_labor_cost = body.estimated_labor_cost
+        else:
+            t = models.WorkCategoryTemplate(
+                company_id=current_user.company_id,
+                cost_code_id=body.cost_code_id,
+                name=body.name.strip(),
+                description=body.description,
+                estimated_hours=body.estimated_hours,
+                estimated_material_cost=body.estimated_material_cost,
+                estimated_labor_cost=body.estimated_labor_cost,
+            )
+            db.add(t)
         db.commit()
         db.refresh(t)
         return {"template_id": t.template_id, "name": t.name}

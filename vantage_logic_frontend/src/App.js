@@ -4767,8 +4767,8 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
             {settingsTab === "estimating" && (
               <div style={styles.card}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>Estimating</h2>
-                <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 16 }}>
-                  Job type = empty rows. Template = hours/$.
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 16 }}>
+                  Presets used when you build a customer estimate.
                 </p>
                 <EstimatingSettingsPanel token={token} costCodes={costCodes} readonly={readonly} />
               </div>
@@ -6015,10 +6015,57 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
 
   function flash(m) { setMsg(m); setErr(""); setTimeout(() => setMsg(""), 3000); }
 
-  function apiErr(detail, fallback) {
-    if (detail === "Not Found") return "Save failed — refresh the page and try again.";
+  function parseApiError(res, detail, fallback) {
+    if (res.status === 403) return "Owner or admin access required.";
+    if (res.status === 404 && detail === "Not Found") return "Could not reach save — try again in a minute.";
     if (typeof detail === "string") return detail;
     return fallback;
+  }
+
+  async function postJson(url, body) {
+    return apiFetch(url, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function patchJson(url, body) {
+    return apiFetch(url, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function saveJobTypeRequest(payload, jobTypeId) {
+    let res = await postJson(`${API}/job-types/save`, { ...payload, job_type_id: jobTypeId || null });
+    if (res.ok || res.status !== 404) return res;
+    if (jobTypeId) {
+      res = await patchJson(`${API}/job-types/${jobTypeId}`, payload);
+      if (res.ok) return res;
+      return apiFetch(`${API}/job-types/${jobTypeId}`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+    return postJson(`${API}/job-types`, payload);
+  }
+
+  async function saveTemplateRequest(payload, templateId) {
+    let res = await postJson(`${API}/estimate-templates/save`, { ...payload, template_id: templateId || null });
+    if (res.ok || res.status !== 404) return res;
+    if (templateId) {
+      res = await patchJson(`${API}/estimate-templates/${templateId}`, payload);
+      if (res.ok) return res;
+      return apiFetch(`${API}/estimate-templates/${templateId}`, {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+    return postJson(`${API}/estimate-templates`, payload);
   }
 
   function cancelEditJobType() {
@@ -6033,59 +6080,85 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
     setErr("");
   }
 
+  function startEditJobType(jt) {
+    setErr("");
+    setEditingJt(jt);
+    setJtForm({ name: jt.name, hint: jt.hint || "", cost_code_ids: jt.cost_code_ids || [] });
+  }
+
+  function startEditTemplate(t) {
+    setErr("");
+    setEditingTpl(t);
+    setTplForm({
+      name: t.name,
+      cost_code_id: t.cost_code_id ? String(t.cost_code_id) : "",
+      estimated_hours: String(t.estimated_hours || ""),
+      estimated_material_cost: String(t.estimated_material_cost || ""),
+    });
+  }
+
+  function toggleJtCostCode(id) {
+    const n = Number(id);
+    setJtForm(f => ({
+      ...f,
+      cost_code_ids: f.cost_code_ids.some(x => Number(x) === n)
+        ? f.cost_code_ids.filter(x => Number(x) !== n)
+        : [...f.cost_code_ids, n],
+    }));
+  }
+
+  function jtHasCostCode(id) {
+    return jtForm.cost_code_ids.some(x => Number(x) === Number(id));
+  }
+
   async function saveJobType() {
     setErr("");
-    if (!jtForm.name.trim()) { setErr("Enter a name first"); return; }
+    if (!jtForm.name.trim()) {
+      setErr("Enter a name — e.g. Bathroom Reno");
+      return;
+    }
     setSaving(true);
-    const body = { name: jtForm.name.trim(), hint: jtForm.hint || null, cost_code_ids: jtForm.cost_code_ids.map(Number) };
-    const isEdit = editingJt != null && Number(editingJt) > 0;
-    const url = isEdit ? `${API}/job-types/${editingJt}` : `${API}/job-types`;
-    const method = isEdit ? "PUT" : "POST";
-    const res = await apiFetch(url, { method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const payload = {
+      name: jtForm.name.trim(),
+      hint: jtForm.hint || null,
+      cost_code_ids: jtForm.cost_code_ids.map(Number),
+    };
+    const res = await saveJobTypeRequest(payload, editingJt?.job_type_id);
     setSaving(false);
     if (res.ok) {
-      flash(isEdit ? "Saved" : "Added");
+      flash(editingJt ? "Job type updated." : "Job type added.");
       cancelEditJobType();
       load();
     } else {
       const d = await res.json().catch(() => ({}));
-      setErr(apiErr(d.detail, "Could not save job type"));
+      setErr(parseApiError(res, d.detail, "Could not save job type."));
     }
   }
 
   async function saveTemplate() {
     setErr("");
-    if (!tplForm.name.trim()) { setErr("Enter a name first"); return; }
+    if (!tplForm.name.trim()) {
+      setErr("Enter a name — e.g. Standard demo");
+      return;
+    }
     setSaving(true);
-    const body = {
+    const payload = {
       name: tplForm.name.trim(),
       cost_code_id: tplForm.cost_code_id ? parseInt(tplForm.cost_code_id, 10) : null,
       estimated_hours: parseFloat(tplForm.estimated_hours) || 0,
       estimated_material_cost: parseFloat(tplForm.estimated_material_cost) || 0,
       estimated_labor_cost: 0,
     };
-    const isEdit = editingTpl != null && Number(editingTpl) > 0;
-    const url = isEdit ? `${API}/estimate-templates/${editingTpl}` : `${API}/estimate-templates`;
-    const method = isEdit ? "PUT" : "POST";
-    const res = await apiFetch(url, { method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await saveTemplateRequest(payload, editingTpl?.template_id);
     setSaving(false);
     if (res.ok) {
-      flash(isEdit ? "Saved" : "Added");
+      flash(editingTpl ? "Template updated." : "Template added.");
       cancelEditTemplate();
       load();
     } else {
       const d = await res.json().catch(() => ({}));
-      setErr(apiErr(d.detail, "Could not save template"));
+      setErr(parseApiError(res, d.detail, "Could not save template."));
     }
-  }
-
-  function toggleJtCostCode(id) {
-    const n = Number(id);
-    setJtForm(f => ({ ...f, cost_code_ids: f.cost_code_ids.includes(n) ? f.cost_code_ids.filter(x => x !== n) : [...f.cost_code_ids, n] }));
-  }
-
-  function jtHasCostCode(id) {
-    return jtForm.cost_code_ids.some(x => Number(x) === Number(id));
   }
 
   return (
@@ -6093,24 +6166,37 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
       {msg && <div style={{ color: theme.accent, fontWeight: 600, marginBottom: 12, fontSize: 13 }}>{msg}</div>}
       {err && <p style={styles.errorMsg}>{err}</p>}
 
-      <p style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 14 }}>
-        Shortcuts for new estimates. <strong>Job type</strong> = empty rows. <strong>Template</strong> = hours/$ on one row.
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Job Types</h3>
+      <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
+        A <strong>job type</strong> is a starter kit for new estimates. Pick a name and which work categories belong on that job — when you create an estimate, those rows appear empty (you fill in hours and materials after).
+      </p>
+      <p style={{ fontSize: 12, color: theme.textLight, margin: "0 0 12px", fontStyle: "italic" }}>
+        Example: &quot;Bathroom Reno&quot; → Demo, Plumbing, Tile rows (no numbers yet).
       </p>
 
-      <div style={{ ...styles.card, marginBottom: 16 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 8px" }}>Job Types</h3>
-        {editingJt && (
-          <div style={{ fontSize: 12, color: theme.accent, fontWeight: 600, marginBottom: 8 }}>
-            Editing — tap Cancel to add new instead
-          </div>
-        )}
-        <input style={styles.input} placeholder="Name" value={jtForm.name} onChange={e => { setJtForm({ ...jtForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
-        <input style={styles.input} placeholder="Short hint (optional)" value={jtForm.hint} onChange={e => setJtForm({ ...jtForm, hint: e.target.value })} disabled={readonly} />
-        <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSecondary, margin: "10px 0 6px" }}>Cost codes (optional)</div>
+      {editingJt ? (
+        <>
+          <p style={{ fontSize: 12, fontWeight: 600, color: theme.primary, marginBottom: 10 }}>Editing: {editingJt.name}</p>
+          <label style={styles.label}>Job type name</label>
+          <input style={styles.input} placeholder="e.g. Bathroom Reno" value={jtForm.name} onChange={e => { setJtForm({ ...jtForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
+          <label style={styles.label}>Notes (optional)</label>
+          <input style={styles.input} placeholder="e.g. Full gut and rebuild" value={jtForm.hint} onChange={e => setJtForm({ ...jtForm, hint: e.target.value })} disabled={readonly} />
+        </>
+      ) : (
+        <>
+          <label style={styles.label}>Job type name</label>
+          <input style={styles.input} placeholder="e.g. Bathroom Reno" value={jtForm.name} onChange={e => { setJtForm({ ...jtForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
+          <label style={styles.label}>Notes (optional)</label>
+          <input style={styles.input} placeholder="e.g. Full gut and rebuild" value={jtForm.hint} onChange={e => setJtForm({ ...jtForm, hint: e.target.value })} disabled={readonly} />
+        </>
+      )}
+
+      <label style={styles.label}>Work categories on this job type</label>
+      {costCodes.length === 0 ? (
+        <p style={{ fontSize: 12, color: theme.textLight, marginBottom: 8 }}>Add work categories first (Work Categories tab).</p>
+      ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {costCodes.length === 0 ? (
-            <span style={{ fontSize: 12, color: theme.textLight }}>Add work categories first (Settings → Work Categories).</span>
-          ) : costCodes.map(cc => (
+          {costCodes.map(cc => (
             <button key={cc.cost_code_id} type="button" disabled={readonly} onClick={() => toggleJtCostCode(cc.cost_code_id)} style={{
               padding: "6px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: font.body,
               border: `1.5px solid ${jtHasCostCode(cc.cost_code_id) ? theme.accent : theme.border}`,
@@ -6119,69 +6205,83 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
             }}>{cc.code}</button>
           ))}
         </div>
-        {!readonly && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" disabled={saving} onClick={saveJobType} style={{ ...styles.button, marginTop: 0, maxWidth: 200 }}>
-              {saving ? "Saving…" : editingJt ? "Save" : "Add job type"}
-            </button>
-            {editingJt && (
-              <button type="button" onClick={cancelEditJobType} style={{ ...styles.button, marginTop: 0, maxWidth: 120, backgroundColor: "#888" }}>
-                Cancel
-              </button>
-            )}
-          </div>
-        )}
-        {jobTypes.length > 0 && (
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-            {jobTypes.map(jt => (
-              <div key={jt.job_type_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{jt.name}</div>
-                  <div style={{ fontSize: 11, color: theme.textSecondary }}>{jt.hint || ""} · {(jt.cost_code_ids || []).length} categories</div>
-                </div>
-                {!readonly && (
-                  <button type="button" onClick={() => { setErr(""); setEditingJt(jt.job_type_id); setJtForm({ name: jt.name, hint: jt.hint || "", cost_code_ids: jt.cost_code_ids || [] }); }} style={{ fontSize: 12, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div style={styles.card}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 8px" }}>Saved Templates</h3>
-        <input style={styles.input} placeholder="Name" value={tplForm.name} onChange={e => { setTplForm({ ...tplForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
+      )}
+
+      {!readonly && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button type="button" disabled={saving} onClick={saveJobType} style={{ ...styles.button, flex: 1, marginTop: 0 }}>
+            {saving ? "Saving…" : editingJt ? "Save Job Type" : "Add Job Type"}
+          </button>
+          {editingJt && (
+            <button type="button" onClick={cancelEditJobType} style={{ ...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0 }}>Cancel</button>
+          )}
+        </div>
+      )}
+
+      {jobTypes.length > 0 && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+          {jobTypes.map(jt => (
+            <Row
+              key={jt.job_type_id}
+              main={jt.name}
+              sub={[jt.hint, `${(jt.cost_code_ids || []).length} categories`].filter(Boolean).join(" · ")}
+              actions={!readonly ? [<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditJobType(jt)} />] : []}
+            />
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${theme.border}` }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Saved Templates</h3>
+        <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
+          A <strong>template</strong> fills in default hours and materials for <em>one</em> task. Load it while building an estimate.
+        </p>
+        <p style={{ fontSize: 12, color: theme.textLight, margin: "0 0 12px", fontStyle: "italic" }}>
+          Example: &quot;Standard demo&quot; → 8 hours, $150 on the Demo row.
+        </p>
+
+        {editingTpl ? (
+          <p style={{ fontSize: 12, fontWeight: 600, color: theme.primary, marginBottom: 10 }}>Editing: {editingTpl.name}</p>
+        ) : null}
+
+        <label style={styles.label}>Template name</label>
+        <input style={styles.input} placeholder="e.g. Standard demo" value={tplForm.name} onChange={e => { setTplForm({ ...tplForm, name: e.target.value }); setErr(""); }} disabled={readonly} />
+        <label style={styles.label}>{T.workCategory}</label>
         <select style={styles.input} value={tplForm.cost_code_id} onChange={e => setTplForm({ ...tplForm, cost_code_id: e.target.value })} disabled={readonly}>
-          <option value="">Link to cost code (optional)</option>
+          <option value="">Select…</option>
           {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{cc.code} — {cc.description}</option>)}
         </select>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <input style={styles.input} type="number" placeholder="Default hours" value={tplForm.estimated_hours} onChange={e => setTplForm({ ...tplForm, estimated_hours: e.target.value })} disabled={readonly} />
-          <input style={styles.input} type="number" placeholder="Default materials $" value={tplForm.estimated_material_cost} onChange={e => setTplForm({ ...tplForm, estimated_material_cost: e.target.value })} disabled={readonly} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+          <div>
+            <label style={styles.label}>Default hours</label>
+            <input style={styles.input} type="number" placeholder="0" value={tplForm.estimated_hours} onChange={e => setTplForm({ ...tplForm, estimated_hours: e.target.value })} disabled={readonly} />
+          </div>
+          <div>
+            <label style={styles.label}>Default materials $</label>
+            <input style={styles.input} type="number" placeholder="0" value={tplForm.estimated_material_cost} onChange={e => setTplForm({ ...tplForm, estimated_material_cost: e.target.value })} disabled={readonly} />
+          </div>
         </div>
+
         {!readonly && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-            <button type="button" disabled={saving} onClick={saveTemplate} style={{ ...styles.button, marginTop: 0, maxWidth: 200 }}>
-              {saving ? "Saving…" : editingTpl ? "Save" : "Add template"}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" disabled={saving} onClick={saveTemplate} style={{ ...styles.button, flex: 1, marginTop: 0 }}>
+              {saving ? "Saving…" : editingTpl ? "Save Template" : "Add Template"}
             </button>
             {editingTpl && (
-              <button type="button" onClick={cancelEditTemplate} style={{ ...styles.button, marginTop: 0, maxWidth: 120, backgroundColor: "#888" }}>
-                Cancel
-              </button>
+              <button type="button" onClick={cancelEditTemplate} style={{ ...styles.button, backgroundColor: "#888", flex: 1, marginTop: 0 }}>Cancel</button>
             )}
           </div>
         )}
+
         {templates.length > 0 && (
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
             {templates.map(t => (
-              <div key={t.template_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: theme.bg, borderRadius: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</div>
-                  <div style={{ fontSize: 11, color: theme.textSecondary }}>{t.estimated_hours}h · ${fmt(t.estimated_material_cost)} mat</div>
-                </div>
-                {!readonly && (
-                  <button type="button" onClick={() => { setEditingTpl(t.template_id); setTplForm({ name: t.name, cost_code_id: t.cost_code_id || "", estimated_hours: String(t.estimated_hours || ""), estimated_material_cost: String(t.estimated_material_cost || "") }); }} style={{ fontSize: 12, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Edit</button>
-                )}
-              </div>
+              <Row
+                key={t.template_id}
+                main={t.name}
+                sub={`${t.estimated_hours}h · $${fmt(t.estimated_material_cost)} materials`}
+                actions={!readonly ? [<Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditTemplate(t)} />] : []}
+              />
             ))}
           </div>
         )}
@@ -6473,11 +6573,14 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
 
       <div style={{ ...styles.card, marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 12 }}>1 — Project info</div>
-        <label style={styles.label}>Job type <span style={{ fontWeight: 400, color: theme.textLight }}>(optional)</span></label>
+        <label style={styles.label}>Job type starter kit (optional)</label>
         <select style={styles.input} value={jobTypeId} onChange={e => setJobTypeId(e.target.value)} disabled={!!savedEstimate}>
-          <option value="">None</option>
+          <option value="">None — add rows yourself</option>
           {jobTypes.map(jt => <option key={jt.job_type_id} value={jt.job_type_id}>{jt.name}</option>)}
         </select>
+        {!savedEstimate && jobTypes.length > 0 && (
+          <p style={{ fontSize: 11, color: theme.textLight, margin: "6px 0 0" }}>Adds empty rows from Settings → Estimating.</p>
+        )}
         {selectedJobType?.hint && <p style={{ fontSize: 12, color: theme.textSecondary, margin: "6px 0 0" }}>{selectedJobType.hint}</p>}
         <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10, marginTop: 12 }}>
           <div>
