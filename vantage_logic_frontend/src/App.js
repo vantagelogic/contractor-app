@@ -291,95 +291,161 @@ function Skeleton({ width = "100%", height = "16px", radius = "4px" }) {
 }
 
 // ─── HELP CHAT WIDGET ─────────────────────────────────────────
-function HelpChat({ token, role }) {
+const HELP_QUICK_PROMPTS = {
+  crew: [
+    "How do I log hours?",
+    "How does voice logging work?",
+    "How do I submit a site quote?",
+    "I made a mistake on a timesheet",
+  ],
+  owner: [
+    "How do I create a project?",
+    "How do cost-plus invoices work?",
+    "How do I review crew site quotes?",
+    "How do I give crew app access?",
+  ],
+};
+
+function HelpChat({ token, role, mobile = false }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { from: "bot", text: "Hi! I'm your VantageLogic assistant. Ask me anything about using the app." }
+    { from: "bot", text: "Hi! I'm your VantageLogic assistant — powered by AI. Ask me anything about using the app, or tap a suggestion below." }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const quickPrompts = HELP_QUICK_PROMPTS[role === "crew" ? "crew" : "owner"];
+  const fabBottom = mobile ? "calc(78px + env(safe-area-inset-bottom))" : "24px";
+  const panelBottom = mobile ? "calc(138px + env(safe-area-inset-bottom))" : "84px";
 
   useEffect(() => {
     if (bottomRef.current) bottomRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, open]);
 
-  async function send() {
-    const msg = input.trim();
-    if (!msg || loading) return;
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  useEffect(() => {
+    if (open && inputRef.current) inputRef.current.focus();
+  }, [open]);
+
+  async function sendMessage(msg) {
+    const text = (msg || input).trim();
+    if (!text || loading) return;
     setInput("");
-    setMessages(prev => [...prev, { from: "user", text: msg }]);
+    const nextMessages = [...messages, { from: "user", text }];
+    setMessages(nextMessages);
     setLoading(true);
     try {
+      const history = nextMessages
+        .slice(-8)
+        .filter(m => m.from === "user" || m.from === "bot")
+        .slice(0, -1)
+        .map(m => ({ role: m.from === "user" ? "user" : "assistant", text: m.text }));
       const res = await apiFetch(`${API}/help-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: msg, role: role || "crew" })
+        body: JSON.stringify({ message: text, role: role || "crew", history })
       });
       const data = await res.json();
-      setMessages(prev => [...prev, { from: "bot", text: data.reply || "Sorry, something went wrong." }]);
+      if (res.status === 429) {
+        setMessages(prev => [...prev, { from: "bot", text: "You're sending messages quickly — wait a moment and try again." }]);
+      } else {
+        setMessages(prev => [...prev, { from: "bot", text: data.reply || "Sorry, something went wrong." }]);
+      }
     } catch {
-      setMessages(prev => [...prev, { from: "bot", text: "Sorry, I couldn't reach the server. Try again." }]);
+      setMessages(prev => [...prev, { from: "bot", text: "Sorry, I couldn't reach the server. Check your connection and try again." }]);
     }
     setLoading(false);
   }
 
   return (
     <>
-      {/* Floating button */}
       <button
+        type="button"
         onClick={() => setOpen(o => !o)}
-        style={{ position: "fixed", bottom: "80px", right: "16px", zIndex: 1100, width: "50px", height: "50px", borderRadius: "50%", backgroundColor: theme.primary, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(26,61,43,0.35)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "22px" }}
-        title="Help"
+        aria-label={open ? "Close help" : "Open help assistant"}
+        aria-expanded={open}
+        style={{ position: "fixed", bottom: fabBottom, right: mobile ? "14px" : "20px", zIndex: 1099, width: "50px", height: "50px", borderRadius: "50%", backgroundColor: theme.primary, border: `2px solid ${theme.gold}`, cursor: "pointer", boxShadow: "0 4px 16px rgba(26,61,43,0.35)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", transition: "transform 0.15s" }}
+        title="Help assistant"
       >
-        {open ? "×" : "?"}
+        {open ? (
+          <span style={{ fontSize: "22px", lineHeight: 1 }}>×</span>
+        ) : (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" fill={theme.gold} stroke={theme.gold} />
+            <path d="M5 19h14" stroke="white" strokeWidth="2" />
+          </svg>
+        )}
       </button>
 
-      {/* Chat panel */}
       {open && (
-        <div style={{ position: "fixed", bottom: "140px", right: "16px", zIndex: 1100, width: "320px", maxWidth: "calc(100vw - 32px)", backgroundColor: "white", borderRadius: "16px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", overflow: "hidden", border: `1px solid ${theme.border}`, animation: "vlFadeUp 0.25s ease both" }}>
-          {/* Header */}
-          <div style={{ backgroundColor: theme.primary, padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>?</div>
-            <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: "white" }}>VantageLogic Help</div>
-              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)" }}>Ask me anything about the app</div>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: "320px", minHeight: "160px" }}>
-            {messages.map((m, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: m.from === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ maxWidth: "80%", backgroundColor: m.from === "user" ? theme.primary : theme.bg, color: m.from === "user" ? "white" : theme.textPrimary, borderRadius: m.from === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", padding: "9px 13px", fontSize: "13px", lineHeight: 1.55, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
-                  {m.text}
-                </div>
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1098, backgroundColor: "rgba(0,0,0,0.12)" }} aria-hidden="true" />
+          <div role="dialog" aria-label="VantageLogic help assistant" style={{ position: "fixed", bottom: panelBottom, right: mobile ? "14px" : "20px", zIndex: 1099, width: mobile ? "calc(100vw - 28px)" : "340px", maxWidth: "340px", backgroundColor: "white", borderRadius: "16px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", overflow: "hidden", border: `1px solid ${theme.border}`, animation: "vlFadeUp 0.25s ease both" }}>
+            <div style={{ backgroundColor: theme.primary, padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "rgba(200,151,58,0.25)", border: `1px solid ${theme.gold}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={theme.gold} stroke="none"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L6 21l2.3-7-6-4.6h7.6z"/></svg>
               </div>
-            ))}
-            {loading && (
-              <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <div style={{ backgroundColor: theme.bg, borderRadius: "14px 14px 14px 4px", padding: "10px 14px", display: "flex", gap: "4px", alignItems: "center" }}>
-                  {[0,1,2].map(i => <div key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: theme.textLight, animation: `vlPulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />)}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: "white" }}>VantageLogic Help</div>
+                <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)" }}>AI assistant · knows your role</div>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: "20px", padding: "4px", lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: "10px", maxHeight: mobile ? "min(50vh, 360px)" : "320px", minHeight: "160px" }}>
+              {messages.map((m, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: m.from === "user" ? "flex-end" : "flex-start" }}>
+                  <div style={{ maxWidth: "85%", backgroundColor: m.from === "user" ? theme.primary : theme.bg, color: m.from === "user" ? "white" : theme.textPrimary, borderRadius: m.from === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", padding: "9px 13px", fontSize: "13px", lineHeight: 1.55, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                    {m.text}
+                  </div>
                 </div>
+              ))}
+              {loading && (
+                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                  <div style={{ backgroundColor: theme.bg, borderRadius: "14px 14px 14px 4px", padding: "10px 14px", display: "flex", gap: "4px", alignItems: "center" }}>
+                    {[0, 1, 2].map(i => <div key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: theme.textLight, animation: `vlPulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />)}
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {messages.length <= 1 && !loading && (
+              <div style={{ padding: "0 12px 10px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {quickPrompts.map(q => (
+                  <button key={q} type="button" onClick={() => sendMessage(q)} style={{ fontSize: "11px", padding: "6px 10px", borderRadius: "20px", border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.textSecondary, cursor: "pointer", fontFamily: font.body, fontWeight: "600", lineHeight: 1.3, textAlign: "left" }}>
+                    {q}
+                  </button>
+                ))}
               </div>
             )}
-            <div ref={bottomRef} />
-          </div>
 
-          {/* Input */}
-          <div style={{ padding: "10px 12px", borderTop: `1px solid ${theme.border}`, display: "flex", gap: "8px" }}>
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && send()}
-              placeholder="Ask a question..."
-              style={{ flex: 1, padding: "9px 12px", borderRadius: "8px", border: `1.5px solid ${theme.border}`, fontSize: "13px", fontFamily: font.body, outline: "none" }}
-            />
-            <button onClick={send} disabled={!input.trim() || loading} style={{ padding: "9px 14px", borderRadius: "8px", border: "none", backgroundColor: theme.primary, color: "white", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: font.body, opacity: !input.trim() || loading ? 0.5 : 1 }}>
-              Send
-            </button>
+            <div style={{ padding: "10px 12px", borderTop: `1px solid ${theme.border}`, display: "flex", gap: "8px" }}>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                placeholder="Ask a question..."
+                aria-label="Help message"
+                style={{ flex: 1, padding: "9px 12px", borderRadius: "8px", border: `1.5px solid ${theme.border}`, fontSize: "13px", fontFamily: font.body, outline: "none" }}
+              />
+              <button type="button" onClick={() => sendMessage()} disabled={!input.trim() || loading} style={{ padding: "9px 14px", borderRadius: "8px", border: "none", backgroundColor: theme.primary, color: "white", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: font.body, opacity: !input.trim() || loading ? 0.5 : 1 }}>
+                Send
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </>
   );
@@ -619,6 +685,7 @@ function OnboardingModal({ onClose }) {
 function OnboardingChecklist({ token, onDismiss, onNavigate }) {
   const [hasJob, setHasJob] = useState(false);
   const [hasEmployee, setHasEmployee] = useState(false);
+  const [hasCostCode, setHasCostCode] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linkShared, setLinkShared] = useState(() => {
     try { return localStorage.getItem("vl_link_shared") === "1"; } catch { return false; }
@@ -651,6 +718,7 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
     const h = { Authorization: `Bearer ${token}` };
     apiFetch(`${API}/jobs`, { headers: h }).then(r => r.json()).then(data => setHasJob(Array.isArray(data) && data.length > 0)).catch(() => {});
     apiFetch(`${API}/employees`, { headers: h }).then(r => r.json()).then(data => setHasEmployee(Array.isArray(data) && data.length > 0)).catch(() => {});
+    apiFetch(`${API}/cost-codes`, { headers: h }).then(r => r.json()).then(data => setHasCostCode(Array.isArray(data) && data.length > 0)).catch(() => {});
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = [
@@ -661,6 +729,14 @@ function OnboardingChecklist({ token, onDismiss, onNavigate }) {
       view: "settings",
       settingsTab: "projects",
       color: "#2d6a4f",
+    },
+    {
+      label: "Set up work types",
+      desc: "Crew pick these when logging hours — e.g. Framing, Electrical",
+      done: hasCostCode,
+      view: "settings",
+      settingsTab: "categories",
+      color: "#1a3d2b",
     },
     {
       label: "Add crew members",
@@ -1358,7 +1434,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false }) 
                     if (type === "timesheet") setView("timesheet");
                     else if (type === "material") setView("materials");
                     else if (type === "mileage") setView("mileage");
-                    else if (type === "request") setView("requests");
+                    else if (type === "request") setView("crew_requests");
                     if (window._setVoicePrefill) window._setVoicePrefill(voiceResult);
                     setVoiceResult(null);
                   }} style={{ flex: 1, ...styles.button, marginTop: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
@@ -3355,7 +3431,7 @@ function RequestsScreen({ token, readonly = false }) {
 }
 
 // ─── CREW REQUESTS SCREEN ──────────────────────────────────────
-function CrewRequestsScreen({ token, readonly = false }) {
+function CrewRequestsScreen({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null }) {
   const [requests, setRequests] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -3405,6 +3481,20 @@ function CrewRequestsScreen({ token, readonly = false }) {
   }
 
   useEffect(() => { loadAll(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!voicePrefill || voicePrefill.type !== "request") return;
+    const reqType = voicePrefill.request_type || "Other";
+    const allowed = REQUEST_TYPES.includes(reqType) ? reqType : "Other";
+    setForm(prev => ({
+      ...prev,
+      job_id: voicePrefill._matchedJobId || prev.job_id,
+      request_type: allowed,
+      description: voicePrefill.description || voicePrefill.notes || prev.description,
+    }));
+    setShowForm(true);
+    onPrefillConsumed?.();
+  }, [voicePrefill]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function validate() {
     const e = {};
@@ -8835,7 +8925,7 @@ function AuthenticatedApp() {
         <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
         {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
         <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
-        {token && <HelpChat token={token} role={role} />}
+        {token && <HelpChat token={token} role={role} mobile={mobile} />}
 
         {/* Full-screen onboarding walkthrough — shown once on first login */}
         {showOnboarding && (role === "owner" || role === "admin") && (
@@ -8850,7 +8940,7 @@ function AuthenticatedApp() {
           {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
           {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
           {role === "crew" && view === "mileage" && <MileageForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
-          {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}
           {(role === "owner" || role === "admin") && view === "dashboard" && (

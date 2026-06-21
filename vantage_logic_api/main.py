@@ -553,7 +553,7 @@ def require_owner(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 from cost_plus import register_cost_plus_routes
-register_cost_plus_routes(app, get_db, get_current_user, require_owner, _timesheet_labour_cost)
+register_cost_plus_routes(app, get_db, get_current_user, require_owner, _timesheet_labour_cost, limiter)
 
 
 def _has_route(path: str) -> bool:
@@ -1388,6 +1388,7 @@ class ReceiptRequest(BaseModel):
     image_base64: str
 
 @app.post("/receipts/parse")
+@limiter.limit("15/minute")
 def parse_receipt(
     request: Request,
     job_id: int,
@@ -1464,7 +1465,9 @@ class VoiceRequest(BaseModel):
     transcript: str
 
 @app.post("/voice/parse-timesheet")
+@limiter.limit("30/minute")
 def parse_voice_timesheet(
+    request: Request,
     body: VoiceRequest,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1520,7 +1523,9 @@ Match job_name and cost_code to the closest option from the lists provided. If n
         return {"success": False, "message": "Something went wrong. Please try again."}
     
 @app.post("/voice/parse-entry")
+@limiter.limit("30/minute")
 def parse_voice_entry(
+    request: Request,
     body: VoiceRequest,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -1596,12 +1601,19 @@ Rules:
         print(f"Voice parse error: {e}")
         return {"success": False, "message": "Something went wrong. Please try again."}
 
+class HelpChatMessage(BaseModel):
+    role: str
+    text: str
+
 class HelpChatRequest(BaseModel):
     message: str
     role: str = "crew"
+    history: list[HelpChatMessage] = []
 
 @app.post("/help-chat")
+@limiter.limit("20/minute")
 def help_chat(
+    request: Request,
     body: HelpChatRequest,
     current_user: models.User = Depends(get_current_user)
 ):
@@ -1648,21 +1660,53 @@ Overtime Tracking: An optional company-wide setting (Setup → Overtime). When t
 ---
 NAVIGATION:
 
-CREW (bottom navigation bar):
-- Home: Your personal dashboard. Shows your stats for the week (hours, jobs, km), your scheduled shifts by day, quick log buttons, and the voice logging feature.
-- Log: Opens a choice screen — tap Hours, Materials, or Mileage to log that type of entry. When you're inside one of these, the nav bar changes to show Home | Hours | Materials | Mileage so you can switch between them easily.
-- Requests: Submit requests to your admin and track their status. Tap any request to see the comment thread.
-- Settings: Update your name, email, and password.
-
 ADMIN/OWNER (left sidebar on desktop, bottom bar on mobile):
+- Dashboard: Live profitability for all projects. Filter by All/Active/Completed. Tap a project to expand and see timesheets, materials, and change orders.
 - Schedule: Assign shifts to crew members. Desktop shows a weekly drag-and-drop grid. Mobile shows a vertical day list with an Add Shift button.
-- Dashboard: Live profitability for all jobs. Filter by All/Active/Completed. Tap a job to expand and see timesheets, materials, and change orders.
-- Inventory: Manage stock items. Add, edit, or deactivate items. See current quantities.
 - Requests: Review all crew requests. Approve or deny with an optional reason. Reply via comment threads.
-- Setup (Admin): Jobs, Your Crew, Cost Codes, Crew App Access, Your Account (name, company name, password), and Overtime (toggle and rate).
+- Estimate: Build customer estimates from templates, use AI to suggest line items, review crew site quotes, send PDFs to customers.
+- Billing: Generate cost-plus client invoices from logged job costs (labour, materials, mileage). Preview unbilled costs, create invoice PDFs, and share with customers. Send magic links for subs to upload invoices or sign lien waivers.
+- Settings: Company profile, Projects, Crew management, Work types, Estimating templates, Inventory, Financials (rates, markup, tax), Data exports, Overtime rules.
+
+CREW (bottom navigation bar):
+- Home: Personal dashboard — weekly stats, scheduled shifts, quick log buttons, and voice logging.
+- Quote: Build site quotes on the job. Add scope notes, voice notes, or photos, then tap "Generate estimate with AI". Submit to office for review.
+- Log: Hours, Materials (store bought, receipt scan, or inventory pull), or Mileage.
+- Requests: Submit and track requests. Comment threads with admin.
+- Settings: Update name, email, and password.
 
 ---
-HOW TO DO COMMON TASKS:
+ESTIMATING & QUOTES:
+
+SITE QUOTES (crew — Quote tab):
+1. Tap Quote → + New site quote
+2. Select the project the office set up
+3. Add scope summary, site notes, voice note, and/or photos
+4. Tap "Generate estimate with AI" — AI drafts budget rows by work type
+5. Review rows, then tap Submit to office for review
+Office can approve, return for changes, or convert to a customer estimate.
+
+CUSTOMER ESTIMATES (admin — Estimate tab):
+1. Go to Estimate → select a project
+2. Add line items manually or use AI suggest (describe the job in a few words)
+3. Adjust hours, materials, and labour rates
+4. Generate PDF and send to customer
+
+COST-PLUS BILLING (admin — Billing tab):
+1. Go to Billing → select a project with logged costs
+2. Preview unbilled labour, materials, and mileage
+3. Tap Generate client invoice — creates a PDF with your markup
+4. Share the PDF with your customer
+
+RECEIPT SCANNING (crew — Log → Materials → Scan Receipt):
+1. Select project and work type first
+2. Tap Scan Receipt and photograph the receipt
+3. AI reads line items — review and save each item
+
+INVENTORY (admin — Settings → Inventory):
+Manage stock items. Crew pull inventory via Log → Materials → From Inventory (creates a request for admin approval).
+
+---
 
 LOG HOURS (crew):
 1. Tap Log in the bottom nav bar
@@ -1805,14 +1849,24 @@ RESPONSE RULES:
 - Always be friendly and encouraging — trades workers are busy people on job sites"""
 
     try:
+        contents = [system_prompt]
+        for msg in body.history[-6:]:
+            role_label = "User" if msg.role == "user" else "Assistant"
+            text = (msg.text or "").strip()
+            if text:
+                contents.append(f"{role_label}: {text}")
+        contents.append(f"User: {body.message.strip()}")
+
         response = get_gemini_client().models.generate_content(
             model="gemini-2.5-flash",
-            contents=[f"{system_prompt}\n\nUser question: {body.message}"]
+            contents=contents
         )
         return {"reply": response.text.strip()}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Help chat error: {e}")
-        return {"reply": "Sorry, I couldn't process that. Please try again."}
+        return {"reply": "Sorry, I couldn't process that right now. Please try again in a moment."}
 
 @app.delete("/materials/{material_id}")
 def delete_material(

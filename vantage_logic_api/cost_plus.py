@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, date
 import os
 import secrets
 
-from fastapi import Depends, HTTPException, Body, File, UploadFile, Form
+from fastapi import Depends, HTTPException, Body, File, UploadFile, Form, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette.responses import FileResponse
@@ -122,7 +122,7 @@ class EstimateSendIn(BaseModel):
     customer_name: str | None = None
 
 
-def register_cost_plus_routes(app, get_db, get_current_user, require_owner, timesheet_labour_cost):
+def register_cost_plus_routes(app, get_db, get_current_user, require_owner, timesheet_labour_cost, limiter=None):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
     def _next_invoice_number(db: Session, company_id: int) -> str:
@@ -872,7 +872,9 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         return {"template_id": t.template_id, "name": t.name}
 
     @app.post("/estimates/suggest")
+    @limiter.limit("10/minute")
     def suggest_estimate(
+        request: Request,
         body: EstimateSuggestIn,
         current_user: models.User = Depends(get_current_user),
         db: Session = Depends(get_db),
@@ -1417,7 +1419,9 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         }
 
     @app.post("/field-estimates/{estimate_id}/generate")
+    @limiter.limit("10/minute")
     def generate_field_estimate(
+        request: Request,
         estimate_id: int,
         body: FieldEstimateGenerateIn = Body(default_factory=FieldEstimateGenerateIn),
         current_user: models.User = Depends(get_current_user),
