@@ -3148,7 +3148,7 @@ function RequestsScreen({ token, readonly = false }) {
           {unreadCount > 0 && <span style={{ backgroundColor: theme.danger, color: "white", fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "10px" }}>{unreadCount} unread</span>}
         </div>
       </div>
-      <p style={styles.subtitle}>Review and respond to crew requests</p>
+      <p style={styles.subtitle}>Approve crew requests and keep the conversation going on each thread</p>
 
       {message && <div style={{ backgroundColor: theme.accentLight, color: theme.accent, padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginBottom: "14px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -3385,7 +3385,7 @@ function CrewRequestsScreen({ token, readonly = false }) {
         <h1 style={styles.title}>Requests</h1>
         {unreadCount > 0 && <span style={{ backgroundColor: theme.danger, color: "white", fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "10px" }}>{unreadCount} new</span>}
       </div>
-      <p style={styles.subtitle}>Job site requests and team discussion</p>
+      <p style={styles.subtitle}>Ask for materials, flag issues, and chat with your admin on each request</p>
 
       {message && <div style={{ backgroundColor: theme.accentLight, color: theme.accent, padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginBottom: "14px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -3766,10 +3766,10 @@ function ScheduleScreen({ token, readonly = false }) {
       {tab === "calendar" && (
         <>
           {/* Week nav */}
-          <div style={{ backgroundColor: "white", borderRadius: "12px", border: `1px solid ${theme.border}`, padding: "12px 16px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", boxShadow: theme.shadowSm }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ backgroundColor: "white", borderRadius: "12px", border: `1px solid ${theme.border}`, padding: "12px 16px", marginBottom: "14px", display: "flex", flexDirection: isMobile() ? "column" : "row", alignItems: isMobile() ? "stretch" : "center", justifyContent: isMobile() ? "flex-start" : "space-between", gap: "12px", flexWrap: "wrap", boxShadow: theme.shadowSm }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: isMobile() ? "100%" : undefined }}>
               <button onClick={() => setWeekOffset(w => w - 1)} style={{ padding: "6px 13px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: theme.bg, cursor: "pointer", fontFamily: font.body, fontSize: "16px", color: theme.textPrimary, fontWeight: "700", lineHeight: 1, minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-              <div style={{ textAlign: "center", minWidth: "180px" }}>
+              <div style={{ textAlign: "center", minWidth: isMobile() ? "160px" : "180px" }}>
                 <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, letterSpacing: "-0.2px" }}>{weekLabel}</div>
                 <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>
                   {weekHours > 0 ? <span style={{ color: theme.accent, fontWeight: "600" }}>{weekHours}h scheduled</span> : "Nothing scheduled"}
@@ -3778,7 +3778,7 @@ function ScheduleScreen({ token, readonly = false }) {
               </div>
               <button onClick={() => setWeekOffset(w => w + 1)} style={{ padding: "6px 13px", borderRadius: "8px", border: `1px solid ${theme.border}`, backgroundColor: theme.bg, cursor: "pointer", fontFamily: font.body, fontSize: "16px", color: theme.textPrimary, fontWeight: "700", lineHeight: 1, minHeight: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
             </div>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", justifyContent: isMobile() ? "center" : "flex-start", width: isMobile() ? "100%" : undefined }}>
               <span style={{ fontSize: "11px", color: theme.textLight, fontWeight: "500", marginRight: "2px" }}>Filter:</span>
               <button onClick={() => setJobFilter("all")} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === "all" ? theme.primary : theme.border}`, backgroundColor: jobFilter === "all" ? theme.primary : "white", color: jobFilter === "all" ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>All {T.projects.toLowerCase()}</button>
               {jobs.map(j => <button key={j.job_id} onClick={() => setJobFilter(String(j.job_id))} style={{ padding: "5px 12px", borderRadius: "20px", border: `1.5px solid ${jobFilter === String(j.job_id) ? jobColors[j.job_id] : theme.border}`, backgroundColor: jobFilter === String(j.job_id) ? jobColors[j.job_id] : "white", color: jobFilter === String(j.job_id) ? "white" : theme.textSecondary, fontFamily: font.body, fontSize: "11px", fontWeight: "600", cursor: "pointer", transition: "all 0.15s" }}>{j.job_name}</button>)}
@@ -4060,24 +4060,24 @@ function ScheduleScreen({ token, readonly = false }) {
               <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "14px" }}>{editingTemplate ? "Edit Template" : "New Template"}</div>
               <label style={styles.label}>Template Name</label>
               <input style={styles.input} value={templateForm.name} onChange={e => setTemplateForm({...templateForm, name: e.target.value})} placeholder='e.g. "8h Framing – Smith House"' />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: "10px" }}>
                 <div>
                   <label style={styles.label}>{T.project}</label>
-                  <select style={styles.input} value={templateForm.job_id} onChange={e => setTemplateForm({...templateForm, job_id: e.target.value})}>
+                  <select style={{ ...styles.input, fontSize: isMobile() ? 16 : 15 }} value={templateForm.job_id} onChange={e => setTemplateForm({...templateForm, job_id: e.target.value})}>
                     <option value="">Select project</option>
                     {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={styles.label}>{T.workCategory}</label>
-                  <select style={styles.input} value={templateForm.cost_code_id} onChange={e => setTemplateForm({...templateForm, cost_code_id: e.target.value})}>
+                  <select style={{ ...styles.input, fontSize: isMobile() ? 16 : 15 }} value={templateForm.cost_code_id} onChange={e => setTemplateForm({...templateForm, cost_code_id: e.target.value})}>
                     <option value="">{T.selectWorkCategory}</option>
                     {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "1fr 1fr 1fr", gap: "10px" }}>
                 <div>
                   <label style={styles.label}>Start Time</label>
                   <input style={styles.input} type="time" value={templateForm.start_time} onChange={e => {
@@ -4094,8 +4094,8 @@ function ScheduleScreen({ token, readonly = false }) {
                     setTemplateForm({...templateForm, end_time: en, ...(h ? { hours: h } : {})});
                   }} />
                 </div>
-                <div>
-                  <label style={styles.label}>Default Hours</label>
+                <div style={isMobile() ? { gridColumn: "1 / -1" } : undefined}>
+                  <label style={styles.label}>Hours</label>
                   <input style={styles.input} type="number" min="0.5" max="24" step="0.5" value={templateForm.hours} onChange={e => setTemplateForm({...templateForm, hours: e.target.value})} />
                 </div>
               </div>
@@ -4409,15 +4409,30 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
   const [userRefresh, setUserRefresh] = useState(0);
   const [settingsTab, setSettingsTab] = useState(initialTab);
 
-  const settingsTabs = [
-    { id: "company", label: "Company Profile" },
-    { id: "projects", label: T.projects },
-    { id: "crew", label: "Crew Management" },
-    { id: "categories", label: T.workCategories },
-    { id: "estimating", label: "Estimating" },
-    { id: "financials", label: "Financials" },
-    { id: "exports", label: "Data Exports" },
-    { id: "inventory", label: "Inventory" },
+  const settingsTabGroups = [
+    {
+      label: "Organization",
+      tabs: [
+        { id: "company", label: "Company Profile" },
+        { id: "projects", label: T.projects },
+        { id: "crew", label: "Crew Management" },
+      ],
+    },
+    {
+      label: "Job setup",
+      tabs: [
+        { id: "categories", label: T.workCategories },
+        { id: "estimating", label: "Estimating" },
+        { id: "inventory", label: "Inventory" },
+      ],
+    },
+    {
+      label: "Money & data",
+      tabs: [
+        { id: "financials", label: "Financials" },
+        { id: "exports", label: "Data Exports" },
+      ],
+    },
   ];
 
   useEffect(() => { setSettingsTab(initialTab); }, [initialTab]);
@@ -4619,15 +4634,24 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
         />
       ) : (
         <div style={{ display: "flex", flexDirection: isMobile() ? "column" : "row", gap: "20px", alignItems: "flex-start" }}>
-          <div style={{ width: isMobile() ? "100%" : "220px", flexShrink: 0, display: "flex", flexDirection: isMobile() ? "row" : "column", flexWrap: "wrap", gap: "6px" }}>
-            {settingsTabs.map(t => (
-              <button key={t.id} type="button" onClick={() => setSettingsTab(t.id)} style={{
-                padding: "10px 14px", borderRadius: "8px", border: `1.5px solid ${settingsTab === t.id ? theme.accent : theme.border}`,
-                backgroundColor: settingsTab === t.id ? theme.accentLight : "white",
-                color: settingsTab === t.id ? theme.primary : theme.textSecondary,
-                fontWeight: settingsTab === t.id ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: font.body,
-                textAlign: "left", flex: isMobile() ? "1 1 auto" : undefined,
-              }}>{t.label}</button>
+          <div style={{ width: isMobile() ? "100%" : "240px", flexShrink: 0 }}>
+            {settingsTabGroups.map(group => (
+              <div key={group.label} style={{ marginBottom: isMobile() ? 12 : 18 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6, paddingLeft: 2 }}>
+                  {group.label}
+                </div>
+                <div style={{ display: "flex", flexDirection: isMobile() ? "row" : "column", flexWrap: "wrap", gap: "6px" }}>
+                  {group.tabs.map(t => (
+                    <button key={t.id} type="button" onClick={() => setSettingsTab(t.id)} style={{
+                      padding: "10px 14px", borderRadius: "8px", border: `1.5px solid ${settingsTab === t.id ? theme.accent : theme.border}`,
+                      backgroundColor: settingsTab === t.id ? theme.accentLight : "white",
+                      color: settingsTab === t.id ? theme.primary : theme.textSecondary,
+                      fontWeight: settingsTab === t.id ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: font.body,
+                      textAlign: "left", flex: isMobile() ? "1 1 auto" : undefined, width: isMobile() ? undefined : "100%",
+                    }}>{t.label}</button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
 
@@ -6027,9 +6051,33 @@ function NotificationBell({ token, role, setView, mobile }) {
 
 // ─── COST-PLUS MODULE ─────────────────────────────────────────
 
-function goToEstimatingSettings() {
-  if (window._navigateToSettings) window._navigateToSettings("estimating");
+function goToSettingsTab(tab) {
+  if (window._navigateToSettings) window._navigateToSettings(tab || "company");
   else if (window._setView) window._setView("settings");
+}
+
+async function shareOrDownloadPdf(blob, filename, shareMeta) {
+  const file = new File([blob], filename, { type: "application/pdf" });
+  if (typeof navigator !== "undefined" && navigator.share) {
+    try {
+      const payload = { title: shareMeta.title, text: shareMeta.text, files: [file] };
+      if (!navigator.canShare || navigator.canShare(payload)) {
+        await navigator.share(payload);
+        return "shared";
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") return "cancelled";
+    }
+  }
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+  return "downloaded";
 }
 
 function EstimateRatesSettings({ token, readonly = false }) {
@@ -6484,7 +6532,7 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
   );
 }
 
-function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initialEstimate = null }) {
+function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initialEstimate = null, prefillEstimate = null }) {
   const headers = { Authorization: `Bearer ${token}` };
   const isEditMode = !!(initialJob && initialEstimate);
   const [jobTypes, setJobTypes] = useState([]);
@@ -6493,13 +6541,14 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
   const [jobTypeId, setJobTypeId] = useState("");
   const [client, setClient] = useState("");
   const [city, setCity] = useState(initialJob?.city || "");
-  const [customerEmail, setCustomerEmail] = useState(initialEstimate?.customer_email || "");
+  const [customerEmail, setCustomerEmail] = useState(initialEstimate?.customer_email || prefillEstimate?.customer_email || "");
   const [mileageKm, setMileageKm] = useState(
     initialEstimate?.estimated_mileage_km ? String(initialEstimate.estimated_mileage_km) : ""
   );
   const [rows, setRows] = useState(() => {
-    if (initialEstimate?.line_items?.length) {
-      return initialEstimate.line_items.map(li => ({
+    const source = initialEstimate || prefillEstimate;
+    if (source?.line_items?.length) {
+      return source.line_items.map(li => ({
         cost_code_id: li.cost_code_id ? String(li.cost_code_id) : "",
         hours: li.estimated_hours != null ? String(li.estimated_hours) : "",
         materials: li.material_cost != null ? String(li.material_cost) : "",
@@ -6507,6 +6556,8 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     }
     return [{ cost_code_id: "", hours: "", materials: "" }];
   });
+  const [templateMode, setTemplateMode] = useState("replace");
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [phase, setPhase] = useState(initialEstimate?.status === "sent" ? "sent" : "form");
@@ -6571,20 +6622,40 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
   }
 
-  function applyTemplate(templateId) {
-    const t = templates.find(x => String(x.template_id) === String(templateId));
-    if (!t) return;
-    const ccId = t.cost_code_id ? String(t.cost_code_id) : "";
+  function templateToRow(t) {
+    return {
+      cost_code_id: t.cost_code_id ? String(t.cost_code_id) : "",
+      hours: String(t.estimated_hours || ""),
+      materials: String(t.estimated_material_cost || ""),
+    };
+  }
+
+  function applyTemplates(templateIds, mode = templateMode) {
+    const picked = templateIds
+      .map(id => templates.find(x => String(x.template_id) === String(id)))
+      .filter(Boolean);
+    if (!picked.length) return;
+    const newRows = picked.map(templateToRow);
+    if (mode === "replace") {
+      setRows(newRows);
+      setSelectedTemplateIds(templateIds.map(String));
+      return;
+    }
     setRows(prev => {
-      const idx = prev.findIndex(r => r.cost_code_id === ccId && ccId);
-      const row = { cost_code_id: ccId, hours: String(t.estimated_hours || ""), materials: String(t.estimated_material_cost || "") };
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = row;
-        return next;
+      const next = [...prev.filter(r => r.cost_code_id || r.hours || r.materials)];
+      for (const row of newRows) {
+        const idx = next.findIndex(r => r.cost_code_id === row.cost_code_id && row.cost_code_id);
+        if (idx >= 0) next[idx] = row;
+        else next.push(row);
       }
-      return [...prev, row];
+      return next.length ? next : [{ cost_code_id: "", hours: "", materials: "" }];
     });
+    setSelectedTemplateIds(prev => Array.from(new Set([...prev, ...templateIds.map(String)])));
+  }
+
+  function toggleTemplateSelection(templateId) {
+    const id = String(templateId);
+    setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
   const totalHours = rows.reduce((s, r) => s + (parseFloat(r.hours) || 0), 0);
@@ -6618,15 +6689,21 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
       .filter(r => r.cost_code_id && (parseFloat(r.hours) > 0 || parseFloat(r.materials) > 0))
       .map(r => {
         const cc = costCodes.find(c => String(c.cost_code_id) === String(r.cost_code_id));
+        const hrs = parseFloat(r.hours) || 0;
+        const mat = parseFloat(r.materials) || 0;
         return {
           cost_code_id: parseInt(r.cost_code_id, 10),
           description: cc ? workTypeLabel(cc) : "Work",
           quantity: 1,
-          estimated_hours: parseFloat(r.hours) || 0,
-          material_cost: parseFloat(r.materials) || 0,
-          labor_cost: 0,
+          estimated_hours: hrs,
+          material_cost: mat,
+          labor_cost: roundMoney(hrs * rates.labor),
         };
       });
+  }
+
+  function roundMoney(n) {
+    return Math.round((Number(n) || 0) * 100) / 100;
   }
 
   async function downloadEstimatePdf(estimateId) {
@@ -6760,17 +6837,35 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
     if (!savedEstimate || !savedJob) return;
     setSaving(true);
     setError("");
-    const ok = await downloadEstimatePdf(savedEstimate.estimate_id);
-    setSaving(false);
-    if (!ok) {
-      setError("Could not download PDF");
-      return;
-    }
-    const to = customerEmail.trim();
-    const subject = `Estimate — ${savedJob.job_name}`;
-    const body = `Hi,\n\nPlease find our estimate attached for ${savedJob.job_name}.\n\nReply to confirm approval before we begin work.\n\nThank you`;
-    if (to) {
-      window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSendMsg("");
+    try {
+      const res = await apiFetch(`${API}/estimates/${savedEstimate.estimate_id}/pdf`, { headers });
+      if (!res.ok) {
+        setError("Could not download PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const filename = `estimate_${savedEstimate.estimate_id}.pdf`;
+      const to = customerEmail.trim();
+      const subject = `Estimate — ${savedJob.job_name}`;
+      const body = `Hi,\n\nPlease find our estimate attached for ${savedJob.job_name}.\n\nReply to confirm approval before we begin work.\n\nThank you`;
+      const result = await shareOrDownloadPdf(blob, filename, {
+        title: subject,
+        text: to ? `${body}\n\nTo: ${to}` : body,
+      });
+      if (result === "shared") {
+        setSendMsg("Choose your email app from the share sheet, attach if needed, and send.");
+      } else if (result === "downloaded") {
+        const draft = `To: ${to || "(add customer email)"}\nSubject: ${subject}\n\n${body}`;
+        try {
+          await navigator.clipboard.writeText(draft);
+          setSendMsg("PDF downloaded. Email draft copied — paste into Outlook, Gmail, or any app you prefer.");
+        } catch {
+          setSendMsg("PDF downloaded. Open your email app, attach the PDF, and send to your customer.");
+        }
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -6815,6 +6910,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         <h1 style={styles.title}>Review your estimate</h1>
         <p style={styles.subtitle}>{savedJob.job_name} — download the PDF and send it from your business email.</p>
         {error && <p style={styles.errorMsg}>{error}</p>}
+        {sendMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{sendMsg}</div>}
 
         <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}` }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>How to send this to your customer</div>
@@ -6848,11 +6944,27 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
             </button>
           </div>
           {pdfPreviewUrl ? (
-            <iframe
-              title="Estimate PDF preview"
-              src={pdfPreviewUrl}
-              style={{ width: "100%", height: isMobile() ? 420 : 560, border: "none", display: "block", backgroundColor: "#f5f5f5" }}
-            />
+            isMobile() ? (
+              <div style={{ padding: "20px 16px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: theme.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
+                  Inline PDF preview is limited on phones. Open the preview in a new tab or download the file.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <a href={pdfPreviewUrl} target="_blank" rel="noopener noreferrer" style={{ ...styles.button, marginTop: 0, textDecoration: "none", display: "block" }}>
+                    Open PDF preview
+                  </a>
+                  <button type="button" disabled={saving} onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent }}>
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <iframe
+                title="Estimate PDF preview"
+                src={pdfPreviewUrl}
+                style={{ width: "100%", height: 560, border: "none", display: "block", backgroundColor: "#f5f5f5" }}
+              />
+            )
           ) : (
             <div style={{ padding: 40, textAlign: "center", color: theme.textLight, fontSize: 13 }}>Loading preview…</div>
           )}
@@ -6867,7 +6979,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           </button>
           {customerEmail.trim() && (
             <button type="button" disabled={saving} onClick={downloadAndOpenEmail} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accentLight, color: theme.primary, flex: isMobile() ? 1 : "0 0 auto" }}>
-              Download &amp; draft email
+              {saving ? "Preparing…" : "Share / draft email"}
             </button>
           )}
           <button type="button" disabled={saving} onClick={markSharedWithCustomer} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold, flex: 1 }}>
@@ -6912,14 +7024,22 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
   return (
     <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
       <button type="button" onClick={onCancel} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← Back to Estimates</button>
-      <h1 style={styles.title}>{isEditMode || savedEstimate ? "Edit Estimate" : "New Estimate"}</h1>
+      <h1 style={styles.title}>{prefillEstimate ? "New revision estimate" : isEditMode || savedEstimate ? "Edit Estimate" : "New Estimate"}</h1>
       <p style={{ ...styles.subtitle, maxWidth: 640 }}>
-        Build the estimate, review the PDF, then download and email it from your business account.
+        {prefillEstimate
+          ? "Starts from your approved estimate — adjust rows, send a new PDF, and set a new baseline when the customer approves."
+          : "Build the estimate, review the PDF, then download and email it from your business account."}
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <button type="button" onClick={goToEstimatingSettings} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, fontSize: 13, padding: "10px 16px" }}>
-          Manage job types &amp; templates
+        <button type="button" onClick={() => goToSettingsTab("estimating")} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, fontSize: 13, padding: "10px 16px" }}>
+          Job types &amp; templates
+        </button>
+        <button type="button" onClick={() => goToSettingsTab("categories")} style={{ ...styles.button, marginTop: 0, backgroundColor: "white", color: theme.primary, fontSize: 13, padding: "10px 16px", border: `1.5px solid ${theme.border}`, boxShadow: "none" }}>
+          Work types
+        </button>
+        <button type="button" onClick={() => goToSettingsTab("financials")} style={{ ...styles.button, marginTop: 0, backgroundColor: "white", color: theme.primary, fontSize: 13, padding: "10px 16px", border: `1.5px solid ${theme.border}`, boxShadow: "none" }}>
+          Labour rates &amp; tax
         </button>
       </div>
 
@@ -6959,15 +7079,63 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
       </div>
 
       <div style={{ ...styles.card, marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary }}>2 — Budget by {T.workCategory.toLowerCase()}</div>
-          {templates.length > 0 && (
-            <select style={{ ...styles.input, margin: 0, maxWidth: 240, fontSize: 13 }} defaultValue="" onChange={e => { if (e.target.value) { applyTemplate(e.target.value); e.target.value = ""; } }}>
-              <option value="">Load template…</option>
-              {templates.map(t => <option key={t.template_id} value={t.template_id}>{t.name}</option>)}
-            </select>
-          )}
         </div>
+        {templates.length > 0 && (
+          <div style={{ marginBottom: 14, padding: "12px", backgroundColor: theme.bg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>Load from template</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: theme.textSecondary, cursor: "pointer" }}>
+                <input type="radio" name="tplMode" checked={templateMode === "replace"} onChange={() => setTemplateMode("replace")} />
+                Replace rows
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: theme.textSecondary, cursor: "pointer" }}>
+                <input type="radio" name="tplMode" checked={templateMode === "add"} onChange={() => setTemplateMode("add")} />
+                Add to rows
+              </label>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+              {templates.map(t => (
+                <label key={t.template_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: theme.textPrimary, cursor: "pointer", padding: "8px 10px", borderRadius: 8, backgroundColor: selectedTemplateIds.includes(String(t.template_id)) ? theme.accentLight : "white", border: `1px solid ${selectedTemplateIds.includes(String(t.template_id)) ? theme.accent : theme.border}` }}>
+                  <input type="checkbox" checked={selectedTemplateIds.includes(String(t.template_id))} onChange={() => toggleTemplateSelection(t.template_id)} />
+                  <span style={{ flex: 1 }}>{t.name}</span>
+                  <span style={{ fontSize: 11, color: theme.textLight }}>{t.estimated_hours || 0}h · ${fmt(t.estimated_material_cost || 0)}</span>
+                </label>
+              ))}
+            </div>
+            <button type="button" disabled={!selectedTemplateIds.length} onClick={() => applyTemplates(selectedTemplateIds, templateMode)} style={{ ...styles.button, marginTop: 0, fontSize: 13, padding: "10px 16px", backgroundColor: theme.primary }}>
+              {templateMode === "replace" ? "Load selected" : "Add selected"}
+            </button>
+          </div>
+        )}
+        {isMobile() ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {rows.map((row, i) => (
+              <div key={i} style={{ padding: "12px", borderRadius: 10, border: `1px solid ${theme.border}`, backgroundColor: theme.bg }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase" }}>Row {i + 1}</span>
+                  <button type="button" onClick={() => removeRow(i)} style={{ background: "none", border: "none", color: theme.danger, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Remove</button>
+                </div>
+                <label style={styles.label}>{T.workCategory}</label>
+                <select style={{ ...styles.input, margin: 0, fontSize: 16 }} value={row.cost_code_id} onChange={e => updateRow(i, "cost_code_id", e.target.value)}>
+                  <option value="">Select…</option>
+                  {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
+                </select>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                  <div>
+                    <label style={styles.label}>Hours</label>
+                    <input style={{ ...styles.input, margin: 0 }} type="number" min="0" step="0.5" placeholder="0" value={row.hours} onChange={e => updateRow(i, "hours", e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={styles.label}>Materials $</label>
+                    <input style={{ ...styles.input, margin: 0 }} type="number" min="0" step="1" placeholder="0" value={row.materials} onChange={e => updateRow(i, "materials", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
@@ -7001,6 +7169,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
             </tbody>
           </table>
         </div>
+        )}
         <p style={{ fontSize: 11, color: theme.textLight, marginTop: 8 }}>
           Hours = total for all crew. × removes a row.
         </p>
@@ -7173,6 +7342,21 @@ function EstimateHub({ token, readonly = false }) {
     if (job) setEditTarget({ job, estimate });
   }
 
+  async function createFollowUpEstimate(estimateId, jobId) {
+    setActionErr("");
+    setBusyId(estimateId);
+    const res = await apiFetch(`${API}/estimates/${estimateId}`, { headers });
+    setBusyId(null);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setActionErr(typeof d.detail === "string" ? d.detail : "Could not load estimate");
+      return;
+    }
+    const estimate = await res.json();
+    const job = jobs.find(j => j.job_id === jobId) || selectedJob;
+    if (job) setEditTarget({ job, estimate: null, prefillEstimate: estimate });
+  }
+
   async function approveBaseline(estimateId, jobId) {
     if (!window.confirm("Has the customer approved this estimate? This sets your internal dashboard baseline.")) return;
     setBusyId(estimateId);
@@ -7209,11 +7393,13 @@ function EstimateHub({ token, readonly = false }) {
   if (formOpen || editTarget) {
     const job = editTarget?.job || null;
     const estimate = editTarget?.estimate || null;
+    const prefillEstimate = editTarget?.prefillEstimate || null;
     return (
       <CreateEstimateForm
         token={token}
         initialJob={job}
         initialEstimate={estimate}
+        prefillEstimate={prefillEstimate}
         onDone={(j) => {
           refreshJobs();
           setSelectedJobId(j.job_id);
@@ -7265,6 +7451,11 @@ function EstimateHub({ token, readonly = false }) {
 
       {selectedJob && (
         <div style={{ marginTop: 8 }}>
+          {estimates.some(e => e.status === "approved") && (
+            <div style={{ ...styles.card, marginBottom: 12, backgroundColor: theme.goldLight, border: `1px solid ${theme.gold}`, fontSize: 13, color: theme.textSecondary, lineHeight: 1.55 }}>
+              This {T.project.toLowerCase()} has an approved baseline. Create a <strong>new estimate</strong> here for change orders or revisions — when the customer approves it, the new total replaces the dashboard baseline (previous approved estimates are marked superseded).
+            </div>
+          )}
           {estimates.length === 0 ? (
             <div style={{ ...styles.card, fontSize: 13, color: theme.textSecondary, textAlign: "center", padding: "24px 16px" }}>
               No estimates yet for {selectedJob.job_name}.
@@ -7303,6 +7494,16 @@ function EstimateHub({ token, readonly = false }) {
                           {busyId === est.estimate_id ? "Setting…" : "Customer approved — set baseline"}
                         </button>
                       )}
+                    </div>
+                  )}
+                  {!readonly && est.status === "approved" && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                      <button type="button" disabled={busyId === est.estimate_id} onClick={() => downloadEstimatePdf(est.estimate_id)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 14px", backgroundColor: theme.accent }}>
+                        Download PDF
+                      </button>
+                      <button type="button" disabled={busyId === est.estimate_id} onClick={() => createFollowUpEstimate(est.estimate_id, selectedJob.job_id)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 14px", backgroundColor: theme.gold }}>
+                        {busyId === est.estimate_id ? "Loading…" : "New revision estimate"}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -7682,7 +7883,11 @@ function AuthenticatedApp() {
     const valid = stored.role === "crew" ? crewViews : ownerViews;
     return valid.includes(saved) ? saved : defaultView;
   });
-  function setView(v) { setViewRaw(v); localStorage.setItem("vl_view", v); }
+  function setView(v) {
+    setViewRaw(v);
+    localStorage.setItem("vl_view", v);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }
   const [settingsTab, setSettingsTab] = useState(() => localStorage.getItem("vl_settings_tab") || "company");
   function navigateTo(v, tab) {
     setView(v);

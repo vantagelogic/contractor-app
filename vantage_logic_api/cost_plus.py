@@ -104,7 +104,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         return f"INV-{company_id:03d}-{count + 1:04d}"
 
     def _company_labor_rate(company) -> float:
-        return float(getattr(company, "estimate_labor_rate_per_hour", None) or 0)
+        return float(getattr(company, "estimate_labor_rate_per_hour", None) or 75)
 
     def _estimate_tax(company, subtotal: float) -> dict:
         rate = float(getattr(company, "tax_rate_percent", None) or 0)
@@ -411,7 +411,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             story.append(Paragraph(f"<b>Notes:</b> {estimate.notes}", styles["Normal"]))
         story.append(Spacer(1, 12))
 
-        table_data = [["Work type", "Hours", "Labor", "Materials", "Subtotal"]]
+        table_data = [["Work type", "Hours", "Labour", "Materials", "Subtotal"]]
         for ln in lines:
             hrs = float(ln.estimated_hours or 0) * float(ln.quantity or 1)
             mat = float(ln.material_cost or 0) * float(ln.quantity or 1)
@@ -909,11 +909,11 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
             raise HTTPException(status_code=404, detail="Estimate not found")
         job = db.query(models.Job).filter(models.Job.job_id == estimate.job_id).first()
         company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
-        path = estimate.pdf_path
-        if not path or not os.path.exists(path):
-            path = _generate_estimate_pdf(db, estimate, company, job)
-            estimate.pdf_path = path
-            db.commit()
+        _recalc_estimate_totals(db, estimate, current_user.company_id)
+        _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
+        path = _generate_estimate_pdf(db, estimate, company, job)
+        estimate.pdf_path = path
+        db.commit()
         return FileResponse(path, media_type="application/pdf", filename=f"estimate_{estimate_id}.pdf")
 
     @app.post("/estimates/{estimate_id}/send-customer")
