@@ -67,6 +67,8 @@ class FieldEstimateCreateIn(BaseModel):
 class FieldEstimateGenerateIn(BaseModel):
     transcript: str | None = None
     description: str | None = None
+    scope_summary: str | None = None
+    field_notes: str | None = None
     job_type: str | None = None
 
 
@@ -1379,6 +1381,16 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         if not _can_edit_estimate_lines(current_user, estimate):
             raise HTTPException(status_code=403, detail="Not allowed")
 
+        if body.scope_summary is not None:
+            estimate.scope_summary = body.scope_summary.strip() or None
+        if body.field_notes is not None:
+            estimate.field_notes = body.field_notes.strip() or None
+        db.flush()
+
+        attachments = db.query(models.EstimateAttachment).filter(
+            models.EstimateAttachment.estimate_id == estimate_id
+        ).all()
+
         text_parts = []
         if body.transcript and body.transcript.strip():
             text_parts.append(body.transcript.strip())
@@ -1390,7 +1402,13 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
             text_parts.append(estimate.field_notes)
         combined = "\n".join(text_parts).strip()
         if len(combined) < 8:
-            raise HTTPException(status_code=400, detail="Add a voice note, description, or site notes first")
+            if attachments:
+                combined = "Review the attached site photos and draft a conservative estimate for this project."
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Add a scope summary, site notes, or voice note first (a few words is enough)",
+                )
 
         cost_codes = db.query(models.CostCode).filter(
             models.CostCode.company_id == current_user.company_id,
@@ -1415,10 +1433,6 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
         labor_rate = _company_labor_rate(company)
         job_type_line = f"Job type hint: {body.job_type}\n" if body.job_type else ""
-
-        attachments = db.query(models.EstimateAttachment).filter(
-            models.EstimateAttachment.estimate_id == estimate_id
-        ).all()
 
         prompt = f"""You are a construction estimator helping a field worker draft a customer estimate.
 
@@ -1452,8 +1466,9 @@ Return ONLY valid JSON:
 Use conservative hours. Only use cost_code_id values from the list. Include 2-8 line items."""
 
         try:
-            contents = [prompt]
+            import re
             from google.genai import types
+            contents = [prompt]
             for att in attachments[:6]:
                 if att.file_path and os.path.exists(att.file_path):
                     ext = os.path.splitext(att.file_path)[1].lower()
@@ -1467,13 +1482,17 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
                 contents=contents,
             )
             raw = (response.text or "").strip()
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-            parsed = json.loads(raw.strip())
+            raw = re.sub(r"```json\s*", "", raw)
+            raw = re.sub(r"```\s*", "", raw).strip()
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if match:
+                raw = match.group(0)
+            parsed = json.loads(raw)
         except HTTPException:
             raise
+        except json.JSONDecodeError as e:
+            print(f"Field estimate generate JSON error: {e}")
+            raise HTTPException(status_code=503, detail="AI returned an invalid format — try again or add rows manually")
         except Exception as e:
             print(f"Field estimate generate error: {e}")
             raise HTTPException(status_code=503, detail="Could not generate estimate — try editing rows manually")

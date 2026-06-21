@@ -18,6 +18,15 @@ async function apiFetch(url, options = {}) {
   return response;
 }
 
+function parseApiError(res, detail, fallback) {
+  if (res.status === 403) return "Owner or admin access required.";
+  if (res.status === 404) {
+    return "Quote API is not on this server yet — redeploy the backend on Render (contractor-api), or point npm start at a local API on port 8000.";
+  }
+  if (typeof detail === "string" && detail !== "Not Found") return detail;
+  return fallback;
+}
+
 function fixMagicLinkUrl(url) {
   if (!url || typeof window === "undefined") return url;
   try {
@@ -6300,13 +6309,6 @@ function EstimatingSettingsPanel({ token, costCodes, readonly = false }) {
 
   function flash(m) { setMsg(m); setErr(""); setTimeout(() => setMsg(""), 3000); }
 
-  function parseApiError(res, detail, fallback) {
-    if (res.status === 403) return "Owner or admin access required.";
-    if (res.status === 404) return "Estimating is not on this server yet — use the local API (restart npm after it is running).";
-    if (typeof detail === "string" && detail !== "Not Found") return detail;
-    return fallback;
-  }
-
   async function postJson(url, body) {
     return apiFetch(url, {
       method: "POST",
@@ -7402,12 +7404,22 @@ function FieldEstimateScreen({ token, readonly = false }) {
   const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [quoteApiReady, setQuoteApiReady] = useState(true);
 
   function loadList() {
     setLoading(true);
     apiFetch(`${API}/field-estimates/mine`, { headers })
-      .then(r => r.ok ? r.json() : [])
-      .then(d => { setList(Array.isArray(d) ? d : []); setLoading(false); })
+      .then(r => {
+        if (r.status === 404) {
+          setQuoteApiReady(false);
+          setList([]);
+          setLoading(false);
+          return null;
+        }
+        setQuoteApiReady(true);
+        return r.ok ? r.json() : [];
+      })
+      .then(d => { if (d !== null) { setList(Array.isArray(d) ? d : []); setLoading(false); } })
       .catch(() => { setList([]); setLoading(false); });
   }
 
@@ -7483,6 +7495,11 @@ function FieldEstimateScreen({ token, readonly = false }) {
     setBusy(true);
     setErr("");
     const lineItems = buildLineItemsPayload();
+    const metaPayload = {
+      field_notes: fieldNotes.trim() || null,
+      scope_summary: scopeSummary.trim() || null,
+      estimated_mileage_km: parseFloat(mileageKm) || null,
+    };
     try {
       if (!active) {
         if (!selectedJobId) { setErr(`Please select a ${T.project.toLowerCase()}`); setBusy(false); return null; }
@@ -7491,15 +7508,13 @@ function FieldEstimateScreen({ token, readonly = false }) {
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
             job_id: parseInt(selectedJobId, 10),
-            field_notes: fieldNotes.trim() || null,
-            scope_summary: scopeSummary.trim() || null,
-            estimated_mileage_km: parseFloat(mileageKm) || null,
+            ...metaPayload,
             line_items: lineItems.length ? lineItems : undefined,
           }),
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setErr(typeof d.detail === "string" ? d.detail : "Could not create estimate");
+          setErr(parseApiError(res, d.detail, "Could not create estimate"));
           return null;
         }
         const est = await res.json();
@@ -7509,19 +7524,16 @@ function FieldEstimateScreen({ token, readonly = false }) {
         return est;
       }
       if (active.status === "field_draft") {
+        const patchBody = { ...metaPayload };
+        if (lineItems.length) patchBody.line_items = lineItems;
         const res = await apiFetch(`${API}/estimates/${active.estimate_id}`, {
           method: "PATCH",
           headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            field_notes: fieldNotes.trim() || null,
-            scope_summary: scopeSummary.trim() || null,
-            estimated_mileage_km: parseFloat(mileageKm) || null,
-            line_items: lineItems,
-          }),
+          body: JSON.stringify(patchBody),
         });
         if (!res.ok) {
           const d = await res.json().catch(() => ({}));
-          setErr(typeof d.detail === "string" ? d.detail : "Could not save");
+          setErr(parseApiError(res, d.detail, "Could not save"));
           return null;
         }
         const est = await res.json();
@@ -7537,35 +7549,52 @@ function FieldEstimateScreen({ token, readonly = false }) {
     }
   }
 
+  function fieldInputHint() {
+    return [transcript, scopeSummary, fieldNotes].map(s => (s || "").trim()).filter(Boolean).join(" ");
+  }
+
   async function generateFromAI(extraDesc) {
-    let est = active;
-    if (!est?.estimate_id) {
-      est = await saveDraft();
-      if (!est?.estimate_id) return;
+    if (!active?.estimate_id && !selectedJobId) {
+      setErr(`Please select a ${T.project.toLowerCase()} first`);
+      return;
+    }
+    const textHint = [fieldInputHint(), (extraDesc || "").trim()].filter(Boolean).join(" ");
+    if (textHint.length < 8 && !(active?.attachment_count > 0)) {
+      setErr("Add a scope summary, site notes, or voice note first (a few words is enough).");
+      return;
     }
     setGenerating(true);
     setErr("");
-    const res = await apiFetch(`${API}/field-estimates/${est.estimate_id}/generate`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        transcript: transcript.trim() || undefined,
-        description: extraDesc || scopeSummary || fieldNotes || undefined,
-      }),
-    });
-    setGenerating(false);
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setErr(typeof d.detail === "string" ? d.detail : "AI could not generate rows");
-      return;
+    try {
+      const est = await saveDraft();
+      if (!est?.estimate_id) return;
+      const res = await apiFetch(`${API}/field-estimates/${est.estimate_id}/generate`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: transcript.trim() || undefined,
+          description: extraDesc || scopeSummary.trim() || fieldNotes.trim() || undefined,
+          scope_summary: scopeSummary.trim() || undefined,
+          field_notes: fieldNotes.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setErr(parseApiError(res, d.detail, "AI could not generate rows"));
+        return;
+      }
+      const data = await res.json();
+      setActive(data.estimate);
+      setRows(rowsFromEstimate(data.estimate));
+      setScopeSummary(data.estimate.scope_summary || scopeSummary);
+      setAiHints({ assumptions: data.assumptions || [], questions: data.questions_for_office || [] });
+      setMsg("AI draft applied — review rows before submitting");
+      loadList();
+    } catch {
+      setErr("Network error — check your connection and try again.");
+    } finally {
+      setGenerating(false);
     }
-    const data = await res.json();
-    setActive(data.estimate);
-    setRows(rowsFromEstimate(data.estimate));
-    setScopeSummary(data.estimate.scope_summary || scopeSummary);
-    setAiHints({ assumptions: data.assumptions || [], questions: data.questions_for_office || [] });
-    setMsg("AI draft applied — review rows before submitting");
-    loadList();
   }
 
   function startVoice() {
@@ -7590,15 +7619,37 @@ function FieldEstimateScreen({ token, readonly = false }) {
 
   async function uploadPhoto(e) {
     const file = e.target.files?.[0];
-    if (!file || !active?.estimate_id) return;
+    if (!file) return;
+    let estimateId = active?.estimate_id;
+    if (!estimateId) {
+      if (!selectedJobId) {
+        setErr(`Select a ${T.project.toLowerCase()} before uploading photos`);
+        e.target.value = "";
+        return;
+      }
+      const est = await saveDraft();
+      if (!est?.estimate_id) { e.target.value = ""; return; }
+      estimateId = est.estimate_id;
+    }
     setBusy(true);
+    setErr("");
     const fd = new FormData();
     fd.append("file", file);
-    const res = await apiFetch(`${API}/field-estimates/${active.estimate_id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-    setBusy(false);
-    if (res.ok) setMsg("Photo attached");
-    else setErr("Could not upload photo");
-    e.target.value = "";
+    try {
+      const res = await apiFetch(`${API}/field-estimates/${estimateId}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      if (res.ok) {
+        setMsg("Photo attached");
+        setActive(prev => prev ? { ...prev, estimate_id: estimateId, attachment_count: (prev.attachment_count || 0) + 1 } : prev);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setErr(parseApiError(res, d.detail, "Could not upload photo"));
+      }
+    } catch {
+      setErr("Could not upload photo — check your connection");
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
   }
 
   async function submitForReview() {
@@ -7615,7 +7666,7 @@ function FieldEstimateScreen({ token, readonly = false }) {
       loadList();
     } else {
       const d = await res.json().catch(() => ({}));
-      setErr(typeof d.detail === "string" ? d.detail : "Could not submit");
+      setErr(parseApiError(res, d.detail, "Could not submit"));
     }
   }
 
@@ -7632,6 +7683,11 @@ function FieldEstimateScreen({ token, readonly = false }) {
         <button type="button" onClick={() => { setView("list"); loadList(); }} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← My site quotes</button>
         <h1 style={styles.title}>{active ? "Edit site quote" : "New site quote"}</h1>
         <p style={styles.subtitle}>Pick the project the office set up, describe the scope on site, then submit for review.</p>
+        {!quoteApiReady && (
+          <div style={{ ...styles.card, backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}`, fontSize: 13, marginBottom: 12 }}>
+            <strong>Backend update required.</strong> The live API is missing Quote endpoints. In Render, open contractor-api and run Manual Deploy from latest main.
+          </div>
+        )}
         {msg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, marginBottom: 12 }}>{msg}</div>}
         {err && <p style={styles.errorMsg}>{err}</p>}
         {active?.rejection_reason && active.status === "field_draft" && (
@@ -7697,16 +7753,15 @@ function FieldEstimateScreen({ token, readonly = false }) {
             <textarea style={styles.textarea} value={scopeSummary} onChange={e => setScopeSummary(e.target.value)} placeholder="What needs to be done on site?" />
             <label style={styles.label}>Site notes</label>
             <textarea style={styles.textarea} value={fieldNotes} onChange={e => setFieldNotes(e.target.value)} placeholder="Access, conditions, measurements…" />
-            {active?.estimate_id && (
-              <>
-                <label style={styles.label}>Site photos</label>
-                <input style={styles.input} type="file" accept="image/*" onChange={uploadPhoto} />
-                {active.attachment_count > 0 && <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>{active.attachment_count} photo(s) attached</p>}
-              </>
-            )}
-            <button type="button" disabled={generating || busy} onClick={() => generateFromAI()} style={{ ...styles.button, marginTop: 12, backgroundColor: theme.gold, fontSize: 13 }}>
+            <label style={styles.label}>Site photos</label>
+            <input style={styles.input} type="file" accept="image/*" onChange={uploadPhoto} disabled={!selectedJobId && !active?.estimate_id} />
+            {(active?.attachment_count > 0) && <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>{active.attachment_count} photo(s) attached</p>}
+            <button type="button" disabled={generating || busy || !quoteApiReady} onClick={() => generateFromAI()} style={{ ...styles.button, marginTop: 12, backgroundColor: theme.gold, fontSize: 13, opacity: quoteApiReady ? 1 : 0.6 }}>
               {generating ? "Generating…" : "Generate estimate with AI"}
             </button>
+            {!generating && fieldInputHint().length < 8 && !(active?.attachment_count > 0) && (
+              <p style={{ fontSize: 11, color: theme.textSecondary, marginTop: 8 }}>Tip: add a short scope summary or site notes, or attach photos, then tap generate.</p>
+            )}
             {aiHints && (
               <div style={{ marginTop: 10, fontSize: 12, color: theme.textSecondary, lineHeight: 1.5 }}>
                 {aiHints.assumptions?.length > 0 && <div><strong>Assumptions:</strong> {aiHints.assumptions.join("; ")}</div>}
@@ -7753,8 +7808,8 @@ function FieldEstimateScreen({ token, readonly = false }) {
 
         {!readOnly && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
-            <button type="button" disabled={busy} onClick={saveDraft} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.primary }}>{busy ? "Saving…" : "Save draft"}</button>
-            <button type="button" disabled={busy} onClick={submitForReview} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold }}>{busy ? "Submitting…" : "Submit to office for review"}</button>
+            <button type="button" disabled={busy || !quoteApiReady} onClick={saveDraft} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.primary }}>{busy ? "Saving…" : "Save draft"}</button>
+            <button type="button" disabled={busy || !quoteApiReady} onClick={submitForReview} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold }}>{busy ? "Submitting…" : "Submit to office for review"}</button>
           </div>
         )}
         {active?.status === "pending_review" && (
@@ -7770,6 +7825,11 @@ function FieldEstimateScreen({ token, readonly = false }) {
     <div style={{ ...styles.container, paddingTop: "66px" }}>
       <h1 style={styles.title}>Site quotes</h1>
       <p style={styles.subtitle}>Build estimates on site — office reviews before anything goes to the customer.</p>
+      {!quoteApiReady && (
+        <div style={{ ...styles.card, backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}`, fontSize: 13, marginBottom: 12 }}>
+          <strong>Backend update required.</strong> The live API is missing Quote endpoints. In Render, open contractor-api and run Manual Deploy from latest main.
+        </div>
+      )}
       {!readonly && (
         <button type="button" onClick={openNew} disabled={jobs.length === 0} style={{ ...styles.button, marginTop: 0, marginBottom: 16, backgroundColor: theme.gold, opacity: jobs.length === 0 ? 0.6 : 1 }}>+ New site quote</button>
       )}
