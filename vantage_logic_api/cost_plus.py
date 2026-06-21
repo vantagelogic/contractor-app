@@ -435,6 +435,57 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "receipt_urls": receipt_urls,
         }
 
+    def _preview_from_sweep(sweep: dict, markup_pct: float) -> dict:
+        line_items = []
+        raw_subtotal = 0.0
+        for g in sweep["labor_groups"].values():
+            raw = round(g["amount"], 2)
+            billed = round(raw * (1 + markup_pct / 100), 2)
+            raw_subtotal += raw
+            line_items.append({
+                "category": "labor",
+                "description": f"Labor — {g['label']}",
+                "raw": raw,
+                "billed": billed,
+                "entry_count": len(g["ids"]),
+            })
+        for g in sweep["mat_groups"].values():
+            raw = round(g["amount"], 2)
+            billed = round(raw * (1 + markup_pct / 100), 2)
+            raw_subtotal += raw
+            line_items.append({
+                "category": "materials",
+                "description": f"Materials — {g['label']}",
+                "raw": raw,
+                "billed": billed,
+                "entry_count": len(g["ids"]),
+            })
+        if sweep["mi_total"] > 0:
+            raw = round(sweep["mi_total"], 2)
+            billed = round(raw * (1 + markup_pct / 100), 2)
+            raw_subtotal += raw
+            line_items.append({
+                "category": "mileage",
+                "description": "Mileage Reimbursement",
+                "raw": raw,
+                "billed": billed,
+                "entry_count": len(sweep["mi_ids"]),
+            })
+        markup_amount = round(raw_subtotal * (markup_pct / 100), 2)
+        return {
+            "line_items": line_items,
+            "raw_subtotal": raw_subtotal,
+            "markup_percent": markup_pct,
+            "markup_amount": markup_amount,
+            "total": round(raw_subtotal + markup_amount, 2),
+            "entry_counts": {
+                "timesheets": len(sweep["timesheets"]),
+                "materials": len(sweep["materials"]),
+                "mileage_trips": len(sweep["mileage"]),
+            },
+            "has_unbilled": bool(sweep["timesheets"] or sweep["materials"] or sweep["mileage"]),
+        }
+
     def _generate_invoice_pdf(invoice, job, company, line_items, receipt_urls=None):
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
@@ -1533,6 +1584,37 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
             "questions_for_office": parsed.get("questions_for_office") or [],
         }
 
+    @app.get("/jobs/{job_id}/invoices/unbilled-preview")
+    def preview_unbilled_invoice(
+        job_id: int,
+        markup_percent: float | None = None,
+        period_start: str | None = None,
+        period_end: str | None = None,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        job = db.query(models.Job).filter(
+            models.Job.job_id == job_id,
+            models.Job.company_id == current_user.company_id,
+        ).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        company = db.query(models.Company).filter(
+            models.Company.company_id == current_user.company_id
+        ).first()
+        markup = markup_percent
+        if markup is None:
+            markup = float(getattr(company, "default_markup_percent", 15) or 15)
+
+        ps = _parse_date(period_start)
+        pe = _parse_date(period_end)
+        sweep = _sweep_unbilled_costs(db, job_id, current_user.company_id, ps, pe)
+        preview = _preview_from_sweep(sweep, markup)
+        preview["period_start"] = period_start
+        preview["period_end"] = period_end
+        return preview
+
     @app.post("/jobs/{job_id}/invoices/generate")
     def generate_cost_plus_invoice(
         job_id: int,
@@ -1687,9 +1769,14 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         return [{
             "invoice_id": i.invoice_id,
             "invoice_number": i.invoice_number,
+            "status": i.status or "draft",
             "total": float(i.total or 0),
+            "raw_subtotal": float(i.raw_subtotal or 0),
             "markup_percent": float(i.markup_percent or 0),
-            "created_at": str(i.created_at),
+            "markup_amount": float(i.markup_amount or 0),
+            "period_start": str(i.period_start) if i.period_start else None,
+            "period_end": str(i.period_end) if i.period_end else None,
+            "created_at": str(i.created_at) if i.created_at else None,
             "pdf_url": f"/invoices/{i.invoice_id}/pdf" if i.pdf_path else None,
         } for i in invoices]
 

@@ -251,11 +251,11 @@ function downloadCsv(filename, csvText) {
   window.URL.revokeObjectURL(url);
 }
 
-async function parseApiError(res) {
+async function readApiErrorMessage(res) {
   const text = await res.text();
   try {
     const data = JSON.parse(text);
-    if (typeof data.detail === "string") return data.detail;
+    if (typeof data.detail === "string") return parseApiError(res, data.detail, `Request failed (${res.status})`);
     if (Array.isArray(data.detail)) return data.detail.map(d => d.msg || d).join(", ");
     return text.slice(0, 160) || `Request failed (${res.status})`;
   } catch {
@@ -5773,7 +5773,7 @@ function ExportReportForm({ token }) {
         setLoading(false);
         return;
       }
-      setMessage(await parseApiError(res));
+      setMessage(await readApiErrorMessage(res));
     } catch {
       try {
         const csv = await buildClientSideReport();
@@ -6214,7 +6214,7 @@ function EstimateRatesSettings({ token, readonly = false }) {
     <div style={{ ...styles.card, marginBottom: 20 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.primary, margin: "0 0 6px" }}>Estimate &amp; billing rates</h3>
       <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.5 }}>
-        Default labour, mileage, and tax rates used when building estimates and cost-plus invoices.
+        Default labour, mileage, markup, and tax rates used for estimates and cost-plus client invoices.
       </p>
       {message && <div style={{ color: theme.accent, fontWeight: 600, marginBottom: 10, fontSize: 13 }}>{message}</div>}
       <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10 }}>
@@ -8171,6 +8171,22 @@ function EstimateHub({ token, readonly = false }) {
   );
 }
 
+function fmtShortDate(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(String(iso).includes("T") ? iso : `${iso}T12:00:00`);
+    return d.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return String(iso).slice(0, 10);
+  }
+}
+
+async function fetchInvoicePdf(token, invoiceId) {
+  const res = await apiFetch(`${API}/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return null;
+  return res.blob();
+}
+
 function BillingHub({ token, readonly = false }) {
   const [jobs, refreshJobs] = useActiveJobs(token);
   const [selectedJobId, setSelectedJobId] = useState(null);
@@ -8194,24 +8210,20 @@ function BillingHub({ token, readonly = false }) {
     if (selectedJobId && !jobs.some(j => j.job_id === selectedJobId)) setSelectedJobId(null);
   }, [jobs, selectedJobId]);
 
-  async function downloadPdf(invoiceId, invoiceNumber) {
-    const res = await apiFetch(`${API}/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${invoiceNumber}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
+  async function shareInvoicePdf(inv) {
+    const blob = await fetchInvoicePdf(token, inv.invoice_id);
+    if (!blob) return;
+    const mode = await shareOrDownloadPdf(blob, `${inv.invoice_number}.pdf`, {
+      title: inv.invoice_number,
+      text: `Cost-plus invoice for ${selectedJob?.job_name || "project"} — $${fmt(inv.total)}`,
+    });
+    if (mode === "shared") return;
   }
 
   return (
     <div style={{ ...styles.containerWide, paddingTop: "66px", paddingBottom: "110px" }}>
       <h1 style={styles.title}>Billing</h1>
-      <p style={styles.subtitle}>Generate cost-plus invoices and send links to subcontractors.</p>
+      <p style={styles.subtitle}>Turn logged job costs into client invoices. Send separate links when subs need to upload an invoice or sign a waiver.</p>
 
       <ProjectSelectBar
         token={token}
@@ -8225,40 +8237,68 @@ function BillingHub({ token, readonly = false }) {
       {!selectedJob ? (
         <div style={{ ...styles.card, padding: "28px 24px", color: theme.textSecondary, fontSize: 14, textAlign: "center" }}>
           {jobs.length === 0
-            ? `Create a ${T.project.toLowerCase()} above, then generate invoices and sub links here.`
-            : `Select a ${T.project.toLowerCase()} above to invoice or create subcontractor links.`}
+            ? `Create a ${T.project.toLowerCase()} above, then bill logged costs or send sub links here.`
+            : `Select a ${T.project.toLowerCase()} above to review unbilled costs and invoice your customer.`}
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ ...styles.card, marginBottom: 16, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: theme.primary, fontFamily: font.display }}>{selectedJob.job_name}</div>
-            <div style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>Sweep unbilled hours, materials, and mileage into a client invoice.</div>
+            {selectedJob.city && <div style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>{selectedJob.city}</div>}
+            <div style={{ fontSize: 12, color: theme.textLight, marginTop: 10, lineHeight: 1.5 }}>
+              Crew hours, materials, and mileage logged on this job appear here until you sweep them into a cost-plus invoice for your customer.
+            </div>
           </div>
 
           {!readonly && (
             <>
-              <CostPlusInvoicePanel token={token} jobId={selectedJob.job_id} onGenerated={() => loadInvoices(selectedJob.job_id)} />
-              <MagicLinkActions token={token} jobId={selectedJob.job_id} />
+              <CostPlusInvoicePanel
+                token={token}
+                jobId={selectedJob.job_id}
+                jobName={selectedJob.job_name}
+                onGenerated={() => loadInvoices(selectedJob.job_id)}
+              />
+              <MagicLinkActions token={token} jobId={selectedJob.job_id} jobName={selectedJob.job_name} />
             </>
           )}
 
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>Invoice History</div>
+          <div style={{ marginTop: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>Client invoice history</div>
             {invoices.length === 0 ? (
-              <div style={{ ...styles.card, fontSize: 13, color: theme.textSecondary }}>No invoices yet for this {T.project.toLowerCase()}.</div>
+              <div style={{ ...styles.card, fontSize: 13, color: theme.textSecondary, lineHeight: 1.5 }}>
+                No client invoices yet. Once crew log time or materials on this job, generate your first cost-plus invoice above.
+              </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {invoices.map(inv => (
-                  <div key={inv.invoice_id} style={{ ...styles.card, margin: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{inv.invoice_number}</div>
-                      <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>${fmt(inv.total)} · {inv.markup_percent}% markup</div>
+                  <div key={inv.invoice_id} style={{ ...styles.card, margin: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{inv.invoice_number}</div>
+                        <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>
+                          ${fmt(inv.total)} · {inv.markup_percent}% markup
+                          {inv.created_at && ` · ${fmtShortDate(inv.created_at)}`}
+                        </div>
+                        {(inv.period_start || inv.period_end) && (
+                          <div style={{ fontSize: 11, color: theme.textLight, marginTop: 4 }}>
+                            Period: {inv.period_start || "…"} → {inv.period_end || "…"}
+                          </div>
+                        )}
+                      </div>
+                      {inv.pdf_url && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button type="button" onClick={() => shareInvoicePdf(inv)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 12px", backgroundColor: theme.gold }}>
+                            Share PDF
+                          </button>
+                          <button type="button" onClick={async () => {
+                            const blob = await fetchInvoicePdf(token, inv.invoice_id);
+                            if (blob) await shareOrDownloadPdf(blob, `${inv.invoice_number}.pdf`, { title: inv.invoice_number, text: "Invoice" });
+                          }} style={{ fontSize: 12, fontWeight: 700, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontFamily: font.body, padding: "8px 0" }}>
+                            Download →
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {inv.pdf_url && (
-                      <button type="button" onClick={() => downloadPdf(inv.invoice_id, inv.invoice_number)} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 700, cursor: "pointer", fontFamily: font.body, fontSize: 13 }}>
-                        Download PDF →
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -8270,99 +8310,174 @@ function BillingHub({ token, readonly = false }) {
   );
 }
 
-function CostPlusInvoicePanel({ token, jobId, onGenerated }) {
+function CostPlusInvoicePanel({ token, jobId, jobName, onGenerated }) {
+  const headers = { Authorization: `Bearer ${token}` };
   const [markup, setMarkup] = useState("15");
   const [includeReceipts, setIncludeReceipts] = useState(false);
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [shareMsg, setShareMsg] = useState("");
 
-  async function downloadPdf(invoiceId, invoiceNumber) {
-    const res = await apiFetch(`${API}/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${invoiceNumber}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  }
+  useEffect(() => {
+    apiFetch(`${API}/me`, { headers })
+      .then(r => r.ok ? r.json() : {})
+      .then(me => {
+        if (me.default_markup_percent != null) setMarkup(String(me.default_markup_percent));
+      })
+      .catch(() => {});
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!jobId) return;
+    setPreviewLoading(true);
+    setError("");
+    const params = new URLSearchParams();
+    params.set("markup_percent", String(parseFloat(markup) || 15));
+    if (periodStart) params.set("period_start", periodStart);
+    if (periodEnd) params.set("period_end", periodEnd);
+    apiFetch(`${API}/jobs/${jobId}/invoices/unbilled-preview?${params}`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setPreview(d); setPreviewLoading(false); })
+      .catch(() => { setPreview(null); setPreviewLoading(false); });
+  }, [jobId, markup, periodStart, periodEnd, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generate() {
+    if (!preview?.has_unbilled) {
+      setError("Nothing to bill yet — crew need to log hours, materials, or mileage on this project first.");
+      return;
+    }
     setGenerating(true);
     setError("");
     setResult(null);
+    setShareMsg("");
+    const body = {
+      markup_percent: parseFloat(markup) || 15,
+      include_receipts: includeReceipts,
+    };
+    if (periodStart) body.period_start = periodStart;
+    if (periodEnd) body.period_end = periodEnd;
     const res = await apiFetch(`${API}/jobs/${jobId}/invoices/generate`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        markup_percent: parseFloat(markup) || 15,
-        include_receipts: includeReceipts,
-      }),
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
     setGenerating(false);
     if (res.ok) {
       const data = await res.json();
       setResult(data);
       onGenerated?.();
+      const params = new URLSearchParams();
+      params.set("markup_percent", String(parseFloat(markup) || 15));
+      if (periodStart) params.set("period_start", periodStart);
+      if (periodEnd) params.set("period_end", periodEnd);
+      apiFetch(`${API}/jobs/${jobId}/invoices/unbilled-preview?${params}`, { headers })
+        .then(r => r.ok ? r.json() : null)
+        .then(setPreview)
+        .catch(() => {});
     } else {
       const err = await res.json().catch(() => ({}));
-      setError(typeof err.detail === "string" ? err.detail : "Could not generate invoice");
+      setError(parseApiError(res, err.detail, "Could not generate invoice"));
     }
   }
 
+  async function shareResultPdf() {
+    if (!result?.invoice_id) return;
+    const blob = await fetchInvoicePdf(token, result.invoice_id);
+    if (!blob) { setShareMsg("Could not load PDF"); return; }
+    const mode = await shareOrDownloadPdf(blob, `${result.invoice_number}.pdf`, {
+      title: result.invoice_number,
+      text: `Cost-plus invoice — ${jobName} — $${fmt(result.total)}`,
+    });
+    setShareMsg(mode === "shared" ? "Shared with customer" : mode === "downloaded" ? "PDF downloaded — email or text it to your customer" : "");
+  }
+
+  const canGenerate = preview?.has_unbilled && !generating;
+
   return (
-    <div style={{ marginTop: 16, padding: 16, backgroundColor: theme.goldLight, borderRadius: 10, border: `1.5px solid ${theme.gold}` }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#7c5518", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>
-        Cost-Plus Invoicing
+    <div style={{ marginTop: 0, padding: 16, backgroundColor: theme.goldLight, borderRadius: 12, border: `1.5px solid ${theme.gold}` }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 4 }}>Client cost-plus invoice</div>
+      <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.45 }}>
+        Bill your customer for unbilled crew time, materials, and mileage. Markup is applied on top of raw job costs.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+
+      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div>
           <label style={styles.label}>Markup %</label>
-          <input style={styles.input} type="number" value={markup} onChange={e => setMarkup(e.target.value)} />
+          <input style={styles.input} type="number" min="0" step="0.5" value={markup} onChange={e => setMarkup(e.target.value)} />
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 22, fontSize: 13, cursor: "pointer" }}>
-          <input type="checkbox" checked={includeReceipts} onChange={e => setIncludeReceipts(e.target.checked)} />
-          Append receipt images
-        </label>
+        <div>
+          <label style={styles.label}>Period from (optional)</label>
+          <input style={styles.input} type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
+        </div>
+        <div>
+          <label style={styles.label}>Period to (optional)</label>
+          <input style={styles.input} type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+        </div>
       </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, cursor: "pointer" }}>
+        <input type="checkbox" checked={includeReceipts} onChange={e => setIncludeReceipts(e.target.checked)} />
+        Append receipt images to PDF
+      </label>
+
+      <div style={{ ...styles.card, margin: "0 0 14px", padding: "14px 16px", backgroundColor: "white" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Ready to bill</div>
+        {previewLoading ? (
+          <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0 }}>Calculating unbilled costs…</p>
+        ) : !preview?.has_unbilled ? (
+          <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0, lineHeight: 1.5 }}>
+            No unbilled entries yet. Have crew log hours, materials, or mileage on <strong>{jobName}</strong>, then return here.
+          </p>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 10 }}>
+              {preview.entry_counts.timesheets} timesheet{preview.entry_counts.timesheets !== 1 ? "s" : ""} · {preview.entry_counts.materials} material{preview.entry_counts.materials !== 1 ? "s" : ""} · {preview.entry_counts.mileage_trips} mileage trip{preview.entry_counts.mileage_trips !== 1 ? "s" : ""}
+            </div>
+            {(preview.line_items || []).map((li, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, padding: "6px 0", borderTop: i ? `1px solid ${theme.border}` : "none" }}>
+                <span style={{ color: theme.textPrimary }}>{li.description}</span>
+                <span style={{ fontWeight: 600, color: theme.primary, whiteSpace: "nowrap" }}>${fmt(li.billed)}</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTop: `2px solid ${theme.primary}`, fontSize: 14, fontWeight: 700, color: theme.primary }}>
+              <span>Customer total ({markup}% markup)</span>
+              <span>${fmt(preview.total)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={generate}
-        disabled={generating}
-        style={{ ...styles.button, marginTop: 0, width: "100%", backgroundColor: theme.primary }}
+        disabled={!canGenerate}
+        style={{ ...styles.button, marginTop: 0, width: "100%", backgroundColor: theme.primary, opacity: canGenerate ? 1 : 0.55 }}
       >
-        {generating ? "Sweeping unbilled costs…" : "Generate Cost-Plus Invoice"}
+        {generating ? "Creating invoice…" : "Generate client invoice & PDF"}
       </button>
       {error && <p style={{ ...styles.errorMsg, marginTop: 8 }}>{error}</p>}
+
       {result && (
-        <div style={{ marginTop: 12, fontSize: 13 }}>
-          <div style={{ fontWeight: 700, color: theme.primary }}>{result.invoice_number} — ${fmt(result.total)}</div>
-          {(result.line_items || []).map((li, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", color: theme.textSecondary, marginTop: 4 }}>
-              <span>{li.description}</span>
-              <span>${fmt(li.billed)}</span>
-            </div>
-          ))}
-          {result.pdf_url && (
-            <button
-              type="button"
-              onClick={() => downloadPdf(result.invoice_id, result.invoice_number)}
-              style={{ marginTop: 10, background: "none", border: "none", color: theme.accent, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: font.body }}
-            >
-              Download PDF →
+        <div style={{ marginTop: 14, padding: 14, backgroundColor: theme.accentLight, borderRadius: 10, border: `1px solid ${theme.accent}` }}>
+          <div style={{ fontWeight: 700, color: theme.primary, fontSize: 14 }}>{result.invoice_number} created</div>
+          <div style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>Customer total: ${fmt(result.total)} · logged costs marked as billed</div>
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            <button type="button" onClick={shareResultPdf} style={{ ...styles.button, marginTop: 0, flex: 1, minWidth: 140, backgroundColor: theme.gold, fontSize: 13 }}>
+              Share with customer
             </button>
-          )}
+          </div>
+          {shareMsg && <p style={{ fontSize: 12, color: theme.accent, marginTop: 8, fontWeight: 600 }}>{shareMsg}</p>}
         </div>
       )}
     </div>
   );
 }
 
-function MagicLinkActions({ token, jobId }) {
+function MagicLinkActions({ token, jobId, jobName }) {
   const [msg, setMsg] = useState("");
   const [lastUrl, setLastUrl] = useState("");
   const [creating, setCreating] = useState(null);
@@ -8388,8 +8503,7 @@ function MagicLinkActions({ token, jobId }) {
     setCreating(null);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const detail = typeof err.detail === "string" ? err.detail : null;
-      setMsg(detail || (res.status === 404 ? "Billing API not found — restart or redeploy the backend." : "Could not create link"));
+      setMsg(parseApiError(res, err.detail, "Could not create link"));
       return;
     }
     const data = await res.json();
@@ -8398,29 +8512,32 @@ function MagicLinkActions({ token, jobId }) {
     const label = purpose === "lien_waiver" ? "Lien waiver" : "Sub invoice";
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Vantage Logic", text: `${label} link`, url });
+        await navigator.share({ title: "Vantage Logic", text: `${label} for ${jobName}`, url });
         setMsg(`${label} link created and shared`);
         return;
       }
-    } catch { /* fall through to copy */ }
+    } catch { /* fall through */ }
     const copied = await copyText(url);
-    setMsg(copied ? `${label} link copied — text or email it to your sub` : `${label} link created — copy it below`);
+    setMsg(copied ? `${label} link copied — text it to your sub` : `${label} link ready — copy below`);
   }
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Subcontractor Links</div>
+    <div style={{ marginTop: 16, padding: 16, backgroundColor: theme.bg, borderRadius: 12, border: `1px solid ${theme.border}` }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 4 }}>Subcontractor links</div>
+      <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 14, lineHeight: 1.45 }}>
+        These go to your subs — not your customer. Sub invoice creates a material cost on the job; lien waiver collects a signed release.
+      </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" onClick={() => shareLink("invoice_upload")} disabled={creating === "invoice_upload"} style={{ ...styles.button, marginTop: 0, padding: "10px 14px", fontSize: 12, flex: 1, minWidth: 140 }}>
-          {creating === "invoice_upload" ? "Creating…" : "Sub Invoice Link"}
+          {creating === "invoice_upload" ? "Creating…" : "Sub invoice link"}
         </button>
         <button type="button" onClick={() => shareLink("lien_waiver")} disabled={creating === "lien_waiver"} style={{ ...styles.button, marginTop: 0, padding: "10px 14px", fontSize: 12, flex: 1, minWidth: 140, backgroundColor: theme.accent }}>
-          {creating === "lien_waiver" ? "Creating…" : "Lien Waiver Link"}
+          {creating === "lien_waiver" ? "Creating…" : "Lien waiver link"}
         </button>
       </div>
-      {msg && <p style={{ fontSize: 12, color: msg.includes("Could not") || msg.includes("not found") ? theme.danger : theme.accent, marginTop: 8, fontWeight: 600 }}>{msg}</p>}
+      {msg && <p style={{ fontSize: 12, color: msg.includes("Could not") || msg.includes("not on") ? theme.danger : theme.accent, marginTop: 10, fontWeight: 600 }}>{msg}</p>}
       {lastUrl && (
-        <div style={{ marginTop: 10, padding: "10px 12px", backgroundColor: theme.bg, borderRadius: 8, border: `1px solid ${theme.border}` }}>
+        <div style={{ marginTop: 10, padding: "10px 12px", backgroundColor: "white", borderRadius: 8, border: `1px solid ${theme.border}` }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: theme.textSecondary, marginBottom: 6 }}>Link (valid 14 days)</div>
           <div style={{ fontSize: 12, wordBreak: "break-all", color: theme.primary, marginBottom: 8 }}>{lastUrl}</div>
           <button type="button" onClick={() => copyText(lastUrl).then(ok => setMsg(ok ? "Copied!" : "Copy failed"))} style={{ fontSize: 12, fontWeight: 700, color: theme.accent, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: font.body }}>
