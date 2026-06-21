@@ -396,6 +396,7 @@ function NavBar({ view, setView, role, onLogout }) {
   const tabs = isCrew
     ? [
         { id: "home", label: "Home", Icon: IconHome },
+        { id: "field_estimate", label: "Quote", Icon: IconEstimate },
         { id: "log", label: "Log", Icon: IconMaterials },
         { id: "crew_requests", label: "Requests", Icon: IconRequests },
         { id: "settings", label: "Settings", Icon: IconGear },
@@ -2988,6 +2989,76 @@ function timeAgo(dateStr) {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
   return then.toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+}
+
+// ─── ESTIMATE THREAD (field ↔ office discussion) ───────────────
+function EstimateThread({ token, estimateId, onActivity }) {
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+
+  function load() {
+    apiFetch(`${API}/estimates/${estimateId}/comments`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setComments(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }
+
+  useEffect(() => { load(); }, [estimateId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function send() {
+    const msg = draft.trim();
+    if (!msg) return;
+    setSending(true);
+    const params = new URLSearchParams({ message: msg });
+    const res = await apiFetch(`${API}/estimates/${estimateId}/comments?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    setSending(false);
+    if (res.ok) { setDraft(""); load(); if (onActivity) onActivity(); }
+  }
+
+  return (
+    <div style={{ marginTop: "12px", paddingTop: "14px", borderTop: `1px solid ${theme.border}` }}>
+      <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "7px" }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Office discussion{comments.length > 0 ? ` (${comments.length})` : ""}
+      </div>
+      {loading ? (
+        <div style={{ fontSize: "12px", color: theme.textLight, padding: "4px 0" }}>Loading...</div>
+      ) : comments.length === 0 ? (
+        <div style={{ fontSize: "12px", color: theme.textLight, padding: "4px 0 10px", fontStyle: "italic" }}>Ask questions or share site details here.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px", maxHeight: "320px", overflowY: "auto", paddingRight: "2px" }}>
+          {comments.map(c => (
+            <div key={c.comment_id} style={{ display: "flex", flexDirection: "column", alignItems: c.is_mine ? "flex-end" : "flex-start" }}>
+              <div style={{ maxWidth: "82%", backgroundColor: c.is_mine ? theme.primary : "white", color: c.is_mine ? "white" : theme.textPrimary, padding: "9px 13px", borderRadius: c.is_mine ? "13px 13px 4px 13px" : "13px 13px 13px 4px", border: c.is_mine ? "none" : `1px solid ${theme.border}`, boxShadow: theme.shadowSm }}>
+                {!c.is_mine && (
+                  <div style={{ fontSize: "10px", fontWeight: "700", color: c.role === "crew" ? theme.gold : theme.accent, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                    {c.author}{c.role === "owner" || c.role === "admin" ? " · Office" : ""}
+                  </div>
+                )}
+                <div style={{ fontSize: "13.5px", lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{c.message}</div>
+              </div>
+              <div style={{ fontSize: "10px", color: theme.textLight, marginTop: "3px", padding: "0 4px" }}>{timeAgo(c.created_at)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Message office or crew..."
+          rows={1}
+          style={{ flex: 1, padding: "10px 13px", fontSize: "14px", borderRadius: "10px", border: `1.5px solid ${theme.border}`, fontFamily: font.body, resize: "none", outline: "none", backgroundColor: "#fdfdfc", minHeight: "42px", maxHeight: "120px", boxSizing: "border-box" }}
+        />
+        <button onClick={send} disabled={sending || !draft.trim()} style={{ flexShrink: 0, width: "42px", height: "42px", borderRadius: "10px", border: "none", cursor: draft.trim() ? "pointer" : "not-allowed", backgroundColor: draft.trim() ? theme.primary : theme.border, color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {sending ? <Spinner size={15} /> : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ─── REQUEST THREAD (shared chat) ─────────────────────────────
@@ -5994,11 +6065,12 @@ function NotificationBell({ token, role, setView, mobile }) {
     setOpen(false);
     if (count > 0) markAllRead();
     if (n.related_type === "request") setView(role === "crew" ? "crew_requests" : "requests");
+    else if (n.related_type === "estimate") setView(role === "crew" ? "field_estimate" : "estimate");
     else if (n.related_type === "job") setView("dashboard");
     else if (n.related_type === "schedule") setView(role === "crew" ? "home" : "schedule");
   }
 
-  const iconColor = (t) => t === "new_request" ? theme.gold : t === "new_comment" ? theme.accent : t === "change_order" ? theme.primary : t === "budget_warning" ? theme.danger : theme.textSecondary;
+  const iconColor = (t) => t === "new_request" ? theme.gold : t === "new_comment" || t === "estimate_comment" ? theme.accent : t === "field_estimate_submitted" ? theme.gold : t === "field_estimate_approved" ? theme.accent : t === "field_estimate_returned" ? theme.danger : t === "change_order" ? theme.primary : t === "budget_warning" ? theme.danger : theme.textSecondary;
 
   return (
     <div style={{ position: "fixed", top: mobile ? "12px" : "20px", right: mobile ? "14px" : "26px", zIndex: 1100 }}>
@@ -7299,6 +7371,432 @@ function useActiveJobs(token) {
   return [jobs, refresh];
 }
 
+function estimateStatusLabel(status) {
+  if (status === "field_draft") return "Drafting on site";
+  if (status === "pending_review") return "Waiting on office";
+  if (status === "draft") return "Ready to send";
+  if (status === "sent") return "Sent to customer";
+  if (status === "approved") return "Approved baseline";
+  return status;
+}
+
+function FieldEstimateScreen({ token, readonly = false }) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const [jobs] = useActiveJobs(token);
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("list");
+  const [active, setActive] = useState(null);
+  const [costCodes, setCostCodes] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [fieldNotes, setFieldNotes] = useState("");
+  const [scopeSummary, setScopeSummary] = useState("");
+  const [mileageKm, setMileageKm] = useState("");
+  const [rates, setRates] = useState({ labor: 75, mileage: 0.7, tax: 0, taxLabel: "HST" });
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [aiHints, setAiHints] = useState(null);
+  const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+
+  function loadList() {
+    setLoading(true);
+    apiFetch(`${API}/field-estimates/mine`, { headers })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { setList(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => { setList([]); setLoading(false); });
+  }
+
+  useEffect(() => {
+    loadList();
+    apiFetch(`${API}/cost-codes`, { headers }).then(r => r.ok ? r.json() : []).then(setCostCodes).catch(() => {});
+    apiFetch(`${API}/me`, { headers }).then(r => r.ok ? r.json() : {}).then(me => {
+      setRates({
+        labor: parseFloat(me.estimate_labor_rate_per_hour) || 75,
+        mileage: parseFloat(me.mileage_rate_per_km) || 0.7,
+        tax: parseFloat(me.tax_rate_percent) || 0,
+        taxLabel: me.tax_label || "HST",
+      });
+    }).catch(() => {});
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function rowsFromEstimate(est) {
+    if (!est?.line_items?.length) return [{ cost_code_id: "", hours: "", materials: "" }];
+    return est.line_items.map(li => ({
+      cost_code_id: li.cost_code_id ? String(li.cost_code_id) : "",
+      hours: li.estimated_hours != null ? String(li.estimated_hours) : "",
+      materials: li.material_cost != null ? String(li.material_cost) : "",
+    }));
+  }
+
+  function openNew() {
+    setActive(null);
+    setSelectedJobId("");
+    setFieldNotes("");
+    setScopeSummary("");
+    setMileageKm("");
+    setRows([{ cost_code_id: "", hours: "", materials: "" }]);
+    setAiHints(null);
+    setErr("");
+    setView("edit");
+  }
+
+  function openEstimate(est) {
+    setActive(est);
+    setSelectedJobId(est.job_id ? String(est.job_id) : "");
+    setFieldNotes(est.field_notes || "");
+    setScopeSummary(est.scope_summary || "");
+    setMileageKm(est.estimated_mileage_km ? String(est.estimated_mileage_km) : "");
+    setRows(rowsFromEstimate(est));
+    setAiHints(null);
+    setErr("");
+    setView("edit");
+  }
+
+  function updateRow(i, field, val) {
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+  }
+
+  function buildLineItemsPayload() {
+    return rows
+      .filter(r => r.cost_code_id && (parseFloat(r.hours) > 0 || parseFloat(r.materials) > 0))
+      .map(r => {
+        const cc = costCodes.find(c => String(c.cost_code_id) === String(r.cost_code_id));
+        const hrs = parseFloat(r.hours) || 0;
+        const mat = parseFloat(r.materials) || 0;
+        return {
+          cost_code_id: parseInt(r.cost_code_id, 10),
+          description: cc ? workTypeLabel(cc) : "Work",
+          quantity: 1,
+          estimated_hours: hrs,
+          material_cost: mat,
+          labor_cost: Math.round(hrs * rates.labor * 100) / 100,
+        };
+      });
+  }
+
+  async function saveDraft() {
+    setBusy(true);
+    setErr("");
+    const lineItems = buildLineItemsPayload();
+    try {
+      if (!active) {
+        if (!selectedJobId) { setErr(`Please select a ${T.project.toLowerCase()}`); setBusy(false); return null; }
+        const res = await apiFetch(`${API}/field-estimates`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            job_id: parseInt(selectedJobId, 10),
+            field_notes: fieldNotes.trim() || null,
+            scope_summary: scopeSummary.trim() || null,
+            estimated_mileage_km: parseFloat(mileageKm) || null,
+            line_items: lineItems.length ? lineItems : undefined,
+          }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setErr(typeof d.detail === "string" ? d.detail : "Could not create estimate");
+          return null;
+        }
+        const est = await res.json();
+        setActive(est);
+        setRows(rowsFromEstimate(est));
+        setMsg("Site estimate started");
+        return est;
+      }
+      if (active.status === "field_draft") {
+        const res = await apiFetch(`${API}/estimates/${active.estimate_id}`, {
+          method: "PATCH",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            field_notes: fieldNotes.trim() || null,
+            scope_summary: scopeSummary.trim() || null,
+            estimated_mileage_km: parseFloat(mileageKm) || null,
+            line_items: lineItems,
+          }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setErr(typeof d.detail === "string" ? d.detail : "Could not save");
+          return null;
+        }
+        const est = await res.json();
+        setActive(est);
+        setRows(rowsFromEstimate(est));
+        setMsg("Saved");
+        return est;
+      }
+      return active;
+    } finally {
+      setBusy(false);
+      loadList();
+    }
+  }
+
+  async function generateFromAI(extraDesc) {
+    let est = active;
+    if (!est?.estimate_id) {
+      est = await saveDraft();
+      if (!est?.estimate_id) return;
+    }
+    setGenerating(true);
+    setErr("");
+    const res = await apiFetch(`${API}/field-estimates/${est.estimate_id}/generate`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transcript: transcript.trim() || undefined,
+        description: extraDesc || scopeSummary || fieldNotes || undefined,
+      }),
+    });
+    setGenerating(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setErr(typeof d.detail === "string" ? d.detail : "AI could not generate rows");
+      return;
+    }
+    const data = await res.json();
+    setActive(data.estimate);
+    setRows(rowsFromEstimate(data.estimate));
+    setScopeSummary(data.estimate.scope_summary || scopeSummary);
+    setAiHints({ assumptions: data.assumptions || [], questions: data.questions_for_office || [] });
+    setMsg("AI draft applied — review rows before submitting");
+    loadList();
+  }
+
+  function startVoice() {
+    if (!voiceSupported || readonly) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = "en-CA";
+    setListening(true);
+    setTranscript("");
+    rec.onresult = (e) => {
+      let text = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) text += e.results[i][0].transcript;
+      setTranscript(text);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    rec.start();
+    window._fieldEstVoice = rec;
+  }
+
+  async function uploadPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file || !active?.estimate_id) return;
+    setBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await apiFetch(`${API}/field-estimates/${active.estimate_id}/photos`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+    setBusy(false);
+    if (res.ok) setMsg("Photo attached");
+    else setErr("Could not upload photo");
+    e.target.value = "";
+  }
+
+  async function submitForReview() {
+    const est = await saveDraft();
+    if (!est?.estimate_id) return;
+    if (!buildLineItemsPayload().length) { setErr("Add at least one row with hours or materials"); return; }
+    setBusy(true);
+    const res = await apiFetch(`${API}/estimates/${est.estimate_id}/submit-for-review`, { method: "PATCH", headers });
+    setBusy(false);
+    if (res.ok) {
+      const updated = await res.json();
+      setActive(updated);
+      setMsg("Submitted to office for review");
+      loadList();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setErr(typeof d.detail === "string" ? d.detail : "Could not submit");
+    }
+  }
+
+  const totalHours = rows.reduce((s, r) => s + (parseFloat(r.hours) || 0), 0);
+  const totalLabor = rows.reduce((s, r) => s + (parseFloat(r.hours) || 0) * rates.labor, 0);
+  const totalMat = rows.reduce((s, r) => s + (parseFloat(r.materials) || 0), 0);
+  const subtotal = totalLabor + totalMat + (parseFloat(mileageKm) || 0) * rates.mileage;
+  const selectedJob = jobs.find(j => String(j.job_id) === String(selectedJobId));
+
+  if (view === "edit") {
+    const readOnly = readonly || (active && active.status !== "field_draft");
+    return (
+      <div style={{ ...styles.container, paddingTop: "66px" }}>
+        <button type="button" onClick={() => { setView("list"); loadList(); }} style={{ background: "none", border: "none", color: theme.accent, fontWeight: 600, marginBottom: 8, cursor: "pointer", fontFamily: font.body }}>← My site quotes</button>
+        <h1 style={styles.title}>{active ? "Edit site quote" : "New site quote"}</h1>
+        <p style={styles.subtitle}>Pick the project the office set up, describe the scope on site, then submit for review.</p>
+        {msg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, marginBottom: 12 }}>{msg}</div>}
+        {err && <p style={styles.errorMsg}>{err}</p>}
+        {active?.rejection_reason && active.status === "field_draft" && (
+          <div style={{ ...styles.card, backgroundColor: theme.dangerLight, border: `1px solid ${theme.danger}`, fontSize: 13, marginBottom: 12 }}>
+            <strong>Office requested changes:</strong> {active.rejection_reason}
+          </div>
+        )}
+
+        {!active && (
+          <div style={{ ...styles.card, marginBottom: 12 }}>
+            <label style={styles.label}>Which job are you quoting?</label>
+            {jobs.length === 0 ? (
+              <p style={{ fontSize: 13, color: theme.textSecondary, margin: "8px 0 0" }}>
+                No active projects yet. Ask the office to create the job (client name and area) before you start a site quote.
+              </p>
+            ) : (
+              <>
+                <select
+                  style={styles.input}
+                  value={selectedJobId}
+                  onChange={e => { setSelectedJobId(e.target.value); setErr(""); }}
+                  disabled={readOnly}
+                >
+                  <option value="">{T.selectProject}…</option>
+                  {jobs.map(j => (
+                    <option key={j.job_id} value={j.job_id}>
+                      {j.job_name}{j.city ? ` — ${j.city}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {selectedJob && (
+                  <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Office setup (read-only)</div>
+                    <div style={{ fontWeight: 700, color: theme.primary }}>{selectedJob.job_name}</div>
+                    {selectedJob.city && <div style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>{selectedJob.city}</div>}
+                    <div style={{ fontSize: 12, color: theme.textLight, marginTop: 8 }}>You add scope, photos, and budget rows below — then send back to the office.</div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {active && (
+          <div style={{ ...styles.card, marginBottom: 12, backgroundColor: theme.bg }}>
+            <div style={{ fontWeight: 700, color: theme.primary }}>{active.job_name || active.title}</div>
+            <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>{estimateStatusLabel(active.status)}</div>
+          </div>
+        )}
+
+        {!readOnly && (
+          <div style={{ ...styles.card, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Capture site info</div>
+            {voiceSupported && (
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+                <button type="button" onClick={startVoice} disabled={listening} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: listening ? theme.primaryDark : theme.accent, fontSize: 13 }}>
+                  {listening ? "Listening…" : "Record voice note"}
+                </button>
+              </div>
+            )}
+            {transcript && <p style={{ fontSize: 12, color: theme.textSecondary, fontStyle: "italic", marginBottom: 10 }}>"{transcript}"</p>}
+            <label style={styles.label}>Scope summary</label>
+            <textarea style={styles.textarea} value={scopeSummary} onChange={e => setScopeSummary(e.target.value)} placeholder="What needs to be done on site?" />
+            <label style={styles.label}>Site notes</label>
+            <textarea style={styles.textarea} value={fieldNotes} onChange={e => setFieldNotes(e.target.value)} placeholder="Access, conditions, measurements…" />
+            {active?.estimate_id && (
+              <>
+                <label style={styles.label}>Site photos</label>
+                <input style={styles.input} type="file" accept="image/*" onChange={uploadPhoto} />
+                {active.attachment_count > 0 && <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>{active.attachment_count} photo(s) attached</p>}
+              </>
+            )}
+            <button type="button" disabled={generating || busy} onClick={() => generateFromAI()} style={{ ...styles.button, marginTop: 12, backgroundColor: theme.gold, fontSize: 13 }}>
+              {generating ? "Generating…" : "Generate estimate with AI"}
+            </button>
+            {aiHints && (
+              <div style={{ marginTop: 10, fontSize: 12, color: theme.textSecondary, lineHeight: 1.5 }}>
+                {aiHints.assumptions?.length > 0 && <div><strong>Assumptions:</strong> {aiHints.assumptions.join("; ")}</div>}
+                {aiHints.questions?.length > 0 && <div style={{ marginTop: 4 }}><strong>Questions for office:</strong> {aiHints.questions.join("; ")}</div>}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ ...styles.card, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Budget rows</div>
+          {rows.map((row, i) => (
+            <div key={i} style={{ padding: "12px", borderRadius: 10, border: `1px solid ${theme.border}`, backgroundColor: theme.bg, marginBottom: 8 }}>
+              <label style={styles.label}>{T.workCategory}</label>
+              <select style={{ ...styles.input, margin: 0, fontSize: 16 }} value={row.cost_code_id} disabled={readOnly} onChange={e => updateRow(i, "cost_code_id", e.target.value)}>
+                <option value="">Select…</option>
+                {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
+              </select>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                <div>
+                  <label style={styles.label}>Hours</label>
+                  <input style={{ ...styles.input, margin: 0 }} type="number" min="0" step="0.5" value={row.hours} disabled={readOnly} onChange={e => updateRow(i, "hours", e.target.value)} />
+                </div>
+                <div>
+                  <label style={styles.label}>Materials $</label>
+                  <input style={{ ...styles.input, margin: 0 }} type="number" min="0" value={row.materials} disabled={readOnly} onChange={e => updateRow(i, "materials", e.target.value)} />
+                </div>
+              </div>
+            </div>
+          ))}
+          {!readOnly && (
+            <button type="button" onClick={() => setRows(prev => [...prev, { cost_code_id: "", hours: "", materials: "" }])} style={{ fontSize: 13, fontWeight: 600, color: theme.accent, background: "none", border: "none", cursor: "pointer", padding: 0 }}>+ Add row</button>
+          )}
+          <label style={{ ...styles.label, marginTop: 12 }}>Est. mileage km</label>
+          <input style={{ ...styles.input, maxWidth: 120 }} type="number" min="0" value={mileageKm} disabled={readOnly} onChange={e => setMileageKm(e.target.value)} />
+          <div style={{ marginTop: 12, fontSize: 13, color: theme.textSecondary }}>
+            {totalHours.toFixed(1)}h · Labour ${fmt(totalLabor)} · Materials ${fmt(totalMat)} · <strong>Total ~${fmt(subtotal)}</strong>
+          </div>
+        </div>
+
+        {active && (
+          <EstimateThread token={token} estimateId={active.estimate_id} onActivity={loadList} />
+        )}
+
+        {!readOnly && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
+            <button type="button" disabled={busy} onClick={saveDraft} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.primary }}>{busy ? "Saving…" : "Save draft"}</button>
+            <button type="button" disabled={busy} onClick={submitForReview} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold }}>{busy ? "Submitting…" : "Submit to office for review"}</button>
+          </div>
+        )}
+        {active?.status === "pending_review" && (
+          <div style={{ ...styles.card, marginTop: 16, backgroundColor: theme.goldLight, fontSize: 13, color: theme.textSecondary }}>
+            Waiting for office review. Use the discussion thread above if they have questions.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...styles.container, paddingTop: "66px" }}>
+      <h1 style={styles.title}>Site quotes</h1>
+      <p style={styles.subtitle}>Build estimates on site — office reviews before anything goes to the customer.</p>
+      {!readonly && (
+        <button type="button" onClick={openNew} disabled={jobs.length === 0} style={{ ...styles.button, marginTop: 0, marginBottom: 16, backgroundColor: theme.gold, opacity: jobs.length === 0 ? 0.6 : 1 }}>+ New site quote</button>
+      )}
+      {loading ? <p style={styles.subtitle}>Loading…</p> : list.length === 0 ? (
+        <div style={{ ...styles.card, textAlign: "center", color: theme.textSecondary, fontSize: 13, padding: "28px 16px" }}>No site quotes yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {list.map(est => (
+            <div key={est.estimate_id} style={{ ...styles.card, margin: 0, cursor: "pointer" }} onClick={() => openEstimate(est)}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{est.job_name || est.title}</div>
+                  <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>
+                    {estimateStatusLabel(est.status)} · ${fmt(est.total_cost || 0)}
+                    {est.comment_count > 0 && ` · ${est.comment_count} msg`}
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "4px 8px", borderRadius: 10, backgroundColor: est.status === "pending_review" ? theme.goldLight : theme.bg, color: theme.textSecondary, textTransform: "capitalize" }}>{est.status.replace("_", " ")}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EstimateHub({ token, readonly = false }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [jobs, refreshJobs] = useActiveJobs(token);
@@ -7309,6 +7807,9 @@ function EstimateHub({ token, readonly = false }) {
   const [actionMsg, setActionMsg] = useState("");
   const [actionErr, setActionErr] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [pendingReview, setPendingReview] = useState([]);
+  const [reviewOpen, setReviewOpen] = useState(null);
+  const [returnReason, setReturnReason] = useState("");
 
   const selectedJob = jobs.find(j => j.job_id === selectedJobId) || null;
 
@@ -7325,6 +7826,54 @@ function EstimateHub({ token, readonly = false }) {
     a.remove();
     window.URL.revokeObjectURL(url);
     return true;
+  }
+
+  function loadPendingReview() {
+    apiFetch(`${API}/estimates/pending-review`, { headers })
+      .then(r => r.ok ? r.json() : [])
+      .then(setPendingReview)
+      .catch(() => setPendingReview([]));
+  }
+
+  useEffect(() => { loadPendingReview(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function approveForCustomer(estimateId, jobId) {
+    setBusyId(estimateId);
+    setActionErr("");
+    const res = await apiFetch(`${API}/estimates/${estimateId}/approve-review`, { method: "PATCH", headers });
+    setBusyId(null);
+    if (res.ok) {
+      setActionMsg("Approved for customer — open it to send PDF.");
+      setReviewOpen(null);
+      loadPendingReview();
+      if (jobId) loadEstimates(jobId);
+      const est = await res.json();
+      const job = jobs.find(j => j.job_id === jobId);
+      if (job) setEditTarget({ job, estimate: est });
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setActionErr(typeof d.detail === "string" ? d.detail : "Could not approve");
+    }
+  }
+
+  async function returnToField(estimateId) {
+    setBusyId(estimateId);
+    setActionErr("");
+    const res = await apiFetch(`${API}/estimates/${estimateId}/return-to-field`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: returnReason.trim() || "Please revise and resubmit." }),
+    });
+    setBusyId(null);
+    if (res.ok) {
+      setActionMsg("Returned to crew for revisions.");
+      setReviewOpen(null);
+      setReturnReason("");
+      loadPendingReview();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setActionErr(typeof d.detail === "string" ? d.detail : "Could not return");
+    }
   }
 
   async function openEstimateEditor(estimateId, jobId) {
@@ -7433,6 +7982,52 @@ function EstimateHub({ token, readonly = false }) {
       {actionMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16 }}>{actionMsg}</div>}
       {actionErr && <p style={styles.errorMsg}>{actionErr}</p>}
 
+      {pendingReview.length > 0 && (
+        <div style={{ ...styles.card, marginBottom: 16, border: `1.5px solid ${theme.gold}`, backgroundColor: theme.goldLight }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Field estimates awaiting review ({pendingReview.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {pendingReview.map(est => (
+              <div key={est.estimate_id} style={{ backgroundColor: "white", borderRadius: 10, padding: "12px 14px", border: `1px solid ${theme.border}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{est.job_name || est.title}</div>
+                    <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>
+                      {est.created_by_name ? `From ${est.created_by_name}` : "From crew"} · ${fmt(est.total_cost || 0)} · {Number(est.total_hours || 0).toFixed(1)}h
+                      {est.comment_count > 0 && ` · ${est.comment_count} messages`}
+                    </div>
+                    {est.scope_summary && <div style={{ fontSize: 12, color: theme.textPrimary, marginTop: 6, lineHeight: 1.45 }}>{est.scope_summary}</div>}
+                  </div>
+                  {!readonly && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button type="button" onClick={() => setReviewOpen(reviewOpen === est.estimate_id ? null : est.estimate_id)} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.primary }}>
+                        {reviewOpen === est.estimate_id ? "Hide" : "Review"}
+                      </button>
+                      <button type="button" disabled={busyId === est.estimate_id} onClick={() => approveForCustomer(est.estimate_id, est.job_id)} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.gold }}>
+                        Approve for customer
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {reviewOpen === est.estimate_id && (
+                  <div style={{ marginTop: 12 }}>
+                    {est.field_notes && <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8 }}><strong>Site notes:</strong> {est.field_notes}</div>}
+                    {!readonly && (
+                      <div style={{ marginBottom: 10 }}>
+                        <input style={styles.input} placeholder="Reason if returning to crew (optional)" value={returnReason} onChange={e => setReturnReason(e.target.value)} />
+                        <button type="button" disabled={busyId === est.estimate_id} onClick={() => returnToField(est.estimate_id)} style={{ ...styles.button, marginTop: 8, fontSize: 12, padding: "8px 12px", backgroundColor: "#888" }}>
+                          Return to crew for changes
+                        </button>
+                      </div>
+                    )}
+                    <EstimateThread token={token} estimateId={est.estimate_id} onActivity={loadPendingReview} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {jobs.length > 0 ? (
         <div style={{ marginBottom: 16 }}>
           <label style={styles.label}>{T.project}</label>
@@ -7462,7 +8057,7 @@ function EstimateHub({ token, readonly = false }) {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {estimates.map(est => (
+              {estimates.filter(e => e.status !== "field_draft" && e.status !== "pending_review").map(est => (
                 <div key={est.estimate_id} style={{ ...styles.card, margin: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                     <div>
@@ -7878,7 +8473,7 @@ function AuthenticatedApp() {
     }
     const defaultView = stored.role === "crew" ? "home" : "dashboard";
     if (!saved) return defaultView;
-    const crewViews = ["home", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
+    const crewViews = ["home", "field_estimate", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
     const ownerViews = ["dashboard", "schedule", "requests", "estimate", "billing", "settings"];
     const valid = stored.role === "crew" ? crewViews : ownerViews;
     return valid.includes(saved) ? saved : defaultView;
@@ -7950,7 +8545,7 @@ function AuthenticatedApp() {
 
   // Keep the view valid for the current role (prevents owners landing on crew pages after refresh)
   useEffect(() => {
-    const crewViews = ["home", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
+    const crewViews = ["home", "field_estimate", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
     const ownerViews = ["dashboard", "schedule", "requests", "estimate", "billing", "settings"];
     if (role === "crew" && !crewViews.includes(view)) {
       setView("home");
@@ -8073,6 +8668,7 @@ function AuthenticatedApp() {
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
           <div key={view} className="vl-screen">
           {role === "crew" && view === "home" && <CrewHome token={token} setView={setView} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} />}
+          {role === "crew" && view === "field_estimate" && <FieldEstimateScreen token={token} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "log" && <LogHub setView={setView} />}
           {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
           {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}

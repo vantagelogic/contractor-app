@@ -203,6 +203,16 @@ with engine.connect() as _conn:
         ("pdf_path", "VARCHAR(500)"),
         ("customer_email", "VARCHAR(255)"),
         ("sent_at", "TIMESTAMP"),
+        ("approved_at", "TIMESTAMP"),
+        ("approved_by", "INTEGER"),
+        ("created_by", "INTEGER"),
+        ("reviewed_by", "INTEGER"),
+        ("reviewed_at", "TIMESTAMP"),
+        ("submitted_at", "TIMESTAMP"),
+        ("field_notes", "TEXT"),
+        ("scope_summary", "TEXT"),
+        ("rejection_reason", "TEXT"),
+        ("source", "VARCHAR(20) DEFAULT 'office'"),
     ]:
         try:
             _conn.execute(__import__("sqlalchemy").text(

@@ -303,6 +303,36 @@ class Estimate(Base):
     sent_at = Column(DateTime, nullable=True)
     approved_at = Column(DateTime, nullable=True)
     approved_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    reviewed_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    field_notes = Column(Text)
+    scope_summary = Column(Text)
+    rejection_reason = Column(Text)
+    source = Column(String(20), default="office")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class EstimateComment(Base):
+    __tablename__ = "estimate_comments"
+
+    comment_id = Column(Integer, primary_key=True, index=True)
+    estimate_id = Column(Integer, ForeignKey("estimates.estimate_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class EstimateAttachment(Base):
+    __tablename__ = "estimate_attachments"
+
+    attachment_id = Column(Integer, primary_key=True, index=True)
+    estimate_id = Column(Integer, ForeignKey("estimates.estimate_id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_name = Column(String(255))
     created_at = Column(DateTime, server_default=func.now())
 
 
