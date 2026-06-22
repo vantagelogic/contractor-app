@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import FileResponse
 
 import models
+from notification_helpers import notify_users, notify_company_owners
 
 MILEAGE_RATE_DEFAULT = 0.70
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
@@ -186,26 +187,10 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         return user.role in ("owner", "admin")
 
     def _notify_users(db: Session, company_id: int, user_ids: list[int], ntype: str, title: str, message: str, related_id: int, related_type: str):
-        for uid in user_ids:
-            if not uid:
-                continue
-            db.add(models.Notification(
-                company_id=company_id,
-                user_id=uid,
-                type=ntype,
-                title=title,
-                message=message[:500] if message else None,
-                related_id=related_id,
-                related_type=related_type,
-            ))
+        notify_users(db, company_id, user_ids, ntype, title, message, related_id, related_type)
 
     def _notify_company_owners(db: Session, company_id: int, exclude_user_id: int | None, ntype: str, title: str, message: str, related_id: int, related_type: str):
-        owners = db.query(models.User).filter(
-            models.User.company_id == company_id,
-            models.User.role.in_(["owner", "admin"]),
-        ).all()
-        ids = [o.user_id for o in owners if o.user_id != exclude_user_id]
-        _notify_users(db, company_id, ids, ntype, title, message, related_id, related_type)
+        notify_company_owners(db, company_id, exclude_user_id, ntype, title, message, related_id, related_type)
 
     def _get_estimate(db: Session, estimate_id: int, company_id: int):
         estimate = db.query(models.Estimate).filter(
@@ -1735,6 +1720,15 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         except ImportError:
             pass
 
+        _notify_company_owners(
+            db, current_user.company_id, current_user.user_id,
+            "invoice_generated",
+            "Client invoice created",
+            f"{invoice.invoice_number} for {job.job_name} — ${float(invoice.total):,.2f}",
+            invoice.invoice_id, "billing",
+        )
+        db.commit()
+
         return {
             "invoice_id": invoice.invoice_id,
             "invoice_number": invoice.invoice_number,
@@ -1888,5 +1882,23 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         )
         link.used_at = datetime.utcnow()
         db.add(submission)
+        job = db.query(models.Job).filter(models.Job.job_id == link.job_id).first()
+        job_label = job.job_name if job else "Project"
+        if link.purpose == "invoice_upload":
+            _notify_company_owners(
+                db, link.company_id, None,
+                "magic_link_submit",
+                "Subcontractor invoice received",
+                f"{sub_name or 'Subcontractor'}: ${float(amount or 0):,.2f} on {job_label}",
+                link.job_id, "billing",
+            )
+        else:
+            _notify_company_owners(
+                db, link.company_id, None,
+                "magic_link_submit",
+                "Lien waiver signed",
+                f"{signature_name or sub_name or 'Subcontractor'} on {job_label}",
+                link.job_id, "billing",
+            )
         db.commit()
         return {"message": "Submitted successfully", "material_id": material_id}

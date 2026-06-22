@@ -553,6 +553,13 @@ def require_owner(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 from cost_plus import register_cost_plus_routes
+from notification_helpers import (
+    notify_users,
+    notify_company_owners,
+    notify_employee_user,
+    notify_schedule_crew,
+    maybe_notify_budget_warning,
+)
 register_cost_plus_routes(app, get_db, get_current_user, require_owner, _timesheet_labour_cost, limiter)
 
 
@@ -1324,6 +1331,8 @@ def create_timesheet(
     db.add(timesheet)
     db.commit()
     db.refresh(timesheet)
+    maybe_notify_budget_warning(db, current_user.company_id, job_id)
+    db.commit()
     return timesheet
 
 @app.delete("/timesheets/{timesheet_id}")
@@ -2352,6 +2361,47 @@ def get_unread_count(
     ).count()
     return {"count": count}
 
+@app.get("/notifications/summary")
+def notifications_summary(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    unread = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.user_id,
+        models.Notification.read == False,
+    ).all()
+    summary = {
+        "unread": len(unread),
+        "requests": sum(1 for n in unread if n.related_type == "request"),
+        "estimates": sum(1 for n in unread if n.related_type == "estimate"),
+        "schedules": sum(1 for n in unread if n.related_type == "schedule"),
+        "projects": sum(1 for n in unread if n.related_type == "job"),
+        "billing": sum(1 for n in unread if n.related_type == "billing"),
+    }
+    if current_user.role in ("owner", "admin"):
+        pending = db.query(models.Estimate).filter(
+            models.Estimate.company_id == current_user.company_id,
+            models.Estimate.status == "pending_review",
+        ).count()
+        summary["pending_estimates"] = pending
+    return summary
+
+@app.patch("/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    notif = db.query(models.Notification).filter(
+        models.Notification.notification_id == notification_id,
+        models.Notification.user_id == current_user.user_id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.read = True
+    db.commit()
+    return {"read": True}
+
 @app.patch("/notifications/mark-read")
 def mark_all_read(
     current_user: models.User = Depends(get_current_user),
@@ -2450,6 +2500,16 @@ def create_schedule(
         schedule_kwargs["end_time"] = end_time or None
     schedule = models.Schedule(**schedule_kwargs)
     db.add(schedule)
+    job = db.query(models.Job).filter(models.Job.job_id == job_id).first()
+    job_name = job.job_name if job else "Project"
+    hours_bit = f" — {scheduled_hours}h" if scheduled_hours else ""
+    notify_schedule_crew(
+        db, current_user.company_id, employee_id,
+        "schedule_assigned",
+        "New shift scheduled",
+        f"{job_name} on {scheduled_date}{hours_bit}",
+        schedule.schedule_id,
+    )
     db.commit()
     db.refresh(schedule)
     return schedule
@@ -2531,6 +2591,15 @@ def update_schedule(
         s.end_time = end_time or None
     s.notes = notes or None
     s.color = color or None
+    job = db.query(models.Job).filter(models.Job.job_id == s.job_id).first()
+    job_name = job.job_name if job else "Project"
+    notify_schedule_crew(
+        db, current_user.company_id, s.employee_id,
+        "schedule_updated",
+        "Shift updated",
+        f"{job_name} on {s.scheduled_date}",
+        s.schedule_id,
+    )
     db.commit()
     db.refresh(s)
     return {"schedule_id": s.schedule_id, "message": "updated"}
@@ -3017,6 +3086,14 @@ def approve_request(
                 purchase_date=datetime.utcnow().date()
             )
             db.add(material)
+    job = db.query(models.Job).filter(models.Job.job_id == req.job_id).first()
+    notify_employee_user(
+        db, current_user.company_id, req.employee_id,
+        "request_approved",
+        "Request approved",
+        f"Your {req.request_type} request on {job.job_name if job else 'project'} was approved",
+        req.request_id, "request",
+    )
     db.commit()
     return {"message": "Request approved"}
 
@@ -3038,6 +3115,15 @@ def deny_request(
     req.denial_reason = denial_reason
     req.reviewed_at = datetime.utcnow()
     req.reviewed_by = current_user.user_id
+    job = db.query(models.Job).filter(models.Job.job_id == req.job_id).first()
+    deny_msg = (denial_reason or "").strip() or f"Your {req.request_type} request was denied"
+    notify_employee_user(
+        db, current_user.company_id, req.employee_id,
+        "request_denied",
+        "Request denied",
+        f"{job.job_name if job else 'Project'}: {deny_msg[:200]}",
+        req.request_id, "request",
+    )
     db.commit()
     return {"message": "Request denied"}
 

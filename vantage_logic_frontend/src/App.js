@@ -452,7 +452,7 @@ function HelpChat({ token, role, mobile = false }) {
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────
-function NavBar({ view, setView, role, onLogout }) {
+function NavBar({ view, setView, role, onLogout, badges = null }) {
   const [mobile, setMobile] = useState(isMobile());
 
   useEffect(() => {
@@ -499,7 +499,7 @@ function NavBar({ view, setView, role, onLogout }) {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "12px 0 14px", boxShadow: "0 -1px 0 rgba(255,255,255,0.08), 0 -8px 28px rgba(0,0,0,0.28)", paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
         {mobileTabs.map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "6px 6px", borderRadius: "8px", minWidth: "44px", minHeight: "48px" }}>
-            <span style={{ color: mobileIsActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", display: "flex" }}><tab.Icon /></span>
+            <span style={{ color: mobileIsActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", display: "flex", position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} /></span>
             <span style={{ fontSize: "9px", color: mobileIsActive(tab.id) ? "white" : "rgba(255,255,255,0.4)", fontWeight: mobileIsActive(tab.id) ? "600" : "400", letterSpacing: "0.2px" }}>{tab.label}</span>
             {mobileIsActive(tab.id) && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
           </button>
@@ -522,7 +522,7 @@ function NavBar({ view, setView, role, onLogout }) {
       <div style={{ flex: 1, padding: "18px 12px" }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: isTabActive(tab.id) ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
-            <span style={{ display: "flex", flexShrink: 0 }}><tab.Icon /></span>
+            <span style={{ display: "flex", flexShrink: 0, position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} /></span>
             <span>{tab.label}</span>
             {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
           </button>
@@ -4584,6 +4584,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
       label: "Organization",
       tabs: [
         { id: "company", label: "Company Profile" },
+        { id: "notifications", label: "Notifications" },
         { id: "projects", label: T.projects },
         { id: "crew", label: "Crew Management" },
       ],
@@ -4837,6 +4838,8 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
                 </div>
               </div>
             )}
+
+            {settingsTab === "notifications" && <NotificationPreferences />}
 
             {settingsTab === "projects" && (
               <div style={styles.card}>
@@ -6061,6 +6064,10 @@ function SettingsScreen({ token, role, onLogout }) {
         <ProfileSettingsForm token={token} showCompany={false} />
       </div>
 
+      <div style={{ marginTop: "14px" }}>
+        <NotificationPreferences />
+      </div>
+
       <div style={{...styles.card, marginTop: "14px"}}>
         <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "8px", fontFamily: font.display }}>Account</div>
         <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px" }}>Sign out of your account on this device.</p>
@@ -6124,99 +6131,311 @@ function GlobalStyles() {
   return null;
 }
 
-// ─── NOTIFICATION BELL ────────────────────────────────────────
-function NotificationBell({ token, role, setView, mobile }) {
+// ─── NOTIFICATIONS ────────────────────────────────────────────
+const DEFAULT_NOTIF_PREFS = {
+  enabled: true,
+  toast: true,
+  requests: true,
+  estimates: true,
+  schedules: true,
+  projects: true,
+  billing: true,
+};
+
+function getNotifPrefs() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("vl_notif_prefs") || "{}");
+    return { ...DEFAULT_NOTIF_PREFS, ...stored };
+  } catch {
+    return { ...DEFAULT_NOTIF_PREFS };
+  }
+}
+
+function saveNotifPrefs(prefs) {
+  try { localStorage.setItem("vl_notif_prefs", JSON.stringify(prefs)); } catch {}
+}
+
+function notifCategory(n) {
+  if (n.related_type === "request") return "requests";
+  if (n.related_type === "estimate") return "estimates";
+  if (n.related_type === "schedule") return "schedules";
+  if (n.related_type === "job") return "projects";
+  if (n.related_type === "billing") return "billing";
+  return null;
+}
+
+function notifAllowedByPrefs(n, prefs) {
+  if (!prefs?.enabled) return false;
+  const cat = notifCategory(n);
+  if (!cat) return true;
+  return prefs[cat] !== false;
+}
+
+function notifTypeMeta(type) {
+  const map = {
+    new_request: { color: theme.gold, label: "Request" },
+    new_comment: { color: theme.accent, label: "Message" },
+    request_approved: { color: theme.accent, label: "Approved" },
+    request_denied: { color: theme.danger, label: "Denied" },
+    field_estimate_submitted: { color: theme.gold, label: "Site quote" },
+    field_estimate_approved: { color: theme.accent, label: "Quote approved" },
+    field_estimate_returned: { color: theme.danger, label: "Quote returned" },
+    estimate_comment: { color: theme.accent, label: "Estimate chat" },
+    change_order: { color: theme.primary, label: "Change order" },
+    budget_warning: { color: theme.danger, label: "Budget alert" },
+    schedule_assigned: { color: theme.accent, label: "Schedule" },
+    schedule_updated: { color: theme.accent, label: "Schedule" },
+    invoice_generated: { color: theme.primary, label: "Invoice" },
+    magic_link_submit: { color: theme.gold, label: "Submittal" },
+  };
+  return map[type] || { color: theme.textSecondary, label: "Update" };
+}
+
+function tabBadgeCount(tabId, badges, role) {
+  if (!badges) return 0;
+  if (tabId === "crew_requests" || tabId === "requests") return badges.requests || 0;
+  if (tabId === "field_estimate") return badges.estimates || 0;
+  if (tabId === "estimate") return (badges.estimates || 0) + (badges.pending_estimates || 0);
+  if (tabId === "home") return (badges.schedules || 0) + (badges.estimates || 0);
+  if (tabId === "dashboard") return badges.projects || 0;
+  if (tabId === "billing") return badges.billing || 0;
+  return 0;
+}
+
+function NavTabBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span style={{ position: "absolute", top: "-2px", right: "-4px", minWidth: "16px", height: "16px", padding: "0 4px", borderRadius: "8px", backgroundColor: theme.danger, color: "white", fontSize: "9px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, border: "2px solid rgba(15,40,24,0.9)" }}>
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
+function NotificationPreferences({ compact = false }) {
+  const [prefs, setPrefs] = useState(getNotifPrefs);
+  const [saved, setSaved] = useState(false);
+
+  function update(key, val) {
+    const next = { ...prefs, [key]: val };
+    setPrefs(next);
+    saveNotifPrefs(next);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  const toggles = [
+    { key: "requests", label: "Requests & comments", desc: "New requests, approvals, denials, and thread replies" },
+    { key: "estimates", label: "Estimates & site quotes", desc: "Quote submissions, reviews, and estimate messages" },
+    { key: "schedules", label: "Schedule", desc: "When shifts are assigned or updated" },
+    { key: "projects", label: "Projects & budget", desc: "Budget warnings and change orders" },
+    { key: "billing", label: "Billing & submittals", desc: "Invoices created and subcontractor link submissions" },
+  ];
+
+  return (
+    <div style={compact ? {} : styles.card}>
+      {!compact && (
+        <>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "6px", fontFamily: font.display }}>Notifications</div>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "16px", lineHeight: 1.5 }}>Choose what shows in your notification bell and alert toasts.</p>
+        </>
+      )}
+      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", marginBottom: "14px" }}>
+        <input type="checkbox" checked={prefs.enabled} onChange={e => update("enabled", e.target.checked)} style={{ width: "17px", height: "17px", accentColor: theme.accent }} />
+        <span style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>Enable notifications</span>
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", marginBottom: "16px", paddingLeft: "4px" }}>
+        <input type="checkbox" checked={prefs.toast} disabled={!prefs.enabled} onChange={e => update("toast", e.target.checked)} style={{ width: "16px", height: "16px", accentColor: theme.accent }} />
+        <span style={{ fontSize: "13px", color: theme.textSecondary }}>Show pop-up alerts for new items</span>
+      </label>
+      {prefs.enabled && toggles.map(t => (
+        <label key={t.key} style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer", marginBottom: "12px", padding: "10px 12px", borderRadius: "10px", border: `1px solid ${theme.border}`, backgroundColor: prefs[t.key] ? theme.accentLight : theme.bg }}>
+          <input type="checkbox" checked={!!prefs[t.key]} onChange={e => update(t.key, e.target.checked)} style={{ width: "16px", height: "16px", accentColor: theme.accent, marginTop: "2px" }} />
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{t.label}</div>
+            <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px", lineHeight: 1.4 }}>{t.desc}</div>
+          </div>
+        </label>
+      ))}
+      {saved && <p style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", margin: "8px 0 0" }}>Preferences saved</p>}
+    </div>
+  );
+}
+
+function NotificationToast({ toast, onDismiss, onOpen }) {
+  if (!toast) return null;
+  const meta = notifTypeMeta(toast.type);
+  return (
+    <div style={{ position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom))", left: "50%", transform: "translateX(-50%)", zIndex: 1200, width: "min(420px, calc(100vw - 28px))", backgroundColor: "white", borderRadius: "14px", border: `1.5px solid ${theme.border}`, boxShadow: theme.shadowLg, padding: "14px 16px", animation: "vlFadeUp 0.25s ease both", cursor: "pointer" }} onClick={onOpen}>
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+        <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: meta.color, marginTop: "5px", flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "10px", fontWeight: "700", color: meta.color, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>{meta.label}</div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{toast.title}</div>
+          {toast.message && <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "4px", lineHeight: 1.4 }}>{toast.message}</div>}
+        </div>
+        <button type="button" onClick={e => { e.stopPropagation(); onDismiss(); }} style={{ background: "none", border: "none", color: theme.textLight, cursor: "pointer", fontSize: "18px", lineHeight: 1, padding: "0 4px" }}>×</button>
+      </div>
+    </div>
+  );
+}
+
+function NotificationBell({ token, role, setView, mobile, onSummaryChange }) {
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const prevCountRef = useRef(0);
+  const headers = { Authorization: `Bearer ${token}` };
 
-  function loadCount() {
-    apiFetch(`${API}/notifications/unread-count`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(d => setCount(d.count || 0)).catch(() => {});
+  function loadSummary() {
+    return apiFetch(`${API}/notifications/summary`, { headers })
+      .then(r => r.ok ? r.json() : {})
+      .then(d => {
+        setCount(d.unread || 0);
+        onSummaryChange?.(d);
+        return d;
+      })
+      .catch(() => ({}));
   }
 
   function loadItems() {
     setLoading(true);
-    apiFetch(`${API}/notifications`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json()).then(d => { setItems(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false));
+    return apiFetch(`${API}/notifications`, { headers })
+      .then(r => r.json())
+      .then(d => { setItems(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }
+
+  function refreshAll() {
+    loadSummary().then(() => loadItems());
   }
 
   useEffect(() => {
-    loadCount();
-    const iv = setInterval(loadCount, 30000);
-    return () => clearInterval(iv);
+    loadSummary().then(d => { prevCountRef.current = d.unread || 0; });
+    loadItems();
+    const iv = setInterval(() => { loadSummary(); loadItems(); }, 20000);
+    const onVis = () => { if (document.visibilityState === "visible") loadSummary(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", loadSummary);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", loadSummary); };
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function toggle() {
-    const next = !open;
-    setOpen(next);
-    if (next) loadItems();
+  useEffect(() => {
+    if (count <= prevCountRef.current) {
+      prevCountRef.current = count;
+      return;
+    }
+    const prefs = getNotifPrefs();
+    if (!prefs.enabled || !prefs.toast) {
+      prevCountRef.current = count;
+      return;
+    }
+    apiFetch(`${API}/notifications`, { headers })
+      .then(r => r.json())
+      .then(list => {
+        const latest = (Array.isArray(list) ? list : []).find(n => !n.read && notifAllowedByPrefs(n, prefs));
+        if (!latest) return;
+        setToast(latest);
+        const t = setTimeout(() => setToast(null), 6000);
+        prevCountRef.current = count;
+        return () => clearTimeout(t);
+      })
+      .catch(() => { prevCountRef.current = count; });
+  }, [count, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function markOneRead(id) {
+    await apiFetch(`${API}/notifications/${id}/read`, { method: "PATCH", headers });
+    setCount(c => Math.max(0, c - 1));
+    setItems(prev => prev.map(n => n.notification_id === id ? { ...n, read: true } : n));
+    loadSummary();
   }
 
   async function markAllRead() {
-    await apiFetch(`${API}/notifications/mark-read`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+    await apiFetch(`${API}/notifications/mark-read`, { method: "PATCH", headers });
     setCount(0);
-    loadItems();
+    setItems(prev => prev.map(n => ({ ...n, read: true })));
+    loadSummary();
   }
 
-  function handleTap(n) {
-    setOpen(false);
-    if (count > 0) markAllRead();
+  function navigateFor(n) {
     if (n.related_type === "request") setView(role === "crew" ? "crew_requests" : "requests");
     else if (n.related_type === "estimate") setView(role === "crew" ? "field_estimate" : "estimate");
     else if (n.related_type === "job") setView("dashboard");
     else if (n.related_type === "schedule") setView(role === "crew" ? "home" : "schedule");
+    else if (n.related_type === "billing") setView("billing");
   }
 
-  const iconColor = (t) => t === "new_request" ? theme.gold : t === "new_comment" || t === "estimate_comment" ? theme.accent : t === "field_estimate_submitted" ? theme.gold : t === "field_estimate_approved" ? theme.accent : t === "field_estimate_returned" ? theme.danger : t === "change_order" ? theme.primary : t === "budget_warning" ? theme.danger : theme.textSecondary;
+  async function handleTap(n) {
+    setOpen(false);
+    setToast(null);
+    if (!n.read) await markOneRead(n.notification_id);
+    navigateFor(n);
+  }
+
+  const prefs = getNotifPrefs();
+  const visibleItems = items.filter(n => notifAllowedByPrefs(n, prefs));
+  const unreadItems = visibleItems.filter(i => !i.read).length;
+  const displayCount = prefs.enabled
+    ? (visibleItems.length ? unreadItems : Math.max(0, count))
+    : 0;
 
   return (
-    <div style={{ position: "fixed", top: mobile ? "12px" : "20px", right: mobile ? "14px" : "26px", zIndex: 1100 }}>
-      <button onClick={toggle} aria-label="Notifications" style={{ position: "relative", width: "42px", height: "42px", borderRadius: "12px", border: `1px solid ${theme.border}`, backgroundColor: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: theme.shadowMd }}>
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={open ? theme.primary : theme.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        {count > 0 && (
-          <span style={{ position: "absolute", top: "-5px", right: "-5px", minWidth: "19px", height: "19px", padding: "0 5px", borderRadius: "10px", backgroundColor: theme.danger, color: "white", fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, border: "2px solid white", boxSizing: "border-box" }}>
-            {count > 9 ? "9+" : count}
-          </span>
-        )}
-      </button>
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: -1 }} />
-          <div className="vl-pop" style={{ position: "absolute", top: "50px", right: 0, width: mobile ? "calc(100vw - 28px)" : "360px", maxWidth: "360px", backgroundColor: "white", borderRadius: "14px", border: `1px solid ${theme.border}`, boxShadow: theme.shadowLg, overflow: "hidden", transformOrigin: "top right" }}>
-            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>Notifications</span>
-              {items.some(i => !i.read) && <button onClick={markAllRead} style={{ fontSize: "11px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>Mark all read</button>}
-            </div>
-            <div style={{ maxHeight: "420px", overflowY: "auto" }}>
-              {loading ? (
-                <div style={{ padding: "24px", textAlign: "center", fontSize: "13px", color: theme.textLight }}>Loading...</div>
-              ) : items.length === 0 ? (
-                <div style={{ padding: "32px 24px", textAlign: "center" }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "8px" }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                  <div style={{ fontSize: "13px", color: theme.textSecondary }}>You are all caught up.</div>
+    <>
+      <NotificationToast toast={toast} onDismiss={() => setToast(null)} onOpen={() => { setToast(null); setOpen(true); loadItems(); }} />
+      <div style={{ position: "fixed", top: mobile ? "12px" : "20px", right: mobile ? "14px" : "26px", zIndex: 1100 }}>
+        <button onClick={() => { const next = !open; setOpen(next); if (next) refreshAll(); }} aria-label={`Notifications${displayCount ? `, ${displayCount} unread` : ""}`} style={{ position: "relative", width: "42px", height: "42px", borderRadius: "12px", border: `1px solid ${displayCount > 0 ? theme.gold : theme.border}`, backgroundColor: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: displayCount > 0 ? "0 2px 12px rgba(200,151,58,0.25)" : theme.shadowMd }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={open || displayCount > 0 ? theme.primary : theme.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          {displayCount > 0 && (
+            <span style={{ position: "absolute", top: "-5px", right: "-5px", minWidth: "19px", height: "19px", padding: "0 5px", borderRadius: "10px", backgroundColor: theme.danger, color: "white", fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, border: "2px solid white", boxSizing: "border-box" }}>
+              {displayCount > 9 ? "9+" : displayCount}
+            </span>
+          )}
+        </button>
+        {open && (
+          <>
+            <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: -1 }} />
+            <div className="vl-pop" style={{ position: "absolute", top: "50px", right: 0, width: mobile ? "calc(100vw - 28px)" : "380px", maxWidth: "380px", backgroundColor: "white", borderRadius: "14px", border: `1px solid ${theme.border}`, boxShadow: theme.shadowLg, overflow: "hidden", transformOrigin: "top right" }}>
+              <div style={{ padding: "14px 16px", borderBottom: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, fontFamily: font.display }}>Notifications</span>
+                  {unreadItems > 0 && <span style={{ fontSize: "11px", color: theme.textSecondary, marginLeft: "8px" }}>{unreadItems} unread</span>}
                 </div>
-              ) : (
-                items.map(n => (
-                  <div key={n.notification_id} onClick={() => handleTap(n)} style={{ padding: "13px 16px", borderBottom: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: n.read ? "white" : theme.accentLight, display: "flex", gap: "11px", alignItems: "flex-start", transition: "background 0.12s" }}>
-                    <div style={{ flexShrink: 0, width: "32px", height: "32px", borderRadius: "9px", backgroundColor: "white", border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", marginTop: "1px" }}>
-                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: iconColor(n.type) }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "13px", fontWeight: n.read ? "500" : "700", color: theme.textPrimary, marginBottom: "2px" }}>{n.title}</div>
-                      {n.message && <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4, marginBottom: "3px" }}>{n.message}</div>}
-                      <div style={{ fontSize: "10.5px", color: theme.textLight }}>{timeAgo(n.created_at)}</div>
-                    </div>
-                    {!n.read && <span style={{ flexShrink: 0, width: "8px", height: "8px", borderRadius: "50%", backgroundColor: theme.danger, marginTop: "5px" }} />}
+                {unreadItems > 0 && <button type="button" onClick={markAllRead} style={{ fontSize: "11px", color: theme.accent, fontWeight: "600", background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>Mark all read</button>}
+              </div>
+              <div style={{ maxHeight: "440px", overflowY: "auto" }}>
+                {loading ? (
+                  <div style={{ padding: "24px", textAlign: "center", fontSize: "13px", color: theme.textLight }}>Loading…</div>
+                ) : visibleItems.length === 0 ? (
+                  <div style={{ padding: "32px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: "13px", color: theme.textSecondary }}>{prefs.enabled ? "You are all caught up." : "Notifications are turned off."}</div>
+                    <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "6px" }}>{prefs.enabled ? "Requests, quotes, schedule, and project alerts appear here." : "Enable them in Settings to see updates."}</div>
                   </div>
-                ))
-              )}
+                ) : (
+                  visibleItems.map(n => {
+                    const meta = notifTypeMeta(n.type);
+                    return (
+                      <div key={n.notification_id} onClick={() => handleTap(n)} style={{ padding: "13px 16px", borderBottom: `1px solid ${theme.border}`, cursor: "pointer", backgroundColor: n.read ? "white" : theme.accentLight, display: "flex", gap: "11px", alignItems: "flex-start" }}>
+                        <div style={{ flexShrink: 0, width: "32px", height: "32px", borderRadius: "9px", backgroundColor: "white", border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: meta.color }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "10px", fontWeight: "700", color: meta.color, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "2px" }}>{meta.label}</div>
+                          <div style={{ fontSize: "13px", fontWeight: n.read ? "500" : "700", color: theme.textPrimary, marginBottom: "2px" }}>{n.title}</div>
+                          {n.message && <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4, marginBottom: "3px" }}>{n.message}</div>}
+                          <div style={{ fontSize: "10.5px", color: theme.textLight }}>{timeAgo(n.created_at)}</div>
+                        </div>
+                        {!n.read && <span style={{ flexShrink: 0, width: "8px", height: "8px", borderRadius: "50%", backgroundColor: theme.danger, marginTop: "5px" }} />}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -8791,6 +9010,7 @@ function AuthenticatedApp() {
   const [tierLimit, setTierLimit] = useState(null);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [voicePrefill, setVoicePrefill] = useState(null);
+  const [notifBadges, setNotifBadges] = useState({});
   useEffect(() => { window._setVoicePrefill = setVoicePrefill; return () => { delete window._setVoicePrefill; }; }, [setVoicePrefill]);
   const [paymentMsg, setPaymentMsg] = useState(() => {
     try {
@@ -8922,9 +9142,9 @@ function AuthenticatedApp() {
             <button onClick={() => setShowPlanPicker(true)} style={{ backgroundColor: "white", color: theme.gold, border: "none", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Subscribe now</button>
           </div>
         )}
-        <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} />
+        <NavBar view={view} setView={setView} role={role} onLogout={handleLogout} badges={notifBadges} />
         {showPlanPicker && <PlanPicker token={token} currentTier={subTier} crewCount={crewCount} onClose={() => setShowPlanPicker(false)} onSuccess={() => { setShowPlanPicker(false); window.location.href = window.location.href.split("?")[0] + "?payment=success"; }} />}
-        <NotificationBell token={token} role={role} setView={setView} mobile={mobile} />
+        <NotificationBell token={token} role={role} setView={setView} mobile={mobile} onSummaryChange={setNotifBadges} />
         {token && <HelpChat token={token} role={role} mobile={mobile} />}
 
         {/* Full-screen onboarding walkthrough — shown once on first login */}
