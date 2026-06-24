@@ -3,11 +3,12 @@
 from datetime import datetime, timedelta, date
 import os
 import secrets
+from types import SimpleNamespace
 
 from fastapi import Depends, HTTPException, Body, File, UploadFile, Form, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, Response
 
 import models
 from notification_helpers import notify_users, notify_company_owners
@@ -471,16 +472,17 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "has_unbilled": bool(sweep["timesheets"] or sweep["materials"] or sweep["mileage"]),
         }
 
-    def _generate_invoice_pdf(invoice, job, company, line_items, receipt_urls=None):
+    def _build_invoice_pdf_bytes(invoice, job, company, line_items, receipt_urls=None) -> bytes:
+        from io import BytesIO
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.lib.units import inch
 
-        path = os.path.join(UPLOAD_DIR, f"invoice_{invoice.invoice_id}.pdf")
+        buffer = BytesIO()
         styles = getSampleStyleSheet()
-        doc = SimpleDocTemplate(path, pagesize=letter, topMargin=0.75 * inch)
+        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75 * inch)
         story = []
 
         created = invoice.created_at.strftime("%Y-%m-%d") if invoice.created_at else ""
@@ -530,6 +532,13 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
                         story.append(Paragraph(f"[Receipt: {os.path.basename(url)}]", styles["Normal"]))
 
         doc.build(story)
+        return buffer.getvalue()
+
+    def _generate_invoice_pdf(invoice, job, company, line_items, receipt_urls=None):
+        path = os.path.join(UPLOAD_DIR, f"invoice_{invoice.invoice_id}.pdf")
+        data = _build_invoice_pdf_bytes(invoice, job, company, line_items, receipt_urls)
+        with open(path, "wb") as f:
+            f.write(data)
         return path
 
     def _generate_estimate_pdf(db: Session, estimate: models.Estimate, company, job):
@@ -1168,9 +1177,9 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         estimate = models.Estimate(
             company_id=current_user.company_id,
             job_id=job.job_id,
-            title=f"Field Estimate — {job.job_name}",
-            status="field_draft",
-            source="field",
+            title=f"Estimate — {job.job_name}" if _is_owner_role(current_user) else f"Field Estimate — {job.job_name}",
+            status="draft" if _is_owner_role(current_user) else "field_draft",
+            source="office" if _is_owner_role(current_user) else "field",
             created_by=current_user.user_id,
             field_notes=body.field_notes,
             scope_summary=body.scope_summary,
@@ -1416,8 +1425,12 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         from main import get_gemini_client
 
         estimate = _get_estimate(db, estimate_id, current_user.company_id)
-        if estimate.status not in ("field_draft",):
-            raise HTTPException(status_code=400, detail="AI generate only available on field drafts")
+        if estimate.status == "field_draft":
+            pass
+        elif estimate.status == "draft" and _is_owner_role(current_user):
+            pass
+        else:
+            raise HTTPException(status_code=400, detail="AI generate only available on drafts")
         if not _can_edit_estimate_lines(current_user, estimate):
             raise HTTPException(status_code=403, detail="Not allowed")
 
@@ -1508,6 +1521,7 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         try:
             import re
             from google.genai import types
+            from main import _extract_json_from_gemini
             contents = [prompt]
             for att in attachments[:6]:
                 if att.file_path and os.path.exists(att.file_path):
@@ -1520,14 +1534,16 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
             response = get_gemini_client().models.generate_content(
                 model="gemini-2.5-flash",
                 contents=contents,
+                config={"response_mime_type": "application/json"},
             )
-            raw = (response.text or "").strip()
-            raw = re.sub(r"```json\s*", "", raw)
-            raw = re.sub(r"```\s*", "", raw).strip()
-            match = re.search(r"\{.*\}", raw, re.DOTALL)
-            if match:
-                raw = match.group(0)
-            parsed = json.loads(raw)
+            try:
+                parsed = _extract_json_from_gemini(response)
+            except json.JSONDecodeError:
+                response = get_gemini_client().models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=contents,
+                )
+                parsed = _extract_json_from_gemini(response)
         except HTTPException:
             raise
         except json.JSONDecodeError as e:
@@ -1603,6 +1619,62 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         preview["period_start"] = period_start
         preview["period_end"] = period_end
         return preview
+
+    @app.get("/jobs/{job_id}/invoices/preview-pdf")
+    def preview_invoice_pdf(
+        job_id: int,
+        markup_percent: float | None = None,
+        period_start: str | None = None,
+        period_end: str | None = None,
+        include_receipts: bool = False,
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        job = db.query(models.Job).filter(
+            models.Job.job_id == job_id,
+            models.Job.company_id == current_user.company_id,
+        ).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        company = db.query(models.Company).filter(
+            models.Company.company_id == current_user.company_id
+        ).first()
+        markup = markup_percent
+        if markup is None:
+            markup = float(getattr(company, "default_markup_percent", 15) or 15)
+
+        ps = _parse_date(period_start)
+        pe = _parse_date(period_end)
+        sweep = _sweep_unbilled_costs(db, job_id, current_user.company_id, ps, pe)
+        if not sweep["timesheets"] and not sweep["materials"] and not sweep["mileage"]:
+            raise HTTPException(status_code=400, detail="No unbilled hours, materials, or mileage for this project")
+
+        preview = _preview_from_sweep(sweep, markup)
+        line_items_out = preview["line_items"]
+        draft_number = _next_invoice_number(db, current_user.company_id)
+        fake_invoice = SimpleNamespace(
+            invoice_id=0,
+            invoice_number=f"{draft_number} (Preview)",
+            created_at=datetime.utcnow(),
+            markup_percent=markup,
+            raw_subtotal=preview["raw_subtotal"],
+            markup_amount=preview["markup_amount"],
+            total=preview["total"],
+        )
+        try:
+            pdf_bytes = _build_invoice_pdf_bytes(
+                fake_invoice, job, company, line_items_out,
+                receipt_urls=sweep["receipt_urls"] if include_receipts else [],
+            )
+        except ImportError:
+            raise HTTPException(status_code=503, detail="PDF generation is not available on this server")
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="invoice_preview_{job_id}.pdf"'},
+        )
 
     @app.post("/jobs/{job_id}/invoices/generate")
     def generate_cost_plus_invoice(

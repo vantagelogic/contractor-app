@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 from database import get_db, engine
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import models
@@ -37,6 +37,48 @@ def get_gemini_client():
             raise HTTPException(status_code=503, detail="Voice/AI features are not configured.")
         _gemini_client = google_genai.Client(api_key=api_key)
     return _gemini_client
+
+
+def _extract_json_from_gemini(response) -> dict:
+    """Parse JSON from Gemini responses — handles markdown fences and nested objects."""
+    raw = (getattr(response, "text", None) or "").strip()
+    if not raw and getattr(response, "candidates", None):
+        c0 = response.candidates[0]
+        content = getattr(c0, "content", None)
+        parts = getattr(content, "parts", None) if content else None
+        if parts:
+            raw = "".join(getattr(p, "text", "") or "" for p in parts).strip()
+    raw = re.sub(r"```json\s*", "", raw)
+    raw = re.sub(r"```\s*", "", raw).strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    start = raw.find("{")
+    if start < 0:
+        raise json.JSONDecodeError("No JSON object in response", raw, 0)
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(raw[start:i + 1])
+    raise json.JSONDecodeError("Unbalanced braces in JSON", raw, start)
 
 import stripe
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -395,6 +437,131 @@ def _timesheet_labour_cost(ts, emp, company) -> float:
     elif _timesheet_ot_hours(ts) > 0:
         cost += _timesheet_ot_hours(ts) * rate * _company_ot_multiplier(company)
     return cost
+
+
+# ── MCP data tools (used by /home/briefing and future MCP server) ──
+
+def mcp_get_project_health(db, company_id: int) -> list[dict]:
+    """Return all active projects with spend, hours, margin, and health status."""
+    jobs = db.query(models.Job).filter(
+        models.Job.company_id == company_id,
+        models.Job.status == "active",
+    ).all()
+    results = []
+    company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
+    for job in jobs:
+        timesheets = db.query(models.Timesheet).filter(models.Timesheet.job_id == job.job_id).all()
+        materials = db.query(models.Material).filter(models.Material.job_id == job.job_id).all()
+        total_hours = sum(float(t.hours_worked or 0) for t in timesheets)
+        mat_cost = sum(float(m.total_cost or 0) for m in materials)
+        labour_cost = sum(
+            _timesheet_labour_cost(
+                t,
+                db.query(models.Employee).filter(models.Employee.employee_id == t.employee_id).first(),
+                company,
+            )
+            for t in timesheets
+        )
+        total_cost = labour_cost + mat_cost
+        contract = float(job.contract_value or 0)
+        budgeted_hours = float(job.budgeted_hours or 0)
+        margin_pct = round(((contract - total_cost) / contract * 100), 1) if contract > 0 else None
+        hours_pct = round((total_hours / budgeted_hours * 100), 1) if budgeted_hours > 0 else None
+        health = "over_budget" if (contract > 0 and total_cost > contract) else \
+            "watch" if (hours_pct and hours_pct >= 85) else "on_track"
+        results.append({
+            "job_id": job.job_id,
+            "name": job.job_name,
+            "contract": contract,
+            "total_cost": round(total_cost, 2),
+            "labour_cost": round(labour_cost, 2),
+            "mat_cost": round(mat_cost, 2),
+            "total_hours": round(total_hours, 1),
+            "budgeted_hours": budgeted_hours,
+            "hours_pct": hours_pct,
+            "margin_pct": margin_pct,
+            "health": health,
+        })
+    return results
+
+
+def mcp_get_crew_logging_status(db, company_id: int) -> list[dict]:
+    """Return which crew members have or haven't logged hours this week."""
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    employees = db.query(models.Employee).filter(
+        models.Employee.company_id == company_id,
+        models.Employee.active == True,  # noqa: E712
+    ).all()
+    results = []
+    for emp in employees:
+        logged_this_week = db.query(models.Timesheet).filter(
+            models.Timesheet.employee_id == emp.employee_id,
+            models.Timesheet.shift_date >= week_start,
+        ).count()
+        last_entry = db.query(models.Timesheet).filter(
+            models.Timesheet.employee_id == emp.employee_id,
+        ).order_by(models.Timesheet.shift_date.desc()).first()
+        results.append({
+            "employee_id": emp.employee_id,
+            "name": f"{emp.first_name} {emp.last_name}",
+            "logged_this_week": logged_this_week > 0,
+            "entries_this_week": logged_this_week,
+            "last_logged": str(last_entry.shift_date) if last_entry else None,
+        })
+    return results
+
+
+def mcp_get_pending_requests(db, company_id: int) -> list[dict]:
+    """Return all pending requests awaiting admin action."""
+    reqs = db.query(models.Request).filter(
+        models.Request.company_id == company_id,
+        models.Request.status == "pending",
+    ).order_by(models.Request.created_at.desc()).all()
+    results = []
+    for r in reqs:
+        emp = db.query(models.Employee).filter(models.Employee.employee_id == r.employee_id).first()
+        job = db.query(models.Job).filter(models.Job.job_id == r.job_id).first()
+        results.append({
+            "request_id": r.request_id,
+            "type": r.request_type,
+            "description": r.description,
+            "employee": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "job": job.job_name if job else "Unknown",
+            "created_at": str(r.created_at.date()) if r.created_at else None,
+        })
+    return results
+
+
+def mcp_get_weekly_spend(db, company_id: int) -> dict:
+    """Return total labour and materials spend for the current week."""
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    company = db.query(models.Company).filter(models.Company.company_id == company_id).first()
+    timesheets = db.query(models.Timesheet).filter(
+        models.Timesheet.company_id == company_id,
+        models.Timesheet.shift_date >= week_start,
+    ).all()
+    materials = db.query(models.Material).filter(
+        models.Material.company_id == company_id,
+        models.Material.purchase_date >= week_start,
+    ).all()
+    labour = sum(
+        _timesheet_labour_cost(
+            t,
+            db.query(models.Employee).filter(models.Employee.employee_id == t.employee_id).first(),
+            company,
+        )
+        for t in timesheets
+    )
+    mat = sum(float(m.total_cost or 0) for m in materials)
+    return {
+        "week_start": str(week_start),
+        "labour_cost": round(labour, 2),
+        "materials_cost": round(mat, 2),
+        "total_cost": round(labour + mat, 2),
+        "timesheet_entries": len(timesheets),
+    }
 
 
 def send_welcome_email(to_email: str, company_name: str):
@@ -1618,6 +1785,121 @@ class HelpChatRequest(BaseModel):
     message: str
     role: str = "crew"
     history: list[HelpChatMessage] = []
+
+
+class BriefingRequest(BaseModel):
+    pass
+
+
+class FollowUpMessage(BaseModel):
+    message: str
+    history: list[dict] = []
+    briefing_data: dict = {}
+
+
+@app.post("/home/briefing")
+@limiter.limit("10/minute")
+def get_home_briefing(
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner or admin only.")
+
+    projects = mcp_get_project_health(db, current_user.company_id)
+    crew_status = mcp_get_crew_logging_status(db, current_user.company_id)
+    pending = mcp_get_pending_requests(db, current_user.company_id)
+    spend = mcp_get_weekly_spend(db, current_user.company_id)
+
+    over_budget = [p for p in projects if p["health"] == "over_budget"]
+    watch = [p for p in projects if p["health"] == "watch"]
+    not_logged = [c for c in crew_status if not c["logged_this_week"]]
+
+    data_summary = f"""
+Today: {date.today().strftime("%A, %B %d")}
+Active projects: {len(projects)}
+Over budget: {[p['name'] for p in over_budget]}
+Watching (>85% hours used): {[p['name'] for p in watch]}
+Pending requests: {len(pending)} ({[r['type'] for r in pending[:3]]})
+Crew not logged this week: {[c['name'] for c in not_logged]}
+This week spend: Labour ${spend['labour_cost']:,.2f} / Materials ${spend['materials_cost']:,.2f} / Total ${spend['total_cost']:,.2f}
+"""
+
+    prompt = f"""You are the daily briefing assistant for Vantage Logic, a project costing app for trades contractors.
+Write a concise 2-4 sentence morning briefing for the owner based on this live data.
+Be direct and trades-friendly. Flag anything that needs attention. If everything looks good, say so briefly.
+Do not use bullet points. Write in plain conversational sentences. Start with the most important thing.
+
+{data_summary}"""
+
+    try:
+        response = get_gemini_client().models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt],
+        )
+        briefing_text = (response.text or "").strip()
+    except Exception as e:
+        print(f"Home briefing error: {e}")
+        briefing_text = (
+            f"{len(over_budget)} project(s) over budget. "
+            f"{len(pending)} pending request(s). "
+            f"{len(not_logged)} crew member(s) haven't logged this week."
+        )
+
+    return {
+        "briefing": briefing_text,
+        "data": {
+            "projects": projects,
+            "crew_status": crew_status,
+            "pending_requests": pending,
+            "weekly_spend": spend,
+            "flags": {
+                "over_budget_count": len(over_budget),
+                "watch_count": len(watch),
+                "not_logged_count": len(not_logged),
+                "pending_count": len(pending),
+            },
+        },
+    }
+
+
+@app.post("/home/followup")
+@limiter.limit("20/minute")
+def home_followup(
+    request: Request,
+    body: FollowUpMessage,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner or admin only.")
+
+    data_context = json.dumps(body.briefing_data, indent=2)[:3000]
+
+    system = f"""You are a business intelligence assistant for a trades contractor using Vantage Logic.
+You have access to their live project data below. Answer questions directly and concisely.
+Use plain language. If you don't know something from the data, say so — don't make up numbers.
+
+LIVE DATA:
+{data_context}
+"""
+    contents = [system]
+    for msg in body.history[-8:]:
+        label = "Owner" if msg.get("role") == "user" else "Assistant"
+        contents.append(f"{label}: {msg.get('text', '').strip()}")
+    contents.append(f"Owner: {body.message.strip()}")
+
+    try:
+        response = get_gemini_client().models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+        )
+        return {"reply": (response.text or "").strip()}
+    except Exception as e:
+        print(f"Home followup error: {e}")
+        return {"reply": "Sorry, I couldn't pull that right now. Try again in a moment."}
+
 
 @app.post("/help-chat")
 @limiter.limit("20/minute")
@@ -2952,11 +3234,29 @@ def get_requests(
                 participants.append(f"{pe.first_name} {pe.last_name}")
 
         is_mine = r.employee_id == current_user.employee_id
+        from_office = False
+        if r.reviewed_by and r.request_type == "Discussion":
+            reviewer = db.query(models.User).filter(models.User.user_id == r.reviewed_by).first()
+            if reviewer and reviewer.role in ["owner", "admin"]:
+                from_office = True
+
+        display_name = f"{emp.first_name} {emp.last_name}" if emp else "Unknown"
+        if from_office and r.reviewed_by:
+            reviewer = db.query(models.User).filter(models.User.user_id == r.reviewed_by).first()
+            if reviewer and reviewer.employee_id:
+                re = db.query(models.Employee).filter(models.Employee.employee_id == reviewer.employee_id).first()
+                if re:
+                    display_name = f"{re.first_name} {re.last_name}"
+                else:
+                    display_name = "Office"
+            else:
+                display_name = "Office"
 
         result.append({
             "request_id": r.request_id,
-            "employee_name": f"{emp.first_name} {emp.last_name}" if emp else "Unknown",
+            "employee_name": display_name,
             "is_mine": is_mine,
+            "from_office": from_office,
             "job_name": job.job_name if job else "Unknown",
             "job_id": r.job_id,
             "request_type": r.request_type,
@@ -2988,69 +3288,130 @@ def create_request(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.employee_id:
-        raise HTTPException(status_code=400, detail="Account not linked to an employee")
+    is_office = current_user.role in ["owner", "admin"]
+    if is_office:
+        emp_id = current_user.employee_id
+        if not emp_id:
+            sched = db.query(models.Schedule).filter(
+                models.Schedule.job_id == job_id,
+                models.Schedule.company_id == current_user.company_id,
+            ).first()
+            if sched:
+                emp_id = sched.employee_id
+            else:
+                fallback = db.query(models.Employee).filter(
+                    models.Employee.company_id == current_user.company_id,
+                    models.Employee.active == True,
+                ).first()
+                if not fallback:
+                    raise HTTPException(status_code=400, detail="Add at least one crew member before starting a thread")
+                emp_id = fallback.employee_id
+        initial_status = "acknowledged" if request_type == "Discussion" else "pending"
+    else:
+        if not current_user.employee_id:
+            raise HTTPException(status_code=400, detail="Account not linked to an employee")
+        emp_id = current_user.employee_id
+        initial_status = "pending"
+
     req = models.Request(
         company_id=current_user.company_id,
-        employee_id=current_user.employee_id,
+        employee_id=emp_id,
         job_id=job_id,
         request_type=request_type,
         description=description,
         inventory_id=inventory_id,
         quantity_requested=quantity_requested,
-        status="pending"
+        status=initial_status,
     )
+    if is_office and initial_status == "acknowledged":
+        from datetime import datetime
+        req.reviewed_at = datetime.utcnow()
+        req.reviewed_by = current_user.user_id
     db.add(req)
     db.commit()
     db.refresh(req)
 
-    # Notify all owners
-    owners = db.query(models.User).filter(
-        models.User.company_id == current_user.company_id,
-        models.User.role.in_(["owner", "admin"])
-    ).all()
-    emp = db.query(models.Employee).filter(models.Employee.employee_id == current_user.employee_id).first()
-    emp_name = f"{emp.first_name} {emp.last_name}" if emp else "A crew member"
     job = db.query(models.Job).filter(models.Job.job_id == job_id).first()
-    for owner in owners:
-        notif = models.Notification(
-            company_id=current_user.company_id,
-            user_id=owner.user_id,
-            type="new_request",
-            title=f"New {request_type} Request",
-            message=f"{emp_name} on {job.job_name if job else 'a job'}",
-            related_id=req.request_id,
-            related_type="request"
-        )
-        db.add(notif)
-    db.commit()
+    job_name = job.job_name if job else "a job"
 
-    # Notify crew on same job for safety/equipment issues
-    if request_type in ["Safety Concern", "Equipment Issue"]:
+    if is_office:
+        # Notify crew scheduled on this job
         job_schedules = db.query(models.Schedule).filter(
             models.Schedule.job_id == job_id,
-            models.Schedule.company_id == current_user.company_id
+            models.Schedule.company_id == current_user.company_id,
         ).all()
-        notified_crew = set()
+        notified = set()
+        office_label = "Office"
+        if current_user.employee_id:
+            oe = db.query(models.Employee).filter(models.Employee.employee_id == current_user.employee_id).first()
+            if oe:
+                office_label = f"{oe.first_name} {oe.last_name}"
         for sched in job_schedules:
-            if sched.employee_id == current_user.employee_id or sched.employee_id in notified_crew:
+            if sched.employee_id in notified:
                 continue
-            notified_crew.add(sched.employee_id)
+            notified.add(sched.employee_id)
             crew_user = db.query(models.User).filter(
                 models.User.employee_id == sched.employee_id,
-                models.User.company_id == current_user.company_id
+                models.User.company_id == current_user.company_id,
             ).first()
-            if crew_user:
+            if crew_user and crew_user.user_id != current_user.user_id:
                 db.add(models.Notification(
                     company_id=current_user.company_id,
                     user_id=crew_user.user_id,
                     type="new_request",
-                    title=f"{request_type} reported on {job.job_name if job else 'your job'}",
-                    message=f"{emp_name}: {description[:60] if description else 'No details'}",
+                    title=f"Message from {office_label} on {job_name}",
+                    message=(description[:80] if description else request_type),
                     related_id=req.request_id,
-                    related_type="request"
+                    related_type="request",
                 ))
         db.commit()
+    else:
+        # Notify all owners
+        owners = db.query(models.User).filter(
+            models.User.company_id == current_user.company_id,
+            models.User.role.in_(["owner", "admin"])
+        ).all()
+        emp = db.query(models.Employee).filter(models.Employee.employee_id == current_user.employee_id).first()
+        emp_name = f"{emp.first_name} {emp.last_name}" if emp else "A crew member"
+        for owner in owners:
+            notif = models.Notification(
+                company_id=current_user.company_id,
+                user_id=owner.user_id,
+                type="new_request",
+                title=f"New {request_type} Request",
+                message=f"{emp_name} on {job_name}",
+                related_id=req.request_id,
+                related_type="request"
+            )
+            db.add(notif)
+        db.commit()
+
+        # Notify crew on same job for safety/equipment issues
+        if request_type in ["Safety Concern", "Equipment Issue"]:
+            job_schedules = db.query(models.Schedule).filter(
+                models.Schedule.job_id == job_id,
+                models.Schedule.company_id == current_user.company_id
+            ).all()
+            notified_crew = set()
+            for sched in job_schedules:
+                if sched.employee_id == current_user.employee_id or sched.employee_id in notified_crew:
+                    continue
+                notified_crew.add(sched.employee_id)
+                crew_user = db.query(models.User).filter(
+                    models.User.employee_id == sched.employee_id,
+                    models.User.company_id == current_user.company_id
+                ).first()
+                if crew_user:
+                    db.add(models.Notification(
+                        company_id=current_user.company_id,
+                        user_id=crew_user.user_id,
+                        type="new_request",
+                        title=f"{request_type} reported on {job_name}",
+                        message=f"{emp_name}: {description[:60] if description else 'No details'}",
+                        related_id=req.request_id,
+                        related_type="request"
+                    ))
+            db.commit()
     return req
 
 @app.patch("/requests/{request_id}/approve")
@@ -3259,11 +3620,29 @@ def add_comment(
                 models.User.role.in_(["owner", "admin"])
             ).all()
         else:
-            crew_user = db.query(models.User).filter(
-                models.User.employee_id == req.employee_id,
-                models.User.company_id == current_user.company_id
-            ).first()
-            targets = [crew_user] if crew_user else []
+            targets = []
+            job_schedules = db.query(models.Schedule).filter(
+                models.Schedule.job_id == req.job_id,
+                models.Schedule.company_id == current_user.company_id,
+            ).all()
+            notified = set()
+            for sched in job_schedules:
+                if sched.employee_id in notified:
+                    continue
+                notified.add(sched.employee_id)
+                crew_user = db.query(models.User).filter(
+                    models.User.employee_id == sched.employee_id,
+                    models.User.company_id == current_user.company_id,
+                ).first()
+                if crew_user:
+                    targets.append(crew_user)
+            if not targets:
+                crew_user = db.query(models.User).filter(
+                    models.User.employee_id == req.employee_id,
+                    models.User.company_id == current_user.company_id,
+                ).first()
+                if crew_user:
+                    targets = [crew_user]
         for target in targets:
             if target and target.user_id != current_user.user_id:
                 notif = models.Notification(
