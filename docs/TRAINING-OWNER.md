@@ -22,14 +22,18 @@ VantageLogic helps trades companies track where money goes on every project in r
 
 ## Navigation (Owner / Admin)
 
+**Desktop:** left sidebar · **Mobile:** ☰ menu (top-left)
+
 | Tab | Purpose |
 |-----|---------|
-| **Dashboard** | Live project profitability, margins, change orders |
+| **Home** | Morning briefing, today's action plan, items needing attention, voice log |
+| **Dashboard** | Live project profitability, margins, change orders; expand → **Set up project** |
 | **Schedule** | Assign shifts; drag-and-drop templates on desktop |
+| **Inventory** | Stock items, photos, assign to projects |
 | **Requests** | Approve/deny crew requests; comment threads |
-| **Estimate** | Customer estimates; review crew site quotes |
+| **Estimates** | Customer estimates; review crew site quotes |
 | **Billing** | Cost-plus client invoices from logged costs |
-| **Settings** | Company, projects, crew, work types, estimating, inventory, financials, exports |
+| **Settings** | Company, projects, crew, work types, estimating, financials, exports |
 
 **Also available:** Notification bell (top right), AI Help assistant (floating button).
 
@@ -49,13 +53,15 @@ Complete these steps before inviting crew. The in-app checklist on the Dashboard
 - **Budgeted hours** — your estimate; even rough numbers help flag overruns
 
 ### 2. Set up work types
-**Settings → Work Types**
+**Settings → Job setup → Work types**
 
 Work types label where time and money go on a project. Crew pick one on every timesheet.
 
 Examples: Framing, Electrical, Plumbing, Demo, Tile, Finishing
 
 > **Important:** Set these up before crew start logging. Without work types, timesheets cannot be submitted.
+
+**Alternate path:** Dashboard → expand project → **Set up project** → section **2 · Work types**
 
 ### 3. Add crew members
 **Settings → Crew Management**
@@ -73,7 +79,7 @@ For each person:
 For each crew member:
 1. Enter their email and a temporary password
 2. Select role: Crew (or Admin if appropriate)
-3. Link them to their employee record
+3. Link them to their crew record
 4. Share the app URL and their login credentials
 
 **Share message template:**
@@ -86,7 +92,7 @@ For each crew member:
 
 - **Job types** — e.g. Bathroom Reno, Kitchen Remodel
 - **Work category templates** — reusable packages with default hours and material costs
-- Powers AI estimate suggestions for office and field quotes
+- Powers AI estimate suggestions for office and site quotes
 
 ### 6. Optional — Financial defaults
 **Settings → Financials**
@@ -106,9 +112,27 @@ For each crew member:
 - When on, crew log premium hours separately from regular hours
 
 ### 8. Optional — Inventory
-**Settings → Inventory**
+**Inventory** (main menu — not under Settings)
 
-Add stock items (name, unit, quantity, prices). Crew request pulls via Log → Materials → From Inventory.
+Add stock items (name, category, optional photo, quantity, prices). Assign to projects from Inventory or Dashboard project setup. Crew pull via Log → Materials → From Inventory.
+
+---
+
+## Home (Owner)
+
+### Morning briefing
+Weather, schedule snapshot, and company flags (over-budget projects, pending quotes, etc.).
+
+### Today's action plan
+Personal checklist for the day. Tap **Add from briefing** to pull suggested tasks from flagged items.
+
+### Needs action
+- Pending **site quotes** listed by project name — tap to open Estimates
+- Crew who haven't logged hours — **Send reminder notification**
+- Links to Dashboard, Requests, Schedule as needed
+
+### Voice log
+Same hold-to-lock microphone as crew: hold → speak → slide up to lock for hands-free → tap mic when done.
 
 ---
 
@@ -120,10 +144,7 @@ Add stock items (name, unit, quantity, prices). Crew request pulls via Log → M
 - Company totals: hours, labour, materials, revenue, margin
 
 ### Expand a project
-Tap/click a project card to see:
-- Timesheets (who, when, hours, work type)
-- Materials (purchases logged by crew)
-- Change orders (scope/value adjustments)
+Tap/click a project card to see timesheets, materials, change orders — or tap **Set up project** for contract, work types, crew assignment, and inventory.
 
 ### Change orders
 From an expanded project card:
@@ -172,23 +193,23 @@ Create reusable presets:
 
 ## Estimates
 
-### Office customer estimates
-**Estimate → select project → New estimate**
+### Customer estimates
+**Estimates → select project → New estimate**
 
-1. Add line items manually, or use **AI suggest** (describe the job in a few words)
+1. Add line items manually, or use **AI suggest** (describe the project in a few words)
 2. Adjust hours, materials, labour rate, mileage, tax
 3. Save draft → **Generate PDF**
 4. Send to customer (download/share PDF)
 5. **Approve estimate** when customer accepts — updates dashboard baseline
 
 ### Crew site quote review
-**Estimate → Pending review queue**
+**Estimates → Pending review queue**
 
 When crew submit site quotes from the field:
 
 | Action | Result |
 |--------|--------|
-| **Approve for customer** | Quote moves to office estimate workflow; crew notified |
+| **Approve for customer** | Quote moves to customer estimate workflow; crew notified |
 | **Return to field** | Crew gets reason; they revise and resubmit |
 | **Comment** | Discussion thread on the estimate |
 
@@ -204,7 +225,7 @@ Crew builds quote on site (Quote tab)
 
 ## Billing (Cost-Plus Invoicing)
 
-Turn logged job costs into client invoices.
+Turn logged project costs into client invoices.
 
 1. **Billing → select project**
 2. Review **unbilled** labour, materials, and mileage
@@ -230,7 +251,7 @@ No login required for subs — they use the link directly.
 
 ## Inventory
 
-**Settings → Inventory**
+**Inventory** (main menu)
 
 ### Two ways to charge inventory to a project
 
@@ -239,7 +260,7 @@ No login required for subs — they use the link directly.
    You: Approve under Requests → stock deducted
 
 2. **Direct assign (admin)**  
-   Inventory screen → Assign to project with quantity and work type
+   Inventory screen → **Assign**, or Dashboard → Set up project → inventory section
 
 ---
 
@@ -281,6 +302,7 @@ Floating button (bottom right on desktop; above nav on mobile).
 - Remembers conversation context within the session
 
 Example questions:
+- *How do I add a work type?*
 - *How do cost-plus invoices work?*
 - *How do I review crew site quotes?*
 - *How do I give crew app access?*
@@ -327,10 +349,10 @@ Populates sample projects, crew, and timesheets for exploration during trial. Us
 |-------|----------|
 | Dashboard shows $0 | Crew haven't logged yet, or no active projects |
 | Crew can't see a project | Confirm project status is Active |
-| Crew missing work types | Add in Settings → Work Types |
+| Crew missing work types | Add in Settings → Job setup → Work types |
 | Quote tab shows "Backend update required" | Redeploy latest API on Render |
 | AI features not working | Confirm GEMINI_API_KEY is set on server |
-| Crew account "not linked" | Settings → Crew → Edit → link to employee record |
+| Crew account "not linked" | Settings → Crew → Edit → link to crew record |
 | Export fails | Check date range; retry with smaller range |
 
 ---

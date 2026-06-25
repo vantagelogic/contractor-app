@@ -71,6 +71,17 @@ const isMobile = () => window.innerWidth < 768;
 const OWNER_VIEWS = ["home", "dashboard", "schedule", "inventory", "requests", "estimate", "billing", "settings"];
 const CREW_VIEWS = ["home", "field_estimate", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
 
+const INVENTORY_ITEM_TYPES = [
+  { id: "lumber", label: "Lumber", tip: "Check grade stamp, length, and species match your takeoff." },
+  { id: "electrical", label: "Electrical", tip: "Confirm wire gauge, amperage rating, and CSA/UL marking." },
+  { id: "plumbing", label: "Plumbing", tip: "Verify pipe size, material (PEX/copper/PVC), and pressure rating." },
+  { id: "fasteners", label: "Fasteners", tip: "Match screw length and coating to substrate (wood, metal, exterior)." },
+  { id: "drywall", label: "Drywall & finishing", tip: "Confirm sheet thickness (1/2\" vs 5/8\") and mold/moisture rating." },
+  { id: "paint", label: "Paint & coatings", tip: "Check sheen, interior/exterior, and colour code on the lid." },
+  { id: "hardware", label: "Hardware", tip: "Compare SKU or model number to the spec sheet." },
+  { id: "other", label: "Other", tip: "Snap a photo or note the supplier SKU so crew can confirm on site." },
+];
+
 function pushAppHistory(state) {
   window.history.pushState({ vl: true, ...state }, "");
 }
@@ -422,6 +433,7 @@ const HELP_QUICK_PROMPTS = {
     "I made a mistake on a timesheet",
   ],
   owner: [
+    "How do I add a work type?",
     "How do I create a project?",
     "How do cost-plus invoices work?",
     "How do I review crew site quotes?",
@@ -793,7 +805,7 @@ function OnboardingModal({ onClose }) {
       label: "Step 3 of 3",
       title: "Get Your Crew In the App",
       body: "Create logins for your crew so they can log hours, materials, and mileage from their phones. They only see their own assignments — nothing sensitive.",
-      tip: `Share this link with your crew:\n${window.location.origin}\nThey sign up, and you approve their access from Setup → Crew Access.`,
+      tip: `Share this link with your crew:\n${window.location.origin}\nThey sign up, and you approve their access from Settings → Crew Management.`,
     },
   ];
 
@@ -1457,13 +1469,12 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
   const [schedule, setSchedule] = useState([]);
   const [schedWeek, setSchedWeek] = useState(0);
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split("T")[0]);
-  const [voiceListening, setVoiceListening] = useState(false);
   const [voiceProcessing, setVoiceProcessing] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const [voiceResult, setVoiceResult] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [costCodes, setCostCodes] = useState([]);
+  const crewVoice = useVoiceRecorder();
   const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
 
   useEffect(() => {
@@ -1491,6 +1502,49 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
 
   const today = new Date().toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" });
   const firstName = stats?.employee_name?.split(" ")[0] || "";
+
+  async function parseCrewVoice(transcript) {
+    if (!transcript || transcript.trim().length < 3) {
+      setVoiceError("Nothing captured. Hold the mic, speak, then release or slide up to lock.");
+      return;
+    }
+    setVoiceError("");
+    setVoiceResult(null);
+    setVoiceProcessing(true);
+    try {
+      const res = await apiFetch(`${API}/voice/parse-entry`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const matchedJob = jobs.find(j => {
+          const jn = j.job_name.toLowerCase();
+          const hint = (data.job_name || "").toLowerCase();
+          return hint && (jn.includes(hint) || hint.includes(jn) || jn.split(" ").some(w => w.length > 3 && hint.includes(w)));
+        });
+        const matchedCC = costCodes.find(c => {
+          const ccStr = `${c.code} ${c.description}`.toLowerCase();
+          const hint = (data.cost_code || "").toLowerCase();
+          return hint && (ccStr.includes(hint) || hint.includes(c.code.toLowerCase()) || hint.split(" ").some(w => w.length > 3 && ccStr.includes(w)));
+        });
+        setVoiceResult({
+          ...data,
+          _matchedJobId: matchedJob ? String(matchedJob.job_id) : "",
+          _matchedJobName: matchedJob ? matchedJob.job_name : (data.job_name || ""),
+          _matchedCCId: matchedCC ? String(matchedCC.cost_code_id) : "",
+          _matchedCCLabel: matchedCC ? workTypeLabel(matchedCC) : (data.cost_code || ""),
+        });
+      } else {
+        setVoiceError(data.message || "Could not parse. Try again.");
+      }
+    } catch {
+      setVoiceError("Something went wrong. Try again.");
+    }
+    setVoiceProcessing(false);
+    crewVoice.setTranscript("");
+  }
 
   /* StatCard and QuickActionBtn moved to module scope */
 
@@ -1567,20 +1621,20 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
         <div style={{ marginBottom: "22px" }}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Voice Log</div>
           <VoiceInCardFrame processing={voiceProcessing} processingLabel="Reading your entry…">
-          <div style={{ ...styles.card, padding: "16px", minHeight: 88, background: voiceListening && !voiceProcessing ? `linear-gradient(135deg, ${theme.primary} 0%, #0d3d2e 100%)` : "white", transition: "background 0.3s" }}>
+          <div style={{ ...styles.card, padding: "16px", minHeight: 88, background: (crewVoice.listening || crewVoice.locked) && !voiceProcessing ? `linear-gradient(135deg, ${theme.primary} 0%, #0d3d2e 100%)` : "white", transition: "background 0.3s" }}>
             {voiceResult ? (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
                   <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>
                     {voiceResult.type === "timesheet" ? "Hours Entry" : voiceResult.type === "material" ? "Material Entry" : voiceResult.type === "mileage" ? "Mileage Entry" : "Request"}
                   </div>
-                  <button onClick={() => { setVoiceResult(null); setVoiceTranscript(""); setVoiceError(""); }} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontFamily: font.body }}>Redo</button>
+                  <button onClick={() => { setVoiceResult(null); crewVoice.setTranscript(""); setVoiceError(""); }} style={{ fontSize: "12px", color: theme.textSecondary, background: "none", border: `1px solid ${theme.border}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontFamily: font.body }}>Redo</button>
                 </div>
                 <div style={{ backgroundColor: theme.bg, borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
                   {voiceResult.type === "timesheet" && <>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Hours</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{voiceResult.hours || "?"}</span></div>
                     {voiceResult.overtime_hours > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Overtime</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.gold }}>{voiceResult.overtime_hours}</span></div>}
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.project}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.workCategory}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedCCLabel || voiceResult.cost_code || "?"}</span></div>
                     {voiceResult.cost_code_confidence === "low" && (
                       <div style={{ marginTop: "4px" }}>
@@ -1598,18 +1652,18 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
                   </>}
                   {voiceResult.type === "material" && <>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Item</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult.description || "?"}</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.project}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
                     {voiceResult.amount > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Amount</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>${voiceResult.amount}</span></div>}
                     {voiceResult.notes && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Notes</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.notes}</span></div>}
                   </>}
                   {voiceResult.type === "mileage" && <>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>KM</span><span style={{ fontSize: "13px", fontWeight: "700", color: theme.primary }}>{voiceResult.km || "?"}</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.project}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
                     {voiceResult.notes && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Notes</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.notes}</span></div>}
                   </>}
                   {voiceResult.type === "request" && <>
                     <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Type</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult.request_type || "Other"}</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>Job</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: "12px", color: theme.textSecondary }}>{T.project}</span><span style={{ fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{voiceResult._matchedJobName || voiceResult.job_name || "?"}</span></div>
                     {(voiceResult.description || voiceResult.notes) && <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}><span style={{ fontSize: "12px", color: theme.textSecondary, flexShrink: 0 }}>Details</span><span style={{ fontSize: "12px", color: theme.textPrimary, textAlign: "right" }}>{voiceResult.description || voiceResult.notes}</span></div>}
                   </>}
                 </div>
@@ -1630,101 +1684,32 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
                 <p style={{ fontSize: "11px", color: theme.textSecondary, textAlign: "center", marginTop: "10px", marginBottom: 0 }}>Review the entry on the next screen before it saves</p>
               </div>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <button
-                  type="button"
-                  onPointerDown={() => {
-                    setVoiceError("");
-                    setVoiceTranscript("");
-                    setVoiceResult(null);
-                    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    const recognition = new SR();
-                    recognition.lang = "en-CA";
-                    recognition.continuous = false;
-                    recognition.interimResults = true;
-                    window._crewVoiceRecognition = recognition;
-                    window._crewVoiceTranscript = "";
-                    recognition.onresult = (e) => {
-                      const t = Array.from(e.results).map(r => r[0].transcript).join("");
-                      setVoiceTranscript(t);
-                      window._crewVoiceTranscript = t;
-                    };
-                    recognition.onerror = (e) => {
-                      setVoiceListening(false);
-                      setVoiceError(e.error === "not-allowed" ? "Microphone access denied. Check your browser settings." : "Could not hear clearly. Try again.");
-                    };
-                    recognition.onend = async () => {
-                      setVoiceListening(false);
-                      const transcript = window._crewVoiceTranscript;
-                      if (!transcript || transcript.trim().length < 3) {
-                        setVoiceError("Nothing captured. Hold the button and speak clearly.");
-                        return;
-                      }
-                      setVoiceProcessing(true);
-                      try {
-                        const res = await apiFetch(`${API}/voice/parse-entry`, {
-                          method: "POST",
-                          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                          body: JSON.stringify({ transcript })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          const matchedJob = jobs.find(j => {
-                            const jn = j.job_name.toLowerCase();
-                            const hint = (data.job_name || "").toLowerCase();
-                            return hint && (jn.includes(hint) || hint.includes(jn) || jn.split(" ").some(w => w.length > 3 && hint.includes(w)));
-                          });
-                          const matchedCC = costCodes.find(c => {
-                            const ccStr = `${c.code} ${c.description}`.toLowerCase();
-                            const hint = (data.cost_code || "").toLowerCase();
-                            return hint && (ccStr.includes(hint) || hint.includes(c.code.toLowerCase()) || hint.split(" ").some(w => w.length > 3 && ccStr.includes(w)));
-                          });
-                          setVoiceResult({
-                            ...data,
-                            _matchedJobId: matchedJob ? String(matchedJob.job_id) : "",
-                            _matchedJobName: matchedJob ? matchedJob.job_name : (data.job_name || ""),
-                            _matchedCCId: matchedCC ? String(matchedCC.cost_code_id) : "",
-                            _matchedCCLabel: matchedCC ? workTypeLabel(matchedCC) : (data.cost_code || ""),
-                          });
-                        } else {
-                          setVoiceError(data.message || "Could not parse. Try again.");
-                        }
-                      } catch {
-                        setVoiceError("Something went wrong. Try again.");
-                      }
-                      setVoiceProcessing(false);
-                      setVoiceTranscript("");
-                    };
-                    setVoiceListening(true);
-                    recognition.start();
-                  }}
-                  onPointerUp={() => { if (window._crewVoiceRecognition) window._crewVoiceRecognition.stop(); }}
-                  onPointerLeave={() => { if (window._crewVoiceRecognition && voiceListening) window._crewVoiceRecognition.stop(); }}
-                  style={{ width: "60px", height: "60px", borderRadius: "50%", border: "none", backgroundColor: voiceListening ? "rgba(255,255,255,0.2)" : theme.accentLight, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s", boxShadow: voiceListening ? "0 0 0 10px rgba(255,255,255,0.12)" : "none" }}
-                >
-                  {voiceProcessing ? (
-                    <Spinner size={24} color={voiceListening ? "white" : theme.primary} />
-                  ) : (
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={voiceListening ? "white" : theme.primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                      <line x1="12" y1="19" x2="12" y2="23"/>
-                      <line x1="8" y1="23" x2="16" y2="23"/>
-                    </svg>
-                  )}
-                </button>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {voiceListening ? (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+                {voiceProcessing ? (
+                  <div style={{ width: 60, height: 60, borderRadius: "50%", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Spinner size={24} color={theme.primary} />
+                  </div>
+                ) : (
+                  <VoiceHoldButton voice={crewVoice} onDone={parseCrewVoice} disabled={voiceProcessing} size={60} />
+                )}
+                <div style={{ flex: 1, minWidth: 0, paddingTop: 4 }}>
+                  {(crewVoice.listening || crewVoice.locked) ? (
                     <>
-                      <div style={{ fontSize: "14px", fontWeight: "700", color: "white", marginBottom: "3px" }}>Listening... release when done</div>
-                      {voiceTranscript && <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{voiceTranscript}</div>}
+                      <div style={{ fontSize: "14px", fontWeight: "700", color: (crewVoice.listening || crewVoice.locked) && !voiceProcessing ? "white" : theme.primary, marginBottom: "3px" }}>
+                        {crewVoice.locked ? "Recording locked — tap mic when done" : "Listening… slide up on mic to lock"}
+                      </div>
+                      {(crewVoice.transcript || crewVoice.getTranscript()) && (
+                        <div style={{ fontSize: "12px", color: (crewVoice.listening || crewVoice.locked) && !voiceProcessing ? "rgba(255,255,255,0.85)" : theme.textSecondary, fontStyle: "italic", lineHeight: 1.4, maxHeight: 72, overflowY: "auto" }}>
+                          {crewVoice.transcript || crewVoice.getTranscript()}
+                        </div>
+                      )}
                     </>
-                  ) : voiceError ? (
-                    <div style={{ fontSize: "13px", color: theme.danger, fontWeight: "500" }}>{voiceError}</div>
+                  ) : voiceError || crewVoice.error ? (
+                    <div style={{ fontSize: "13px", color: theme.danger, fontWeight: "500" }}>{voiceError || crewVoice.error}</div>
                   ) : (
                     <>
                       <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary, marginBottom: "2px" }}>Log by voice</div>
-                      <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4 }}>Hold and speak. Works for hours, materials, mileage, or requests.</div>
+                      <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.45 }}>Hold the mic and speak. Slide your finger up into the lock zone to keep recording hands-free — then tap the mic when finished.</div>
                     </>
                   )}
                 </div>
@@ -2414,7 +2399,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 
               <label style={styles.label}>Which job is this for?</label>
               <select style={{ ...styles.input, marginBottom: "20px", fontSize: "15px" }} value={scanJob} onChange={e => { setScanJob(e.target.value); setScanError(""); }}>
-                <option value="">Select a job</option>
+                <option value="">{T.selectProject}</option>
                 {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
               </select>
 
@@ -2427,7 +2412,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
                 onChange={async (e) => {
                   const file = e.target.files[0];
                   if (!file) return;
-                  if (!scanJob) { setScanError("Select a job first."); return; }
+                  if (!scanJob) { setScanError(`Select a ${T.project.toLowerCase()} first.`); return; }
                   setScanError("");
                   setScanning(true);
                   setScanResult(null);
@@ -2478,7 +2463,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "32px 20px", backgroundColor: theme.bg, borderRadius: "12px", border: `1.5px dashed ${theme.border}` }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  <span style={{ fontSize: "13px", color: theme.textLight, fontFamily: font.body, textAlign: "center", lineHeight: 1.5 }}>Select a job above, then tap here to photograph your receipt</span>
+                  <span style={{ fontSize: "13px", color: theme.textLight, fontFamily: font.body, textAlign: "center", lineHeight: 1.5 }}>Select a {T.project.toLowerCase()} above, then tap here to photograph your receipt</span>
                 </div>
               )}
 
@@ -2947,6 +2932,25 @@ function UserManagement({ token, activeEmps, refreshSignal }) {
 }
 
 // ─── INVENTORY SCREEN ─────────────────────────────────────────
+function InventoryThumb({ token, inventoryId }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let objectUrl = null;
+    apiFetch(`${API}/inventory/${inventoryId}/image`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.blob() : null))
+      .then(blob => {
+        if (blob) {
+          objectUrl = URL.createObjectURL(blob);
+          setSrc(objectUrl);
+        }
+      })
+      .catch(() => {});
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [token, inventoryId]);
+  if (!src) return null;
+  return <img src={src} alt="" style={{ marginTop: 8, maxWidth: 120, maxHeight: 80, borderRadius: 8, border: `1px solid ${theme.border}`, objectFit: "cover" }} />;
+}
+
 function InventoryScreen({ token, readonly = false, embedded = false }) {
   const [items, setItems] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -2960,8 +2964,10 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
   const [assignForm, setAssignForm] = useState({ job_id: "", quantity: "", cost_code_id: "", notes: "" });
   const [assignErrors, setAssignErrors] = useState({});
   const [assigning, setAssigning] = useState(false);
-  const [form, setForm] = useState({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "" });
+  const [form, setForm] = useState({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "", item_type: "" });
   const [editForm, setEditForm] = useState({});
+  const [imageFile, setImageFile] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [errors, setErrors] = useState({});
 
   const UNITS = ["each", "box", "roll", "litre", "kg", "metre", "sheet", "bag", "pail", "tube"];
@@ -3040,10 +3046,33 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
     if (form.purchase_price) params.append("purchase_price", form.purchase_price);
     if (form.charge_out_price) params.append("charge_out_price", form.charge_out_price);
     if (form.notes) params.append("notes", form.notes);
+    if (form.item_type) params.append("item_type", form.item_type);
     const res = await apiFetch(`${API}/inventory?${params}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     setSubmitting(false);
-    if (res.ok) { showMsg("Item added."); setForm({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "" }); setShowForm(false); loadItems(); }
+    if (res.ok) {
+      const created = await res.json();
+      if (imageFile && created.inventory_id) {
+        setImageUploading(true);
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        await apiFetch(`${API}/inventory/${created.inventory_id}/image`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+        setImageUploading(false);
+        setImageFile(null);
+      }
+      showMsg("Item added."); setForm({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "", item_type: "" }); setShowForm(false); loadItems();
+    }
     else showMsg("Failed to add item.");
+  }
+
+  async function uploadItemImage(id, file) {
+    if (!file) return;
+    setImageUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await apiFetch(`${API}/inventory/${id}/image`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+    setImageUploading(false);
+    if (res.ok) { showMsg("Photo saved."); loadItems(); }
+    else showMsg("Could not upload photo.");
   }
 
   async function handleUpdate(id) {
@@ -3053,6 +3082,7 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
     if (editForm.quantity !== "") params.append("quantity", editForm.quantity);
     if (editForm.purchase_price !== "") params.append("purchase_price", editForm.purchase_price);
     if (editForm.charge_out_price !== "") params.append("charge_out_price", editForm.charge_out_price);
+    if (editForm.item_type !== undefined) params.append("item_type", editForm.item_type || "");
     const res = await apiFetch(`${API}/inventory/${id}?${params}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) { showMsg("Item updated."); setEditingId(null); loadItems(); }
     else showMsg("Failed to update.");
@@ -3151,6 +3181,16 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
           <label style={styles.label}>Item Name</label>
           <input style={errors.name ? styles.inputError : styles.input} placeholder="e.g. 2x4 Lumber, Drywall Screws" value={form.name} onChange={e => { setForm({...form, name: e.target.value}); setErrors({...errors, name: ""}); }} />
           {errors.name && <p style={styles.errorMsg}>{errors.name}</p>}
+          <label style={styles.label}>Item category</label>
+          <select style={styles.input} value={form.item_type} onChange={e => setForm({ ...form, item_type: e.target.value })}>
+            <option value="">Select type (helps crew confirm the right item)</option>
+            {INVENTORY_ITEM_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+          {form.item_type && (
+            <p style={{ fontSize: 12, color: theme.accent, margin: "6px 0 10px", lineHeight: 1.45, backgroundColor: theme.accentLight, padding: "8px 10px", borderRadius: 8 }}>
+              Tip: {INVENTORY_ITEM_TYPES.find(t => t.id === form.item_type)?.tip}
+            </p>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
             <div>
               <label style={styles.label}>Unit</label>
@@ -3173,9 +3213,11 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
           </div>
           <label style={styles.label}>Notes (optional)</label>
           <textarea style={styles.textarea} placeholder="Location, specs, supplier..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+          <label style={styles.label}>Photo (optional)</label>
+          <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} style={{ fontSize: 13, marginBottom: 10 }} />
           <div style={{ display: "flex", gap: "8px" }}>
-            <button style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting}>
-              {submitting ? <><Spinner /> Adding...</> : "Add to Inventory"}
+            <button style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={handleAdd} disabled={submitting || imageUploading}>
+              {submitting || imageUploading ? <><Spinner /> {imageUploading ? "Uploading photo…" : "Adding..."}</> : "Add to Inventory"}
             </button>
             <button style={{ ...styles.button, flex: 1, backgroundColor: "#888" }} onClick={() => setShowForm(false)}>Cancel</button>
           </div>
@@ -3214,12 +3256,18 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
                         {margin && <span style={{ color: theme.gold }}>Margin: {margin}%</span>}
                       </div>
                       {item.notes && <div style={{ fontSize: "11px", color: theme.textLight, marginTop: "3px", fontStyle: "italic" }}>{item.notes}</div>}
+                      {item.item_type && (
+                        <div style={{ fontSize: 11, color: theme.accent, marginTop: 4 }}>
+                          {INVENTORY_ITEM_TYPES.find(t => t.id === item.item_type)?.label || item.item_type}
+                        </div>
+                      )}
+                      {item.image_path && <InventoryThumb token={token} inventoryId={item.inventory_id} />}
                     </div>
                     <div style={{ display: "flex", gap: "5px", flexShrink: 0, flexWrap: "wrap" }}>
                       {!readonly && parseFloat(item.quantity || 0) > 0 && (
                         <button onClick={() => openAssign(item)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.goldLight, color: "#7c5518", fontWeight: "700", fontFamily: font.body }}>Assign</button>
                       )}
-                      <button onClick={() => { setEditingId(item.inventory_id); setEditForm({ name: item.name, unit: item.unit, quantity: String(item.quantity || 0), purchase_price: String(item.purchase_price || ""), charge_out_price: String(item.charge_out_price || "") }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
+                      <button onClick={() => { setEditingId(item.inventory_id); setEditForm({ name: item.name, unit: item.unit, quantity: String(item.quantity || 0), purchase_price: String(item.purchase_price || ""), charge_out_price: String(item.charge_out_price || ""), item_type: item.item_type || "" }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
                       <button onClick={() => handleRemove(item.inventory_id, item.name)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
                     </div>
                   </div>
@@ -3232,6 +3280,13 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
                       <div><label style={styles.label}>Purchase Price</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.purchase_price} onChange={e => setEditForm({...editForm, purchase_price: e.target.value})} /></div>
                       <div><label style={styles.label}>Charge-Out Price</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.charge_out_price} onChange={e => setEditForm({...editForm, charge_out_price: e.target.value})} /></div>
                     </div>
+                    <label style={styles.label}>Category</label>
+                    <select style={{ ...styles.input, marginBottom: 8 }} value={editForm.item_type || ""} onChange={e => setEditForm({ ...editForm, item_type: e.target.value })}>
+                      <option value="">—</option>
+                      {INVENTORY_ITEM_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                    <label style={styles.label}>Update photo</label>
+                    <input type="file" accept="image/*" disabled={imageUploading} onChange={e => uploadItemImage(item.inventory_id, e.target.files?.[0])} style={{ fontSize: 12, marginBottom: 8 }} />
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button onClick={() => handleUpdate(item.inventory_id)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px" }}>Save</button>
                       <button onClick={() => setEditingId(null)} style={{ ...styles.button, marginTop: 0, flex: 1, padding: "11px", backgroundColor: "#888" }}>Cancel</button>
@@ -4088,7 +4143,7 @@ function ScheduleScreen({ token, readonly = false }) {
   function validate() {
     const e = {};
     if (!form.employee_id) e.employee_id = "Select an employee";
-    if (!form.job_id) e.job_id = "Select a job";
+    if (!form.job_id) e.job_id = T.selectProject;
     if (!form.cost_code_id) e.cost_code_id = `Select a ${T.workCategory.toLowerCase()}`;
     if (!form.scheduled_date) e.scheduled_date = "Date is required";
     if (!form.scheduled_hours || parseFloat(form.scheduled_hours) <= 0) e.scheduled_hours = "Enter hours";
@@ -4327,7 +4382,7 @@ function ScheduleScreen({ token, readonly = false }) {
 
                   {/* Employee rows */}
                   {employees.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "40px", color: theme.textLight, fontSize: "13px" }}>No active crew. Add employees in Setup first.</div>
+                    <div style={{ textAlign: "center", padding: "40px", color: theme.textLight, fontSize: "13px" }}>No active crew. Add employees in Settings → Crew Management first.</div>
                   ) : employees.map(emp => {
                     const empHours = filteredSchedules.filter(s => s.employee_id === emp.employee_id).reduce((sum, s) => sum + Number(s.scheduled_hours || 0), 0);
                     return (
@@ -4559,7 +4614,7 @@ function ScheduleScreen({ token, readonly = false }) {
                   <div style={{ fontSize: "10px", fontWeight: "700", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Preview</div>
                   <div style={{ display: "inline-block", backgroundColor: templateForm.color, color: "white", borderRadius: "8px", padding: "9px 12px", minWidth: "130px" }}>
                     <div style={{ fontWeight: "700", fontSize: "12px" }}>{templateForm.name}</div>
-                    <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px" }}>{jobs.find(j => String(j.job_id) === String(templateForm.job_id))?.job_name || "Job"}</div>
+                    <div style={{ fontSize: "10px", opacity: 0.88, marginTop: "1px" }}>{jobs.find(j => String(j.job_id) === String(templateForm.job_id))?.job_name || T.project}</div>
                     <div style={{ fontSize: "10px", opacity: 0.75 }}>{workTypeLabel(costCodes.find(c => String(c.cost_code_id) === String(templateForm.cost_code_id))) || "Work type"} · {templateForm.hours}h</div>
                   </div>
                 </div>
@@ -4697,51 +4752,173 @@ function VoiceInCardFrame({ processing = false, processingLabel = "Reading your 
   );
 }
 
-function JobQuickEdit({ token, job, onSaved, onCancel, compact = false }) {
+function JobProjectSetup({ token, job, onSaved, onCancel, compact = false, onRefreshDetails = null }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [form, setForm] = useState({
     job_name: job.job_name || "",
     job_code: job.job_code || "",
+    street: job.street || "",
     city: job.city || "",
+    province: job.province || "",
+    postal_code: job.postal_code || "",
     contract_value: job.contract_value != null ? String(job.contract_value) : "",
     budgeted_hours: job.budgeted_hours != null ? String(job.budgeted_hours) : "",
+    budgeted_materials_cost: job.budgeted_materials_cost != null ? String(job.budgeted_materials_cost) : "",
+    notes: job.notes || "",
   });
+  const [employees, setEmployees] = useState([]);
+  const [costCodes, setCostCodes] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [newWorkType, setNewWorkType] = useState("");
+  const [crewRow, setCrewRow] = useState({
+    employee_id: "", cost_code_id: "", scheduled_date: new Date().toISOString().split("T")[0], scheduled_hours: "8",
+  });
+  const [invAssign, setInvAssign] = useState({ inventory_id: "", quantity: "", cost_code_id: "", notes: "" });
   const [saving, setSaving] = useState(false);
+  const [crewSaving, setCrewSaving] = useState(false);
+  const [invSaving, setInvSaving] = useState(false);
+  const [workSaving, setWorkSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
 
-  async function save() {
+  useEffect(() => {
+    Promise.all([
+      apiFetch(`${API}/employees`, { headers }).then(r => r.json()),
+      apiFetch(`${API}/cost-codes`, { headers }).then(r => r.json()),
+      apiFetch(`${API}/inventory`, { headers }).then(r => r.json()),
+    ]).then(([emps, ccs, inv]) => {
+      setEmployees(Array.isArray(emps) ? emps.filter(e => e.active !== false) : []);
+      setCostCodes(Array.isArray(ccs) ? ccs : []);
+      setInventory(Array.isArray(inv) ? inv : []);
+    }).catch(() => {});
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function flash(text) { setMsg(text); setTimeout(() => setMsg(""), 3500); }
+
+  async function saveDetails() {
     if (!form.job_name.trim()) { setError(`${T.project} name is required`); return; }
     setSaving(true);
     setError("");
     const params = { job_name: form.job_name.trim() };
-    if (form.city.trim()) params.city = form.city.trim();
-    if (form.job_code.trim()) params.job_code = form.job_code.trim();
+    ["city", "job_code", "street", "province", "postal_code", "notes"].forEach(k => {
+      if (form[k]?.trim()) params[k] = form[k].trim();
+    });
     if (form.contract_value !== "") params.contract_value = form.contract_value;
     if (form.budgeted_hours !== "") params.budgeted_hours = form.budgeted_hours;
+    if (form.budgeted_materials_cost !== "") params.budgeted_materials_cost = form.budgeted_materials_cost;
     const res = await apiFetch(`${API}/jobs/${job.job_id}?${new URLSearchParams(params)}`, { method: "PATCH", headers });
     setSaving(false);
     if (res.ok) {
+      flash("Project details saved.");
       onSaved(await res.json());
     } else {
       setError("Could not save changes. Try again.");
     }
   }
 
+  async function addWorkType() {
+    const name = newWorkType.trim();
+    if (!name) return;
+    setWorkSaving(true);
+    const code = workTypeToCode(name);
+    const res = await apiFetch(`${API}/cost-codes?${new URLSearchParams({ code, description: name })}`, { method: "POST", headers });
+    setWorkSaving(false);
+    if (res.ok) {
+      const cc = await res.json();
+      setCostCodes(prev => [...prev, cc]);
+      setNewWorkType("");
+      flash(`Work type "${name}" added.`);
+    } else {
+      flash("Could not add work type.");
+    }
+  }
+
+  async function assignCrew() {
+    if (!crewRow.employee_id || !crewRow.cost_code_id || !crewRow.scheduled_date) {
+      flash("Pick crew member, work type, and date.");
+      return;
+    }
+    setCrewSaving(true);
+    const res = await apiFetch(`${API}/schedules?${new URLSearchParams({ ...crewRow, job_id: job.job_id })}`, { method: "POST", headers });
+    setCrewSaving(false);
+    if (res.ok) {
+      flash("Crew assigned to this project.");
+      setCrewRow(r => ({ ...r, employee_id: "", scheduled_hours: "8" }));
+      onRefreshDetails?.();
+    } else {
+      flash("Could not assign crew.");
+    }
+  }
+
+  async function assignInventory() {
+    if (!invAssign.inventory_id || !invAssign.quantity) {
+      flash("Pick an inventory item and quantity.");
+      return;
+    }
+    setInvSaving(true);
+    const params = new URLSearchParams({ job_id: job.job_id, quantity: invAssign.quantity });
+    if (invAssign.cost_code_id) params.append("cost_code_id", invAssign.cost_code_id);
+    if (invAssign.notes) params.append("notes", invAssign.notes);
+    const res = await apiFetch(`${API}/inventory/${invAssign.inventory_id}/assign?${params}`, { method: "POST", headers });
+    setInvSaving(false);
+    if (res.ok) {
+      const data = await res.json();
+      flash(data.message || "Inventory assigned to project.");
+      setInvAssign({ inventory_id: "", quantity: "", cost_code_id: "", notes: "" });
+      apiFetch(`${API}/inventory`, { headers }).then(r => r.json()).then(d => setInventory(Array.isArray(d) ? d : []));
+      onRefreshDetails?.();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      flash(err.detail || "Could not assign inventory.");
+    }
+  }
+
+  async function setStatus(status) {
+    setStatusSaving(true);
+    const res = await apiFetch(`${API}/jobs/${job.job_id}/status?status=${status}`, { method: "PATCH", headers });
+    setStatusSaving(false);
+    if (res.ok) {
+      flash(`Project marked ${status}.`);
+      onSaved({ ...job, status });
+    }
+  }
+
+  const sectionStyle = { marginTop: compact ? 14 : 18, paddingTop: compact ? 14 : 18, borderTop: `1px solid ${theme.border}` };
+  const sectionTitle = { fontSize: 12, fontWeight: 700, color: theme.primary, textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 6 };
+  const sectionHint = { fontSize: 12, color: theme.textSecondary, margin: "0 0 12px", lineHeight: 1.45 };
+
   return (
     <div style={{ backgroundColor: theme.bg, borderRadius: 10, padding: compact ? "14px" : "18px", border: `1.5px solid ${theme.gold}`, marginBottom: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 4 }}>Project setup</div>
-      <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 14px", lineHeight: 1.45 }}>
-        Set the contract amount and hour budget so the dashboard can track profit and warn you when you&apos;re running hot.
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 4 }}>Set up this project</div>
+      <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
+        A <strong>project</strong> is a job you track end-to-end: contract value, hour budget, crew assignments, materials, and profit. Configure everything here — you won&apos;t need to jump between screens for basics.
       </p>
+      {msg && <p style={{ fontSize: 12, color: theme.accent, fontWeight: 600, margin: "0 0 10px" }}>{msg}</p>}
+
+      <div style={sectionTitle}>1 · Project details</div>
+      <p style={sectionHint}>Name, location, contract, and budgets used for dashboard alerts.</p>
       <label style={{ ...styles.label, marginTop: 0 }}>{T.project} name</label>
       <input style={styles.input} value={form.job_name} onChange={e => { setForm({ ...form, job_name: e.target.value }); setError(""); }} />
       <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10 }}>
+        <div>
+          <label style={styles.label}>Street</label>
+          <input style={styles.input} placeholder="123 Main St" value={form.street} onChange={e => setForm({ ...form, street: e.target.value })} />
+        </div>
         <div>
           <label style={styles.label}>City</label>
           <input style={styles.input} placeholder="e.g. Burnaby" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
         </div>
         <div>
-          <label style={styles.label}>Job code (optional)</label>
+          <label style={styles.label}>Province</label>
+          <input style={styles.input} placeholder="BC" value={form.province} onChange={e => setForm({ ...form, province: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Postal code</label>
+          <input style={styles.input} placeholder="V5H 1A1" value={form.postal_code} onChange={e => setForm({ ...form, postal_code: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Project code (optional)</label>
           <input style={styles.input} placeholder="e.g. JB-2024" value={form.job_code} onChange={e => setForm({ ...form, job_code: e.target.value })} />
         </div>
         <div>
@@ -4752,21 +4929,117 @@ function JobQuickEdit({ token, job, onSaved, onCancel, compact = false }) {
           <label style={styles.label}>Budgeted hours</label>
           <input style={styles.input} type="number" placeholder="Expected labour hours" value={form.budgeted_hours} onChange={e => setForm({ ...form, budgeted_hours: e.target.value })} />
         </div>
+        <div>
+          <label style={styles.label}>Materials budget ($)</label>
+          <input style={styles.input} type="number" placeholder="Expected materials spend" value={form.budgeted_materials_cost} onChange={e => setForm({ ...form, budgeted_materials_cost: e.target.value })} />
+        </div>
       </div>
+      <label style={styles.label}>Notes</label>
+      <textarea style={{ ...styles.input, minHeight: 64, resize: "vertical" }} placeholder="Access codes, client preferences, scope notes…" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
       {error && <p style={{ ...styles.errorMsg, marginTop: 8 }}>{error}</p>}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-        <button type="button" disabled={saving} onClick={save} style={{ ...styles.button, marginTop: 0, flex: 1, minWidth: 120 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+        <button type="button" disabled={saving} onClick={saveDetails} style={{ ...styles.button, marginTop: 0, flex: 1, minWidth: 140 }}>
           {saving ? <><Spinner /> Saving…</> : "Save project details"}
         </button>
-        {onCancel && (
-          <button type="button" onClick={onCancel} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888", flex: compact ? undefined : 1 }}>Done</button>
+        {job.status === "active" && (
+          <>
+            <button type="button" disabled={statusSaving} onClick={() => setStatus("completed")} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, padding: "10px 14px" }}>Mark complete</button>
+            <button type="button" disabled={statusSaving} onClick={() => setStatus("inactive")} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888", padding: "10px 14px" }}>Archive</button>
+          </>
         )}
       </div>
-      <button type="button" onClick={() => goToSettingsTab("categories")} style={{ marginTop: 10, background: "none", border: "none", color: theme.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font.body, padding: 0 }}>
-        Set up work types (framing, electrical, etc.) →
-      </button>
+
+      <div style={sectionStyle}>
+        <div style={sectionTitle}>2 · Work types</div>
+        <p style={sectionHint}>Categories crew pick when logging hours (framing, electrical, etc.).</p>
+        {costCodes.length === 0 ? (
+          <p style={{ fontSize: 12, color: theme.textLight, margin: "0 0 10px" }}>No work types yet — add your first one below.</p>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            {costCodes.map(cc => (
+              <span key={cc.cost_code_id} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 8, backgroundColor: "white", border: `1px solid ${theme.border}`, color: theme.textPrimary }}>{workTypeLabel(cc)}</span>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <input style={{ ...styles.input, marginTop: 0, flex: 1 }} placeholder="e.g. Framing" value={newWorkType} onChange={e => setNewWorkType(e.target.value)} />
+          <button type="button" disabled={workSaving || !newWorkType.trim()} onClick={addWorkType} style={{ ...styles.button, marginTop: 0, whiteSpace: "nowrap" }}>{workSaving ? "Adding…" : "+ Add type"}</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={sectionTitle}>3 · Assign crew</div>
+        <p style={sectionHint}>Schedule someone on this project. They&apos;ll see it on their Home screen.</p>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 8 }}>
+          <div>
+            <label style={{ ...styles.label, marginTop: 0 }}>Crew member</label>
+            <select style={styles.input} value={crewRow.employee_id} onChange={e => setCrewRow({ ...crewRow, employee_id: e.target.value })}>
+              <option value="">Select…</option>
+              {employees.map(emp => <option key={emp.employee_id} value={emp.employee_id}>{emp.first_name} {emp.last_name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>{T.workCategory}</label>
+            <select style={styles.input} value={crewRow.cost_code_id} onChange={e => setCrewRow({ ...crewRow, cost_code_id: e.target.value })}>
+              <option value="">Select…</option>
+              {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={styles.label}>Date</label>
+            <input style={styles.input} type="date" value={crewRow.scheduled_date} onChange={e => setCrewRow({ ...crewRow, scheduled_date: e.target.value })} />
+          </div>
+          <div>
+            <label style={styles.label}>Hours</label>
+            <input style={styles.input} type="number" value={crewRow.scheduled_hours} onChange={e => setCrewRow({ ...crewRow, scheduled_hours: e.target.value })} />
+          </div>
+        </div>
+        <button type="button" disabled={crewSaving} onClick={assignCrew} style={{ ...styles.button, marginTop: 10, backgroundColor: theme.primary }}>{crewSaving ? "Assigning…" : "Assign to this project"}</button>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={sectionTitle}>4 · Add from inventory</div>
+        <p style={sectionHint}>Pull stock from your warehouse onto this project&apos;s materials list.</p>
+        {inventory.length === 0 ? (
+          <p style={{ fontSize: 12, color: theme.textLight, margin: 0 }}>No inventory items yet — add stock on the Inventory screen first.</p>
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 8 }}>
+              <div>
+                <label style={{ ...styles.label, marginTop: 0 }}>Inventory item</label>
+                <select style={styles.input} value={invAssign.inventory_id} onChange={e => setInvAssign({ ...invAssign, inventory_id: e.target.value })}>
+                  <option value="">Select…</option>
+                  {inventory.map(item => (
+                    <option key={item.inventory_id} value={item.inventory_id}>{item.name} ({item.quantity} {item.unit} on hand)</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={styles.label}>Quantity</label>
+                <input style={styles.input} type="number" value={invAssign.quantity} onChange={e => setInvAssign({ ...invAssign, quantity: e.target.value })} />
+              </div>
+              <div>
+                <label style={styles.label}>{T.workCategory} (optional)</label>
+                <select style={styles.input} value={invAssign.cost_code_id} onChange={e => setInvAssign({ ...invAssign, cost_code_id: e.target.value })}>
+                  <option value="">—</option>
+                  {costCodes.map(cc => <option key={cc.cost_code_id} value={cc.cost_code_id}>{workTypeLabel(cc)}</option>)}
+                </select>
+              </div>
+            </div>
+            <button type="button" disabled={invSaving} onClick={assignInventory} style={{ ...styles.button, marginTop: 10, backgroundColor: theme.gold, color: theme.primaryDark }}>{invSaving ? "Adding…" : "Add to project materials"}</button>
+          </>
+        )}
+      </div>
+
+      {onCancel && (
+        <button type="button" onClick={onCancel} style={{ ...styles.button, marginTop: 14, width: "100%", backgroundColor: "#888" }}>Done editing</button>
+      )}
     </div>
   );
+}
+
+function JobQuickEdit(props) {
+  return <JobProjectSetup {...props} />;
 }
 
 function ProjectCreateForm({ token, onCreated, onCancel, minimal = false, embedded = false, showCancel = true, submitLabel = null }) {
@@ -4794,7 +5067,7 @@ function ProjectCreateForm({ token, onCreated, onCancel, minimal = false, embedd
     }
   }
 
-  const label = submitLabel || (minimal ? `Create ${T.project}` : "Create Job →");
+  const label = submitLabel || (minimal ? `Create ${T.project}` : `Create ${T.project} →`);
 
   return (
     <div style={embedded || minimal ? {} : { ...styles.card, maxWidth: "640px", padding: "28px" }}>
@@ -4955,7 +5228,7 @@ function JobSetupFlow({ token, employees, costCodes, onDone, onCancel }) {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <h3 style={{ fontSize: "18px", fontWeight: "700", color: theme.primary, margin: "0 0 8px", fontFamily: font.display }}>{createdJob.job_name} is ready</h3>
-          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.6 }}>Job created and crew assigned. Your crew can start logging hours and you'll see it live on the dashboard.</p>
+          <p style={{ fontSize: "13px", color: theme.textSecondary, marginBottom: "24px", lineHeight: 1.6 }}>Project created and crew assigned. Your crew can start logging hours and you'll see it live on the dashboard.</p>
           <button onClick={onDone} style={{ ...styles.button, width: "100%", marginTop: 0 }}>Done</button>
         </div>
       )}
@@ -5016,6 +5289,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
   ];
 
   const activeTabMeta = settingsTabGroups.flatMap(g => g.tabs).find(t => t.id === settingsTab);
+  const activeSettingsGroup = settingsTabGroups.find(g => g.tabs.some(t => t.id === settingsTab));
 
   useEffect(() => { setSettingsTab(initialTab); }, [initialTab]);
 
@@ -5058,7 +5332,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
 
   async function updateJob() {
     const res = await apiFetch(`${API}/jobs/${editingJob.job_id}?${new URLSearchParams(jobForm)}`, { method: "PATCH", headers });
-    if (res.ok) { showMsg("Job updated."); setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
+    if (res.ok) { showMsg(`${T.project} updated.`); setEditingJob(null); setJobForm({ job_name: "", city: "", contract_value: "", budgeted_hours: "" }); refresh(); }
     else showMsg("Error updating job.");
   }
 
@@ -5247,6 +5521,11 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
           <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
             {activeTabMeta && (
               <div style={{ marginBottom: 16, padding: "14px 16px", backgroundColor: theme.accentLight, borderRadius: 10, borderLeft: `4px solid ${theme.accent}` }}>
+                {activeSettingsGroup && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: theme.textLight, marginBottom: 6, letterSpacing: "0.2px" }}>
+                    Settings → {activeSettingsGroup.label} → {activeTabMeta.label}
+                  </div>
+                )}
                 <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 4, fontFamily: font.display }}>{activeTabMeta.label}</div>
                 <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>{activeTabMeta.desc}</p>
               </div>
@@ -5257,7 +5536,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
                 <ProfileSettingsForm token={token} showCompany={true} />
                 <div style={{ marginTop: 24, padding: 16, backgroundColor: theme.bg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>Demo Data</div>
-                  <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>Load sample jobs and crew to explore the app.</p>
+                  <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>Load sample projects and crew to explore the app.</p>
                   <button style={{ ...styles.button, backgroundColor: theme.accent, marginTop: 0, maxWidth: 220 }} onClick={loadDemoData} disabled={readonly}>Load Demo Data</button>
                 </div>
               </div>
@@ -5864,12 +6143,13 @@ function Dashboard({ token, readonly = false, topOffset = 0, setView = null }) {
                         compact
                         onSaved={() => { setEditingJobId(null); setFocusJobId(null); loadDashboard(); }}
                         onCancel={() => { setEditingJobId(null); setFocusJobId(null); }}
+                        onRefreshDetails={() => toggleJob(job.job_id)}
                       />
                     </div>
                   ) : !readonly && (
                     <div style={{ paddingTop: 12, marginBottom: 4 }}>
                       <button type="button" onClick={() => setEditingJobId(job.job_id)} style={{ fontSize: 12, fontWeight: 700, color: theme.accent, background: "none", border: `1px solid ${theme.accent}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: font.body }}>
-                        Edit contract, hours &amp; details
+                        Set up project — contract, crew, inventory
                       </button>
                     </div>
                   )}
@@ -6079,6 +6359,68 @@ function PlanPicker({ token, currentTier, crewCount, onClose, onSuccess }) {
   );
 }
 
+
+// ─── LOG MY DAY (tabbed crew logging) ─────────────────────────
+function resolveLogTab(tab) {
+  if (!tab || tab === "log") return "timesheet";
+  if (tab === "timesheet" || tab === "materials" || tab === "mileage") return tab;
+  return "timesheet";
+}
+
+function LogMyDay({ token, voicePrefill = null, onPrefillConsumed = null, readonly = false, setView = null, initialTab = "timesheet" }) {
+  const [logTab, setLogTab] = useState(() => resolveLogTab(initialTab));
+
+  useEffect(() => {
+    setLogTab(resolveLogTab(initialTab));
+  }, [initialTab]);
+
+  const formProps = { token, voicePrefill, onPrefillConsumed, readonly, setView };
+  const tabs = [
+    { id: "timesheet", label: "Hours" },
+    { id: "materials", label: "Materials" },
+    { id: "mileage", label: "Mileage" },
+  ];
+
+  return (
+    <div>
+      <div style={styles.container}>
+        <h1 style={styles.title}>Log my day</h1>
+        <p style={styles.subtitle}>Tell the office what you did today</p>
+        <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${theme.border}`, marginBottom: 4 }}>
+          {tabs.map(tab => {
+            const active = logTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setLogTab(tab.id)}
+                style={{
+                  flex: 1,
+                  padding: "12px 10px",
+                  border: "none",
+                  borderBottom: active ? `3px solid ${theme.gold}` : "3px solid transparent",
+                  marginBottom: -1,
+                  background: "none",
+                  color: active ? theme.primary : theme.textLight,
+                  fontWeight: active ? 700 : 500,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  fontFamily: font.body,
+                  transition: "color 0.15s, border-color 0.15s",
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {logTab === "timesheet" && <TimesheetForm {...formProps} />}
+      {logTab === "materials" && <MaterialsForm {...formProps} />}
+      {logTab === "mileage" && <MileageForm {...formProps} />}
+    </div>
+  );
+}
 
 // ─── LOG HUB ──────────────────────────────────────────────────
 function LogHub({ setView }) {
@@ -6649,7 +6991,7 @@ function notifTypeMeta(type) {
     new_comment: { color: theme.accent, label: "Request reply", hint: "New message on a request thread." },
     request_approved: { color: theme.accent, label: "Request approved", hint: "Your request was approved by the office." },
     request_denied: { color: theme.danger, label: "Request denied", hint: "Your request was declined — open to see why." },
-    field_estimate_submitted: { color: theme.gold, label: "Crew quote to review", hint: "A crew member finished a site quote and needs your approval before sending to the customer." },
+    field_estimate_submitted: { color: theme.gold, label: "Site quote to review", hint: "A crew site quote needs your approval — open Estimates to review and approve or return." },
     field_estimate_approved: { color: theme.accent, label: "Quote approved", hint: "The office approved your site quote — you can send it to the customer." },
     field_estimate_returned: { color: theme.danger, label: "Quote sent back", hint: "The office returned your quote with notes — open to make changes." },
     estimate_comment: { color: theme.accent, label: "Estimate message", hint: "Someone left a note on an estimate — open the thread to read it." },
@@ -6659,6 +7001,7 @@ function notifTypeMeta(type) {
     schedule_updated: { color: theme.accent, label: "Schedule change", hint: "One of your scheduled shifts was updated." },
     invoice_generated: { color: theme.primary, label: "Invoice ready", hint: "A new invoice was created and is ready to send." },
     magic_link_submit: { color: theme.gold, label: "Subcontractor form", hint: "A subcontractor submitted their paperwork via your link." },
+    log_hours_reminder: { color: theme.accent, label: "Hours reminder", hint: "Your office sent a reminder to log your timesheet." },
   };
   return map[type] || { color: theme.textSecondary, label: "Update", hint: "Open to see details." };
 }
@@ -6667,9 +7010,9 @@ function tabBadgeHint(tabId, badges) {
   if (!badges) return "";
   if (tabId === "estimate" || tabId === "field_estimate") {
     const parts = [];
-    if (badges.pending_estimates) parts.push(`${badges.pending_estimates} crew quote${badges.pending_estimates !== 1 ? "s" : ""} awaiting your review`);
+    if (badges.pending_estimates) parts.push(`${badges.pending_estimates} site quote${badges.pending_estimates !== 1 ? "s" : ""} awaiting your approval (Estimates tab)`);
     const estNotifs = badges.estimates || 0;
-    if (estNotifs) parts.push(`${estNotifs} estimate message${estNotifs !== 1 ? "s" : ""} or update${estNotifs !== 1 ? "s" : ""}`);
+    if (estNotifs) parts.push(`${estNotifs} estimate message${estNotifs !== 1 ? "s" : ""} in notifications`);
     return parts.join(" · ");
   }
   if (tabId === "requests" || tabId === "crew_requests") return badges.requests ? `${badges.requests} open request${badges.requests !== 1 ? "s" : ""}` : "";
@@ -8330,7 +8673,7 @@ function EstimateVoiceCapture({ voice, onTranscript, disabled = false, label = "
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary }}>{label}</div>
           <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 3, lineHeight: 1.4 }}>
-            Hold and speak — swipe up on the mic to keep recording while you walk the site. Tap when finished.
+            Hold the mic and speak. Slide up into the lock zone to record hands-free, then tap the mic when done.
           </div>
         </div>
       </div>
@@ -10183,6 +10526,40 @@ function MagicLinkScreen({ token: linkToken }) {
 
 // ─── HOME SCREEN (MCP briefing + capture) ─────────────────────
 
+function microphoneHelpMessage(reason) {
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    return "Voice needs HTTPS. Open https://app.vantagelogic.ca — not http:// or a local IP address on your phone.";
+  }
+  const r = reason?.name || reason?.error || reason || "";
+  if (r === "insecure") {
+    return "Voice needs HTTPS. Open https://app.vantagelogic.ca — not http:// or a local IP address on your phone.";
+  }
+  if (r === "NotAllowedError" || r === "not-allowed" || r === "Permission denied") {
+    return "Microphone blocked. Tap the lock/site icon in your browser address bar → allow Microphone → reload this page.";
+  }
+  if (r === "NotFoundError" || r === "devices-not-found") {
+    return "No microphone found. Plug in or enable a mic, then try again.";
+  }
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isIos = /iPad|iPhone|iPod/.test(ua);
+  const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua);
+  if (isIos && !isSafari) {
+    return "On iPhone, voice works in Safari. Open this link in Safari (not Chrome).";
+  }
+  return "Could not access microphone. Check browser permissions and try again.";
+}
+
+async function requestMicrophoneAccess() {
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    const err = new Error("insecure");
+    err.name = "insecure";
+    throw err;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) return;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  stream.getTracks().forEach(t => t.stop());
+}
+
 function useVoiceRecorder() {
   const [listening, setListening] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -10206,10 +10583,11 @@ function useVoiceRecorder() {
     };
     recognition.onerror = (e) => {
       if (e.error === "no-speech" && lockedRef.current) return;
+      if (e.error === "aborted") return;
       setListening(false);
       setLocked(false);
       lockedRef.current = false;
-      setError(e.error === "not-allowed" ? "Microphone access denied." : "Could not hear clearly. Try again.");
+      setError(microphoneHelpMessage(e));
     };
     recognition.onend = () => {
       if (lockedRef.current) {
@@ -10227,7 +10605,7 @@ function useVoiceRecorder() {
   }, []);
 
   const startSession = useCallback((continuous) => {
-    if (!supported) return;
+    if (!supported) return false;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SR();
     recognitionRef.current = recognition;
@@ -10240,24 +10618,39 @@ function useVoiceRecorder() {
     setListening(true);
     try {
       recognition.start();
+      return true;
     } catch {
       setListening(false);
       setError("Could not start microphone. Try again.");
+      return false;
     }
   }, [supported, attachRecognition]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     lockedRef.current = false;
     setLocked(false);
-    startSession(false);
-  }, [startSession]);
+    try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
+    transcriptRef.current = "";
+    setTranscript("");
+    setError("");
+    if (!supported) {
+      setError("Voice is not supported in this browser. Try Chrome, Edge, or Safari.");
+      return false;
+    }
+    try {
+      await requestMicrophoneAccess();
+    } catch (err) {
+      setListening(false);
+      setError(microphoneHelpMessage(err));
+      return false;
+    }
+    return startSession(true);
+  }, [supported, startSession]);
 
   const lockListening = useCallback(() => {
     lockedRef.current = true;
     setLocked(true);
-    try { recognitionRef.current?.stop(); } catch { /* restart via onend */ }
-    setTimeout(() => startSession(true), 150);
-  }, [startSession]);
+  }, []);
 
   const stopListening = useCallback(() => {
     lockedRef.current = false;
@@ -10275,86 +10668,149 @@ function useVoiceRecorder() {
   };
 }
 
-function VoiceHoldButton({ voice, onDone, disabled = false }) {
+function VoiceHoldButton({ voice, onDone, disabled = false, size = 56 }) {
   const startYRef = useRef(null);
   const didLockRef = useRef(false);
+  const suppressClickRef = useRef(false);
+  const cleanupRef = useRef(null);
+
+  useEffect(() => () => { cleanupRef.current?.(); }, []);
 
   function finishCapture() {
     const t = voice.getTranscript();
     voice.stopListening();
+    didLockRef.current = false;
     if (t?.trim()) onDone(t);
   }
 
+  function beginHold(e) {
+    if (disabled || voice.locked) return;
+    e.preventDefault();
+    cleanupRef.current?.();
+    const target = e.currentTarget;
+    const pointerId = e.pointerId;
+    startYRef.current = e.clientY;
+    didLockRef.current = false;
+    voice.setError("");
+
+    let holdActive = false;
+    let pending = true;
+
+    async function activateMic() {
+      const ok = await voice.startListening();
+      if (!pending) {
+        if (ok) voice.stopListening();
+        return;
+      }
+      if (!ok) {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+        startYRef.current = null;
+        pending = false;
+        return;
+      }
+      holdActive = true;
+      try { target?.setPointerCapture?.(pointerId); } catch { /* some browsers */ }
+    }
+
+    function onMove(ev) {
+      if (!holdActive || startYRef.current == null || didLockRef.current) return;
+      const dy = startYRef.current - ev.clientY;
+      if (dy > 28) {
+        didLockRef.current = true;
+        voice.lockListening();
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(12);
+      }
+    }
+
+    function endHold() {
+      pending = false;
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      const wasLocked = didLockRef.current;
+      startYRef.current = null;
+      if (!holdActive) return;
+      holdActive = false;
+      if (wasLocked) return;
+      suppressClickRef.current = true;
+      voice.stopListening();
+      setTimeout(() => {
+        const t = voice.getTranscript();
+        if (t?.trim()) onDone(t);
+        setTimeout(() => { suppressClickRef.current = false; }, 120);
+      }, 320);
+    }
+
+    function cleanup() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", endHold);
+      window.removeEventListener("pointercancel", endHold);
+    }
+    cleanupRef.current = cleanup;
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", endHold);
+    window.addEventListener("pointercancel", endHold);
+
+    activateMic();
+  }
+
+  const active = voice.listening || voice.locked;
+  const lockZoneHighlight = voice.listening && !voice.locked;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0, position: "relative", paddingTop: lockZoneHighlight ? 52 : 0 }}>
+      {lockZoneHighlight && (
+        <div style={{
+          position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+          width: Math.max(size + 24, 72), height: 46, borderRadius: 12,
+          border: `2px dashed ${theme.gold}`, backgroundColor: "rgba(200,151,58,0.12)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          pointerEvents: "none",
+        }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: theme.gold, textAlign: "center", lineHeight: 1.25, padding: "0 6px" }}>Slide up to lock</span>
+        </div>
+      )}
       <button
         type="button"
         disabled={disabled}
-        onPointerDown={(e) => {
-          if (disabled || voice.locked) return;
+        onPointerDown={beginHold}
+        onClick={(e) => {
           e.preventDefault();
-          startYRef.current = e.clientY;
-          didLockRef.current = false;
-          voice.setError("");
-          voice.startListening();
-        }}
-        onPointerMove={(e) => {
-          if (!voice.listening || voice.locked || startYRef.current == null) return;
-          const dy = startYRef.current - e.clientY;
-          if (dy > 50 && !didLockRef.current) {
-            didLockRef.current = true;
-            voice.lockListening();
-          }
-        }}
-        onPointerUp={(e) => {
-          if (voice.locked) return;
-          startYRef.current = null;
-          if (voice.listening) {
-            voice.stopListening();
-            setTimeout(() => {
-              const t = voice.getTranscript();
-              if (t?.trim()) onDone(t);
-            }, 280);
-          }
-          e.preventDefault();
-        }}
-        onPointerCancel={(e) => {
-          if (!voice.locked) {
-            startYRef.current = null;
-            voice.stopListening();
-          }
-          e.preventDefault();
-        }}
-        onClick={() => {
+          if (suppressClickRef.current) return;
           if (voice.locked) finishCapture();
         }}
         style={{
-          width: 48,
-          height: 48,
+          width: size,
+          height: size,
           borderRadius: "50%",
-          border: voice.locked ? `2px solid ${theme.gold}` : "none",
-          backgroundColor: voice.locked ? theme.gold : voice.listening ? theme.gold : theme.accent,
+          border: voice.locked ? `3px solid ${theme.primaryDark}` : "none",
+          backgroundColor: voice.locked ? theme.gold : active ? theme.gold : theme.accent,
           color: "white",
           cursor: disabled ? "default" : "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           touchAction: "none",
-          boxShadow: voice.listening ? "0 0 0 4px rgba(200,151,58,0.25)" : undefined,
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+          boxShadow: active ? "0 0 0 5px rgba(200,151,58,0.28)" : "0 2px 8px rgba(26,61,43,0.2)",
+          transition: "background-color 0.15s, box-shadow 0.15s",
         }}
-        aria-label={voice.locked ? "Tap to finish recording" : "Hold to speak — swipe up to lock"}
+        aria-label={voice.locked ? "Tap to finish recording" : "Hold to speak — slide up to lock"}
       >
         {voice.locked ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
         ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
         )}
       </button>
-      {!voice.locked && voice.listening && (
-        <span style={{ fontSize: 10, color: theme.textLight, textAlign: "center", lineHeight: 1.2, maxWidth: 72 }}>Swipe up to lock</span>
-      )}
-      {voice.locked && (
-        <span style={{ fontSize: 10, color: theme.gold, fontWeight: 700, textAlign: "center" }}>Tap to finish</span>
+      {voice.locked ? (
+        <span style={{ fontSize: 10, color: theme.gold, fontWeight: 700, textAlign: "center", maxWidth: 88 }}>Locked — tap mic when done</span>
+      ) : active ? (
+        <span style={{ fontSize: 10, color: theme.textSecondary, textAlign: "center", lineHeight: 1.25, maxWidth: 88 }}>Release to send, or slide up to keep talking</span>
+      ) : (
+        <span style={{ fontSize: 10, color: theme.textLight, textAlign: "center", lineHeight: 1.25, maxWidth: 88 }}>Hold mic to speak</span>
       )}
     </div>
   );
@@ -10874,11 +11330,13 @@ function CaptureInput({ token, role, setView, setVoicePrefill, readonly = false,
         {(err || voice.error) && <p style={{ ...styles.errorMsg, marginTop: 10, marginBottom: 0 }}>{err || voice.error}</p>}
         {voice.listening && !voice.locked && (
           <p style={{ fontSize: 12, color: theme.accent, marginTop: 8, marginBottom: 0 }}>
-            Listening… {voice.transcript ? `“${voice.transcript.slice(0, 60)}${voice.transcript.length > 60 ? "…" : ""}”` : "release when done, or swipe up on the mic to lock"}
+            Slide your finger up to lock, or release to send{voice.transcript ? ` — “${voice.transcript.slice(0, 60)}${voice.transcript.length > 60 ? "…" : ""}”` : ""}
           </p>
         )}
-        {voice.locked && voice.transcript && (
-          <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>{voice.transcript}</p>
+        {voice.locked && (
+          <p style={{ fontSize: 12, color: theme.gold, fontWeight: 600, marginTop: 8, marginBottom: 0 }}>
+            Locked — tap the mic when finished{voice.transcript ? `. So far: “${voice.transcript.slice(0, 80)}${voice.transcript.length > 80 ? "…" : ""}”` : ""}
+          </p>
         )}
 
         {parsed && (
@@ -10924,55 +11382,161 @@ function CaptureInput({ token, role, setView, setVoicePrefill, readonly = false,
   );
 }
 
-function HomeAttentionActions({ setView, briefingData, notifBadges }) {
+function actionPlanStorageKey() {
+  return `vl_action_plan_${new Date().toISOString().split("T")[0]}`;
+}
+
+function loadActionPlan() {
+  try {
+    const raw = localStorage.getItem(actionPlanStorageKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveActionPlan(items) {
+  try { localStorage.setItem(actionPlanStorageKey(), JSON.stringify(items)); } catch {}
+}
+
+function DailyActionPlan({ briefingData, setView }) {
+  const [items, setItems] = useState(loadActionPlan);
+  const [draft, setDraft] = useState("");
+  const dateLabel = new Date().toLocaleDateString("en-CA", { weekday: "long", month: "short", day: "numeric" });
+
+  useEffect(() => { saveActionPlan(items); }, [items]);
+
+  function addItem(text, source = "manual") {
+    const t = text.trim();
+    if (!t) return;
+    setItems(prev => [...prev, { id: `${Date.now()}-${Math.random()}`, text: t, done: false, source }]);
+    setDraft("");
+  }
+
+  function toggleItem(id) {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, done: !it.done } : it));
+  }
+
+  function removeItem(id) {
+    setItems(prev => prev.filter(it => it.id !== id));
+  }
+
+  function suggestFromBriefing() {
+    const flags = briefingData?.flags || {};
+    const suggestions = [];
+    if (flags.over_budget_count > 0) suggestions.push(`Review ${flags.over_budget_count} over-budget project${flags.over_budget_count !== 1 ? "s" : ""} on Dashboard`);
+    if (flags.pending_estimates > 0) suggestions.push(`Approve ${flags.pending_estimates} site quote${flags.pending_estimates !== 1 ? "s" : ""} on Estimates`);
+    if (flags.pending_count > 0) suggestions.push(`Respond to ${flags.pending_count} crew request${flags.pending_count !== 1 ? "s" : ""}`);
+    if (flags.not_logged_count > 0) suggestions.push(`Follow up with ${flags.not_logged_count} crew who haven't logged hours`);
+    if (flags.watch_count > 0) suggestions.push(`Check hours on ${flags.watch_count} project${flags.watch_count !== 1 ? "s" : ""} running hot`);
+    if (!suggestions.length) {
+      addItem("Review schedule and confirm crew assignments for today", "briefing");
+      return;
+    }
+    const existing = new Set(items.map(i => i.text));
+    suggestions.filter(s => !existing.has(s)).forEach(s => addItem(s, "briefing"));
+  }
+
+  const openCount = items.filter(i => !i.done).length;
+
+  return (
+    <div style={{ ...styles.card, marginBottom: 18, padding: "16px 18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px" }}>Today&apos;s action plan</div>
+          <div style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>{dateLabel}{openCount > 0 ? ` · ${openCount} open` : ""}</div>
+        </div>
+        <button type="button" onClick={suggestFromBriefing} style={{ fontSize: 11, fontWeight: 700, color: theme.accent, background: theme.accentLight, border: "none", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontFamily: font.body, whiteSpace: "nowrap" }}>
+          Add from briefing
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: items.length ? 12 : 0 }}>
+        <input
+          style={{ ...styles.input, marginTop: 0, flex: 1 }}
+          placeholder="What needs to happen today?"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addItem(draft); } }}
+        />
+        <button type="button" onClick={() => addItem(draft)} disabled={!draft.trim()} style={{ ...styles.button, marginTop: 0, padding: "10px 16px", whiteSpace: "nowrap" }}>Add</button>
+      </div>
+      {items.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {items.map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 10, backgroundColor: item.done ? theme.bg : "white", border: `1px solid ${theme.border}` }}>
+              <input type="checkbox" checked={item.done} onChange={() => toggleItem(item.id)} style={{ width: 18, height: 18, accentColor: theme.accent, marginTop: 2, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, color: item.done ? theme.textLight : theme.textPrimary, textDecoration: item.done ? "line-through" : "none", lineHeight: 1.4 }}>{item.text}</div>
+                {item.source === "briefing" && !item.done && <div style={{ fontSize: 11, color: theme.textLight, marginTop: 2 }}>Suggested from your briefing</div>}
+              </div>
+              <button type="button" onClick={() => removeItem(item.id)} style={{ background: "none", border: "none", color: theme.textLight, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {items.length === 0 && (
+        <p style={{ fontSize: 12, color: theme.textLight, margin: "8px 0 0", lineHeight: 1.45 }}>List what you want done today, or tap &quot;Add from briefing&quot; to pull in flagged items.</p>
+      )}
+    </div>
+  );
+}
+
+function HomeAttentionActions({ setView, briefingData, notifBadges, token }) {
   const flags = briefingData?.flags || {};
-  const estimateBadge = (notifBadges?.pending_estimates || 0) + (notifBadges?.estimates || 0);
+  const crewStatus = briefingData?.crew_status || [];
+  const notLogged = crewStatus.filter(c => !c.logged_this_week);
+  const pendingList = notifBadges?.pending_estimate_list || [];
+  const [reminding, setReminding] = useState(false);
+  const [remindMsg, setRemindMsg] = useState("");
+
+  async function remindAllNotLogged() {
+    setReminding(true);
+    setRemindMsg("");
+    const qs = notLogged.length ? `?employee_ids=${notLogged.map(c => c.employee_id).join(",")}` : "";
+    const res = await apiFetch(`${API}/home/remind-log-hours${qs}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    setReminding(false);
+    setRemindMsg(data.message || (res.ok ? "Reminders sent." : "Could not send reminders."));
+  }
+
+  function goToEstimate(estimateId) {
+    window._estimateFocusId = estimateId;
+    setView("estimate");
+  }
+
   const items = [];
 
   if (flags.over_budget_count > 0) {
-    items.push({
-      view: "dashboard",
-      label: `${flags.over_budget_count} project${flags.over_budget_count !== 1 ? "s" : ""} over budget`,
-      hint: "Review spend vs contract on Dashboard",
-      tone: "danger",
-    });
+    items.push({ key: "budget", view: "dashboard", label: `${flags.over_budget_count} project${flags.over_budget_count !== 1 ? "s" : ""} over budget`, hint: "Review spend vs contract on Dashboard", tone: "danger" });
   }
   if (flags.watch_count > 0) {
-    items.push({
-      view: "dashboard",
-      label: `${flags.watch_count} project${flags.watch_count !== 1 ? "s" : ""} running hot on hours`,
-      hint: "Open Dashboard to see which jobs",
-      tone: "gold",
-    });
+    items.push({ key: "watch", view: "dashboard", label: `${flags.watch_count} project${flags.watch_count !== 1 ? "s" : ""} running hot on hours`, hint: "Open Dashboard to see which jobs", tone: "gold" });
   }
-  if (flags.pending_estimates || notifBadges?.pending_estimates || estimateBadge > 0) {
-    const n = flags.pending_estimates || notifBadges?.pending_estimates || estimateBadge;
-    items.push({
-      view: "estimate",
-      label: `${n} estimate${n !== 1 ? "s" : ""} need your review`,
-      hint: "Site quotes or messages waiting",
-      tone: "gold",
+  if (pendingList.length > 0) {
+    pendingList.forEach(est => {
+      items.push({
+        key: `est-${est.estimate_id}`,
+        action: () => goToEstimate(est.estimate_id),
+        label: `Site quote: ${est.job_name}`,
+        hint: `${est.created_by_name} submitted $${fmt(est.total_cost)} — open Estimates to approve`,
+        tone: "gold",
+      });
     });
+  } else if (flags.pending_estimates > 0 || notifBadges?.pending_estimates > 0) {
+    const n = flags.pending_estimates || notifBadges?.pending_estimates;
+    items.push({ key: "est", view: "estimate", label: `${n} site quote${n !== 1 ? "s" : ""} waiting approval`, hint: "Open Estimates → Site quotes awaiting review", tone: "gold" });
+  }
+  if (notifBadges?.estimates > 0) {
+    items.push({ key: "est-msg", view: "estimate", label: `${notifBadges.estimates} estimate message${notifBadges.estimates !== 1 ? "s" : ""}`, hint: "New comments or updates on estimates — check your notification bell or Estimates tab", tone: "neutral" });
   }
   if (flags.pending_count > 0 || notifBadges?.requests > 0) {
     const n = flags.pending_count || notifBadges?.requests;
-    items.push({
-      view: "requests",
-      label: `${n} crew request${n !== 1 ? "s" : ""} pending`,
-      hint: "Approve, deny, or reply",
-      tone: "accent",
-    });
-  }
-  if (flags.not_logged_count > 0) {
-    items.push({
-      view: "schedule",
-      label: `${flags.not_logged_count} crew member${flags.not_logged_count !== 1 ? "s" : ""} haven't logged this week`,
-      hint: "Check Schedule or follow up with crew",
-      tone: "neutral",
-    });
+    items.push({ key: "req", view: "requests", label: `${n} crew request${n !== 1 ? "s" : ""} pending`, hint: "Approve, deny, or reply on Requests", tone: "accent" });
   }
 
-  if (items.length === 0) return null;
+  const notLoggedBlock = notLogged.length > 0 || flags.not_logged_count > 0;
+
+  if (items.length === 0 && !notLoggedBlock) return null;
 
   const toneStyle = (tone) => {
     if (tone === "danger") return { border: theme.danger, bg: theme.dangerLight, color: theme.danger };
@@ -10989,9 +11553,9 @@ function HomeAttentionActions({ setView, briefingData, notifBadges }) {
           const s = toneStyle(item.tone);
           return (
             <button
-              key={`${item.view}-${item.label}`}
+              key={item.key}
               type="button"
-              onClick={() => setView(item.view)}
+              onClick={() => item.action ? item.action() : setView(item.view)}
               style={{
                 textAlign: "left", padding: "14px 16px", borderRadius: 12, cursor: "pointer", fontFamily: font.body,
                 border: `1.5px solid ${s.border}`, backgroundColor: s.bg, width: "100%",
@@ -11006,6 +11570,25 @@ function HomeAttentionActions({ setView, briefingData, notifBadges }) {
             </button>
           );
         })}
+        {notLoggedBlock && (
+          <div style={{ padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${theme.border}`, backgroundColor: theme.bg }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary }}>
+              {notLogged.length || flags.not_logged_count} crew member{(notLogged.length || flags.not_logged_count) !== 1 ? "s" : ""} haven&apos;t logged this week
+            </div>
+            {notLogged.length > 0 && (
+              <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 6, lineHeight: 1.5 }}>
+                {notLogged.map(c => c.name).join(", ")}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <button type="button" disabled={reminding || !token} onClick={remindAllNotLogged} style={{ ...styles.button, marginTop: 0, padding: "9px 14px", fontSize: 13, backgroundColor: theme.primary }}>
+                {reminding ? "Sending…" : "Send reminder notification"}
+              </button>
+              <button type="button" onClick={() => setView("schedule")} style={{ ...styles.button, marginTop: 0, padding: "9px 14px", fontSize: 13, backgroundColor: "#888" }}>View schedule</button>
+            </div>
+            {remindMsg && <p style={{ fontSize: 12, color: theme.accent, fontWeight: 600, margin: "8px 0 0" }}>{remindMsg}</p>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -11047,7 +11630,8 @@ function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false, n
             subtitle={new Date().toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" })}
           />
           <BriefingCard token={token} setView={setView} onDataChange={setBriefingData} />
-          <HomeAttentionActions setView={setView} briefingData={briefingData} notifBadges={notifBadges} />
+          <DailyActionPlan briefingData={briefingData} setView={setView} />
+          <HomeAttentionActions setView={setView} briefingData={briefingData} notifBadges={notifBadges} token={token} />
           <div style={{ ...styles.card, padding: 0, overflow: "hidden", marginBottom: 16 }}>
             <button
               type="button"
@@ -11313,10 +11897,16 @@ function AuthenticatedApp() {
             <HomeScreen token={token} setView={setView} role={role} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} notifBadges={notifBadges} />
           )}
           {role === "crew" && view === "field_estimate" && <FieldEstimateScreen token={token} readonly={subStatus === "expired"} />}
-          {role === "crew" && view === "log" && <LogHub setView={setView} />}
-          {role === "crew" && view === "timesheet" && <TimesheetForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
-          {role === "crew" && view === "materials" && <MaterialsForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
-          {role === "crew" && view === "mileage" && <MileageForm token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} setView={setView} />}
+          {role === "crew" && ["log", "timesheet", "materials", "mileage"].includes(view) && (
+            <LogMyDay
+              token={token}
+              voicePrefill={voicePrefill}
+              onPrefillConsumed={() => setVoicePrefill(null)}
+              readonly={subStatus === "expired"}
+              setView={setView}
+              initialTab={view}
+            />
+          )}
           {role === "crew" && view === "crew_requests" && <CrewRequestsScreen token={token} voicePrefill={voicePrefill} onPrefillConsumed={() => setVoicePrefill(null)} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "settings" && <SettingsScreen token={token} role={role} onLogout={handleLogout} />}
           {(role === "owner" || role === "admin") && view === "schedule" && <ScheduleScreen token={token} readonly={subStatus === "expired"} />}

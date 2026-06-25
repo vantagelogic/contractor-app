@@ -23,7 +23,7 @@ You do **not** need to install an app. Open the link from your boss in your phon
 1. Open the app link your supervisor sent you
 2. Log in with the email and password they gave you
 3. Go to **Settings** — confirm your name is correct
-4. If you see *"Account not linked"* — tell your supervisor to connect your login to your employee record
+4. If you see *"Account not linked"* — tell your supervisor to connect your login to your crew record
 
 **Change your password:** Settings → enter current password → new password → save
 
@@ -31,37 +31,46 @@ You do **not** need to install an app. Open the link from your boss in your phon
 
 ## Navigation
 
+**Mobile:** ☰ menu (top-left) · **Desktop:** left sidebar
+
 | Tab | What it does |
 |-----|--------------|
 | **Home** | Your dashboard, schedule, voice logging |
-| **Quote** | Build site estimates for office review |
-| **Log** | Hours, Materials, or Mileage |
+| **Site Quote** | Build site quotes for office review |
+| **Log Hours & Costs** | Hours, Materials, or Mileage |
 | **Requests** | Ask the office for materials, report issues |
 | **Settings** | Your name, email, password |
 
-When you're inside Log, the bottom bar switches to: **Home | Hours | Materials | Mileage**
+When you're inside Log, quick tabs appear for: **Hours · Materials · Mileage**
 
 ---
 
 ## Voice Logging (Fastest Way)
 
-**On Home → hold the microphone button → speak → release**
+**On Home → hold the microphone → speak → release (or slide up to lock for hands-free)**
+
+### Hands-free mode (gloves / dirty hands)
+1. **Hold** the mic button and start speaking
+2. **Slide your finger up** into the dashed “Slide up to lock” zone — recording continues without holding
+3. When finished, **tap the mic again** to stop and process
+
+### Quick log (short notes)
+Hold, speak, release without locking.
 
 ### Examples
 - *"Log 8 hours on Smith House, framing, today"*
 - *"Log 4 hours overtime on the Johnson project for electrical"*
 - *"Log 45 kilometres for a trip to the Johnson site"*
-- *"I need 10 sheets of drywall for the Main Street job"*
+- *"I need 10 sheets of drywall for the Main Street project"*
 
 ### After you speak
-1. A summary card appears — check job, hours, work type
+1. A summary card appears — check project, hours, work type
 2. If work type is unclear, pick the correct one from the dropdown
 3. Tap **Review and Submit**
 4. Confirm on the form → tap **Submit**
 
 **Tips:**
-- Speak clearly after tapping the mic
-- Pause when done, then release
+- Hold the mic before you speak; slide up to lock if you need hands-free
 - Allow microphone access if your browser asks
 - iPhone: Settings → Safari → Microphone → Allow
 - Your voice is **not recorded** — only the text is used
@@ -74,7 +83,7 @@ When you're inside Log, the bottom bar switches to: **Home | Hours | Materials |
 
 | Field | What to enter |
 |-------|---------------|
-| Employee | Your name |
+| Crew | Your name |
 | Project | The job you worked on |
 | Work type | What you were doing — Framing, Electrical, etc. |
 | Date | Defaults to today |
@@ -122,7 +131,7 @@ Pull stock the company already owns.
 
 | Field | What to enter |
 |-------|---------------|
-| Employee | Your name |
+| Crew | Your name |
 | Project | Which job the trip was for |
 | Trip date | Date of travel |
 | Kilometres driven | Total km (follow your company's one-way vs round-trip policy) |
@@ -159,9 +168,9 @@ Tap **Submit Request**. Track status on the Requests screen. Tap any request to 
 
 ## Site Quotes (Quote Tab)
 
-*Only if your company uses field quoting.*
+*Only if your company uses site quoting.*
 
-Build an estimate on site for the office to review before it goes to the customer.
+Build a site quote on site for the office to review before it goes to the customer.
 
 1. **Quote → + New site quote**
 2. Select the **project** (office must create it first)
@@ -222,7 +231,7 @@ Your personal dashboard shows:
 | Work type missing | Ask supervisor to add work types in Settings |
 | Voice not working | Allow microphone in browser settings |
 | Mic denied on iPhone | Settings → Safari → Microphone → Allow |
-| "Account not linked" | Supervisor links your login to employee record |
+| "Account not linked" | Supervisor links your login to crew record |
 | "Trial ended" | Company owner needs to subscribe — your data is safe |
 | Quote tab error | Tell supervisor — backend may need updating |
 
@@ -248,7 +257,7 @@ HELP          → Tap the ? button (AI assistant)
 
 ## AI Help Assistant
 
-Tap the floating **?** button (above the bottom nav on phone).
+Tap the floating **?** help button (bottom-right on desktop; above the safe area on phone).
 
 Ask anything:
 - *How do I log hours?*

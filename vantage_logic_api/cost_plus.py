@@ -1248,8 +1248,8 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         _notify_company_owners(
             db, current_user.company_id, current_user.user_id,
             "field_estimate_submitted",
-            "Field estimate ready for review",
-            f"{job.job_name if job else 'Project'} — submitted by {_user_display_name(db, current_user.user_id) or 'crew'}",
+            "Site quote needs your review",
+            f"{job.job_name if job else 'Project'} — submitted by {_user_display_name(db, current_user.user_id) or 'crew'}. Open Estimates to approve or return.",
             estimate.estimate_id, "estimate",
         )
         db.commit()

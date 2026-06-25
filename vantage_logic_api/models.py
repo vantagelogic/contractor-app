@@ -179,6 +179,8 @@ class Inventory(Base):
     purchase_price = Column(Numeric(10, 2))
     charge_out_price = Column(Numeric(10, 2))
     notes = Column(Text)
+    item_type = Column(String(50), nullable=True)
+    image_path = Column(String(500), nullable=True)
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
