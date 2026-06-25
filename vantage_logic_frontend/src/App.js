@@ -2002,7 +2002,7 @@ function LogBackButton({ setView }) {
   );
 }
 
-function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
+function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null, insideLogMyDay = false }) {
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" });
   const [addOvertime, setAddOvertime] = useState(false);
   const [trackOvertime, setTrackOvertime] = useState(false);
@@ -2138,9 +2138,13 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   return (
     <div style={styles.container}>
-      <LogBackButton setView={setView} />
-      <h1 style={styles.title}>Log Hours</h1>
-      <p style={styles.subtitle}>Record your time on a job</p>
+      {!insideLogMyDay && (
+        <>
+          <LogBackButton setView={setView} />
+          <h1 style={styles.title}>Log Hours</h1>
+          <p style={styles.subtitle}>Record your time on a job</p>
+        </>
+      )}
       {linkedEmployeeId && scheduleToLog.filter(s => !dismissedSchedule.includes(s.schedule_id)).length > 0 && (
         <div style={{ marginBottom: "18px" }}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -2258,7 +2262,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 }
 
 // ─── MATERIALS ────────────────────────────────────────────────
-function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
+function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null, insideLogMyDay = false }) {
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: new Date().toISOString().split("T")[0], notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2370,9 +2374,13 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   return (
     <div style={styles.container}>
-      <LogBackButton setView={setView} />
-      <h1 style={styles.title}>Log Materials</h1>
-      <p style={styles.subtitle}>Record a material purchase or inventory pull</p>
+      {!insideLogMyDay && (
+        <>
+          <LogBackButton setView={setView} />
+          <h1 style={styles.title}>Log Materials</h1>
+          <p style={styles.subtitle}>Record a material purchase or inventory pull</p>
+        </>
+      )}
 
       <div style={{ display: "flex", backgroundColor: theme.bg, borderRadius: "10px", padding: "3px", gap: "3px", marginBottom: "16px", border: `1px solid ${theme.border}` }}>
         {[["store", "Store Bought"], ["scan", "Scan Receipt"], ["inventory", "From Inventory"]].map(([id, label]) => (
@@ -2687,7 +2695,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 }
 
 // ─── MILEAGE ──────────────────────────────────────────────────
-function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null }) {
+function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null, insideLogMyDay = false }) {
   const [formData, setFormData] = useState({ job_id: "", trip_date: new Date().toISOString().split("T")[0], km_driven: "", purpose: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2789,9 +2797,13 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
 
   return (
     <div style={styles.container}>
-      <LogBackButton setView={setView} />
-      <h1 style={styles.title}>Log Mileage</h1>
-      <p style={styles.subtitle}>Record a trip for a job</p>
+      {!insideLogMyDay && (
+        <>
+          <LogBackButton setView={setView} />
+          <h1 style={styles.title}>Log Mileage</h1>
+          <p style={styles.subtitle}>Record a trip for a job</p>
+        </>
+      )}
       <div style={styles.card}>
         <form onSubmit={handleSubmit} style={styles.form}>
           {linkedEmployeeId ? (
@@ -6374,7 +6386,7 @@ function LogMyDay({ token, voicePrefill = null, onPrefillConsumed = null, readon
     setLogTab(resolveLogTab(initialTab));
   }, [initialTab]);
 
-  const formProps = { token, voicePrefill, onPrefillConsumed, readonly, setView };
+  const formProps = { token, voicePrefill, onPrefillConsumed, readonly, setView, insideLogMyDay: true };
   const tabs = [
     { id: "timesheet", label: "Hours" },
     { id: "materials", label: "Materials" },
@@ -6418,34 +6430,6 @@ function LogMyDay({ token, voicePrefill = null, onPrefillConsumed = null, readon
       {logTab === "timesheet" && <TimesheetForm {...formProps} />}
       {logTab === "materials" && <MaterialsForm {...formProps} />}
       {logTab === "mileage" && <MileageForm {...formProps} />}
-    </div>
-  );
-}
-
-// ─── LOG HUB ──────────────────────────────────────────────────
-function LogHub({ setView }) {
-  return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Log Entry</h1>
-      <p style={styles.subtitle}>What do you want to record?</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
-        {[
-          { id: "timesheet", label: "Hours", desc: "Log time worked on a job", icon: IconHours, color: theme.primary },
-          { id: "materials", label: "Materials", desc: "Record a purchase or receipt scan", icon: IconMaterials, color: theme.gold },
-          { id: "mileage", label: "Mileage", desc: "Log kilometres driven for a job", icon: IconMileage, color: theme.accent },
-        ].map(item => (
-          <button key={item.id} onClick={() => setView(item.id)} style={{ display: "flex", alignItems: "center", gap: "16px", padding: "18px 20px", backgroundColor: "white", border: `1px solid ${theme.border}`, borderRadius: "14px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: font.body, transition: "all 0.15s" }}>
-            <div style={{ width: "48px", height: "48px", borderRadius: "12px", backgroundColor: `${item.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ color: item.color }}><item.icon /></span>
-            </div>
-            <div>
-              <div style={{ fontSize: "16px", fontWeight: "700", color: theme.primary }}>{item.label}</div>
-              <div style={{ fontSize: "13px", color: theme.textSecondary, marginTop: "2px" }}>{item.desc}</div>
-            </div>
-            <svg style={{ marginLeft: "auto", flexShrink: 0 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textLight} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
