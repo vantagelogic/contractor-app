@@ -564,6 +564,137 @@ def mcp_get_weekly_spend(db, company_id: int) -> dict:
     }
 
 
+def _mcp_snapshot(db, company_id: int) -> dict:
+    """Aggregate all MCP tool outputs for briefing and follow-up."""
+
+    def _safe(label: str, fn):
+        try:
+            return fn()
+        except Exception as e:
+            print(f"{label} error: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            return None
+
+    projects = _safe("mcp_get_project_health", lambda: mcp_get_project_health(db, company_id)) or []
+    crew_status = _safe("mcp_get_crew_logging_status", lambda: mcp_get_crew_logging_status(db, company_id)) or []
+    pending = _safe("mcp_get_pending_requests", lambda: mcp_get_pending_requests(db, company_id)) or []
+    spend = _safe("mcp_get_weekly_spend", lambda: mcp_get_weekly_spend(db, company_id)) or {}
+    over_budget = [p for p in projects if p["health"] == "over_budget"]
+    watch = [p for p in projects if p["health"] == "watch"]
+    not_logged = [c for c in crew_status if not c["logged_this_week"]]
+    return {
+        "projects": projects,
+        "crew_status": crew_status,
+        "pending_requests": pending,
+        "weekly_spend": spend,
+        "flags": {
+            "over_budget_count": len(over_budget),
+            "watch_count": len(watch),
+            "not_logged_count": len(not_logged),
+            "pending_count": len(pending),
+        },
+    }
+
+
+def _build_briefing_text(snapshot: dict) -> str:
+    """Deterministic briefing from live data — always accurate even without AI."""
+    projects = snapshot.get("projects") or []
+    pending = snapshot.get("pending_requests") or []
+    spend = snapshot.get("weekly_spend") or {}
+    crew = snapshot.get("crew_status") or []
+    not_logged = [c["name"] for c in crew if not c.get("logged_this_week")]
+    over = [p["name"] for p in projects if p.get("health") == "over_budget"]
+    watch = [p["name"] for p in projects if p.get("health") == "watch"]
+    active_count = len(projects)
+
+    parts = []
+    if over:
+        tail = f" ({', '.join(over[:3])}{'…' if len(over) > 3 else ''})"
+        parts.append(f"{len(over)} project{'s' if len(over) != 1 else ''} over budget{tail}.")
+    if pending:
+        parts.append(f"{len(pending)} crew request{'s' if len(pending) != 1 else ''} need your review.")
+    if not_logged:
+        names = ", ".join(not_logged[:4])
+        if len(not_logged) > 4:
+            names += "…"
+        parts.append(f"{len(not_logged)} crew member{'s' if len(not_logged) != 1 else ''} haven't logged this week ({names}).")
+    if watch:
+        parts.append(f"Hours running high on {', '.join(watch[:3])}{'…' if len(watch) > 3 else ''}.")
+
+    spend_total = float(spend.get("total_cost") or 0)
+    if spend_total > 0:
+        parts.append(
+            f"This week so far: ${spend_total:,.0f} "
+            f"(${float(spend.get('labour_cost') or 0):,.0f} labour, ${float(spend.get('materials_cost') or 0):,.0f} materials)."
+        )
+
+    if not parts:
+        if active_count == 0:
+            return "No active projects yet — add a job on the Dashboard to start tracking."
+        return f"All clear across {active_count} active project{'s' if active_count != 1 else ''}. Nothing flagged right now."
+
+    return " ".join(parts[:5])
+
+
+def _followup_from_data(message: str, snapshot: dict) -> str | None:
+    """Answer common follow-ups directly from snapshot data."""
+    msg = (message or "").lower()
+    crew = snapshot.get("crew_status") or []
+    projects = snapshot.get("projects") or []
+    pending = snapshot.get("pending_requests") or []
+    spend = snapshot.get("weekly_spend") or {}
+
+    if any(k in msg for k in ("not logged", "haven't logged", "hasn't logged", "who logged")):
+        names = [c["name"] for c in crew if not c.get("logged_this_week")]
+        if not names:
+            return "Everyone on your crew has logged hours this week."
+        return "Haven't logged this week: " + ", ".join(names) + "."
+
+    if "over budget" in msg or "over-budget" in msg:
+        names = [p["name"] for p in projects if p.get("health") == "over_budget"]
+        if not names:
+            return "No projects are over budget right now."
+        detail = "; ".join(
+            f"{p['name']} (${p['total_cost']:,.0f} spent vs ${p['contract']:,.0f} contract)"
+            for p in projects if p.get("health") == "over_budget"
+        )[:500]
+        return f"Over budget ({len(names)}): {detail}."
+
+    if "pending" in msg or "request" in msg:
+        if not pending:
+            return "No pending requests right now."
+        lines = [f"{r.get('employee', '?')} on {r.get('job', '?')} — {r.get('type', 'request')}" for r in pending[:6]]
+        extra = f" (+{len(pending) - 6} more)" if len(pending) > 6 else ""
+        return f"{len(pending)} pending: " + "; ".join(lines) + extra + "."
+
+    if "watch" in msg or "85%" in msg or "hours used" in msg:
+        names = [p["name"] for p in projects if p.get("health") == "watch"]
+        if not names:
+            return "No projects are past 85% of budgeted hours."
+        detail = "; ".join(
+            f"{p['name']} ({p.get('hours_pct')}% of {p.get('budgeted_hours')}h budget)"
+            for p in projects if p.get("health") == "watch"
+        )
+        return f"High hours usage: {detail}."
+
+    if any(k in msg for k in ("spend", "spent", "this week", "labour", "labor", "materials")):
+        return (
+            f"This week ({spend.get('week_start', 'so far')}): "
+            f"${float(spend.get('labour_cost') or 0):,.0f} labour, "
+            f"${float(spend.get('materials_cost') or 0):,.0f} materials "
+            f"(${float(spend.get('total_cost') or 0):,.0f} total, "
+            f"{spend.get('timesheet_entries', 0)} timesheet entries)."
+        )
+
+    if "project" in msg and ("active" in msg or "how many" in msg):
+        return f"You have {len(projects)} active project{'s' if len(projects) != 1 else ''}."
+
+    return None
+
+
 def send_welcome_email(to_email: str, company_name: str):
     try:
         resend.Emails.send({
@@ -1798,6 +1929,7 @@ class FollowUpMessage(BaseModel):
 
 
 @app.post("/home/briefing")
+@app.get("/home/briefing")
 @limiter.limit("10/minute")
 def get_home_briefing(
     request: Request,
@@ -1807,61 +1939,40 @@ def get_home_briefing(
     if current_user.role not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="Owner or admin only.")
 
-    projects = mcp_get_project_health(db, current_user.company_id)
-    crew_status = mcp_get_crew_logging_status(db, current_user.company_id)
-    pending = mcp_get_pending_requests(db, current_user.company_id)
-    spend = mcp_get_weekly_spend(db, current_user.company_id)
+    try:
+        snapshot = _mcp_snapshot(db, current_user.company_id)
+    except Exception as e:
+        print(f"MCP snapshot error: {e}")
+        raise HTTPException(status_code=500, detail="Could not load business data for briefing")
 
-    over_budget = [p for p in projects if p["health"] == "over_budget"]
-    watch = [p for p in projects if p["health"] == "watch"]
-    not_logged = [c for c in crew_status if not c["logged_this_week"]]
+    briefing_text = _build_briefing_text(snapshot)
 
-    data_summary = f"""
-Today: {date.today().strftime("%A, %B %d")}
-Active projects: {len(projects)}
-Over budget: {[p['name'] for p in over_budget]}
-Watching (>85% hours used): {[p['name'] for p in watch]}
-Pending requests: {len(pending)} ({[r['type'] for r in pending[:3]]})
-Crew not logged this week: {[c['name'] for c in not_logged]}
-This week spend: Labour ${spend['labour_cost']:,.2f} / Materials ${spend['materials_cost']:,.2f} / Total ${spend['total_cost']:,.2f}
-"""
-
-    prompt = f"""You are the daily briefing assistant for Vantage Logic, a project costing app for trades contractors.
-Write a concise 2-4 sentence morning briefing for the owner based on this live data.
-Be direct and trades-friendly. Flag anything that needs attention. If everything looks good, say so briefly.
-Do not use bullet points. Write in plain conversational sentences. Start with the most important thing.
-
-{data_summary}"""
+    data_summary = json.dumps({
+        "flags": snapshot["flags"],
+        "project_names": [p["name"] for p in snapshot["projects"][:12]],
+        "pending_count": snapshot["flags"]["pending_count"],
+        "weekly_spend": snapshot["weekly_spend"],
+    }, indent=2)
 
     try:
+        prompt = f"""Rewrite this owner briefing in 2-4 conversational sentences. Use ONLY facts from the data — do not invent numbers or names.
+
+DATA:
+{data_summary}
+
+DRAFT:
+{briefing_text}"""
         response = get_gemini_client().models.generate_content(
             model="gemini-2.5-flash",
             contents=[prompt],
         )
-        briefing_text = (response.text or "").strip()
+        ai_text = (response.text or "").strip()
+        if ai_text and len(ai_text) > 24:
+            briefing_text = ai_text
     except Exception as e:
-        print(f"Home briefing error: {e}")
-        briefing_text = (
-            f"{len(over_budget)} project(s) over budget. "
-            f"{len(pending)} pending request(s). "
-            f"{len(not_logged)} crew member(s) haven't logged this week."
-        )
+        print(f"Home briefing AI polish error: {e}")
 
-    return {
-        "briefing": briefing_text,
-        "data": {
-            "projects": projects,
-            "crew_status": crew_status,
-            "pending_requests": pending,
-            "weekly_spend": spend,
-            "flags": {
-                "over_budget_count": len(over_budget),
-                "watch_count": len(watch),
-                "not_logged_count": len(not_logged),
-                "pending_count": len(pending),
-            },
-        },
-    }
+    return {"briefing": briefing_text, "data": snapshot}
 
 
 @app.post("/home/followup")
@@ -1875,7 +1986,19 @@ def home_followup(
     if current_user.role not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="Owner or admin only.")
 
-    data_context = json.dumps(body.briefing_data, indent=2)[:3000]
+    snapshot = body.briefing_data if body.briefing_data and body.briefing_data.get("projects") is not None else None
+    if not snapshot:
+        try:
+            snapshot = _mcp_snapshot(db, current_user.company_id)
+        except Exception as e:
+            print(f"MCP snapshot error on followup: {e}")
+            return {"reply": "I couldn't load your live data right now. Try refreshing the briefing."}
+
+    rule_answer = _followup_from_data(body.message, snapshot)
+    if rule_answer:
+        return {"reply": rule_answer}
+
+    data_context = json.dumps(snapshot, indent=2)[:3000]
 
     system = f"""You are a business intelligence assistant for a trades contractor using Vantage Logic.
 You have access to their live project data below. Answer questions directly and concisely.

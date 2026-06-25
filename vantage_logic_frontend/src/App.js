@@ -70,7 +70,6 @@ const isMobile = () => window.innerWidth < 768;
 
 const OWNER_VIEWS = ["home", "dashboard", "schedule", "inventory", "requests", "estimate", "billing", "settings"];
 const CREW_VIEWS = ["home", "field_estimate", "log", "timesheet", "materials", "mileage", "crew_requests", "settings"];
-const MORE_VIEWS = ["estimate", "billing", "settings"];
 
 function pushAppHistory(state) {
   window.history.pushState({ vl: true, ...state }, "");
@@ -108,7 +107,7 @@ function ScreenContainer({ children, wide = false, style = {} }) {
     <div style={{
       maxWidth: wide ? "1120px" : "1120px",
       margin: "0 auto",
-      padding: mobile ? "58px 18px 110px" : "66px 24px 110px",
+      padding: mobile ? "max(58px, calc(52px + env(safe-area-inset-top))) 18px max(28px, calc(20px + env(safe-area-inset-bottom)))" : "66px 24px 110px",
       fontFamily: font.body,
       backgroundColor: theme.bg,
       minHeight: "100vh",
@@ -399,7 +398,7 @@ function IconGear() { return <svg width="18" height="18" viewBox="0 0 24 24" fil
 function IconEstimate() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>; }
 function IconBilling() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>; }
 function IconInventory() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>; }
-function IconMore() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>; }
+function IconMenu() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>; }
 function Spinner({ size = 16, color = "white" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ animation: "vlspin 0.8s linear infinite" }}>
@@ -441,8 +440,8 @@ function HelpChat({ token, role, mobile = false }) {
   const inputRef = useRef(null);
 
   const quickPrompts = HELP_QUICK_PROMPTS[role === "crew" ? "crew" : "owner"];
-  const fabBottom = mobile ? "calc(78px + env(safe-area-inset-bottom))" : "24px";
-  const panelBottom = mobile ? "calc(138px + env(safe-area-inset-bottom))" : "84px";
+  const fabBottom = mobile ? "calc(22px + env(safe-area-inset-bottom))" : "24px";
+  const panelBottom = mobile ? "calc(82px + env(safe-area-inset-bottom))" : "84px";
 
   useEffect(() => {
     if (bottomRef.current) bottomRef.current.scrollIntoView({ behavior: "smooth" });
@@ -578,7 +577,7 @@ function HelpChat({ token, role, mobile = false }) {
 // ─── NAVIGATION ───────────────────────────────────────────────
 function NavBar({ view, setView, role, onLogout, badges = null }) {
   const [mobile, setMobile] = useState(isMobile());
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const handler = () => setMobile(isMobile());
@@ -586,96 +585,121 @@ function NavBar({ view, setView, role, onLogout, badges = null }) {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  useEffect(() => {
-    if (!MORE_VIEWS.includes(view)) setMoreOpen(false);
-  }, [view]);
+  useEffect(() => { setMenuOpen(false); }, [view]);
 
   const isCrew = role === "crew";
-
   const logViews = ["log", "timesheet", "materials", "mileage"];
   const isTabActive = (tabId) => tabId === "log" ? logViews.includes(view) : view === tabId;
-  const isMoreActive = MORE_VIEWS.includes(view);
 
   const crewTabs = [
     { id: "home", label: "Home", Icon: IconHome },
-    { id: "field_estimate", label: "Quote", Icon: IconEstimate },
-    { id: "log", label: "Log", Icon: IconMaterials },
+    { id: "field_estimate", label: "Site Quote", Icon: IconEstimate },
+    { id: "log", label: "Log Hours & Costs", Icon: IconMaterials },
     { id: "crew_requests", label: "Requests", Icon: IconRequests },
     { id: "settings", label: "Settings", Icon: IconGear },
   ];
 
-  const ownerMobileTabs = [
+  const ownerTabs = [
     { id: "home", label: "Home", Icon: IconHome },
     { id: "dashboard", label: "Dashboard", Icon: IconDashboard },
     { id: "schedule", label: "Schedule", Icon: IconSchedule },
     { id: "inventory", label: "Inventory", Icon: IconInventory },
     { id: "requests", label: "Requests", Icon: IconRequests },
-    { id: "more", label: "More", Icon: IconMore, isMore: true },
-  ];
-
-  const ownerDesktopTabs = [
-    { id: "home", label: "Home", Icon: IconHome },
-    { id: "dashboard", label: "Dashboard", Icon: IconDashboard },
-    { id: "schedule", label: "Schedule", Icon: IconSchedule },
-    { id: "inventory", label: "Inventory", Icon: IconInventory },
-    { id: "requests", label: "Requests", Icon: IconRequests },
-    { id: "estimate", label: "Estimate", Icon: IconEstimate },
+    { id: "estimate", label: "Estimates", Icon: IconEstimate },
     { id: "billing", label: "Billing", Icon: IconBilling },
     { id: "settings", label: "Settings", Icon: IconGear },
   ];
 
-  const logContextTabs = [
-    { id: "home", label: "Home", Icon: IconHome },
-    { id: "timesheet", label: "Hours", Icon: IconHours },
-    { id: "materials", label: "Materials", Icon: IconMaterials },
-    { id: "mileage", label: "Mileage", Icon: IconMileage },
-  ];
+  const allTabs = isCrew ? crewTabs : ownerTabs;
+  const currentLabel = allTabs.find(t => isTabActive(t.id))?.label || "Vantage Logic";
 
-  const moreMenuItems = [
-    { id: "estimate", label: "Estimate", Icon: IconEstimate, desc: "Build quotes and review site estimates" },
-    { id: "billing", label: "Billing", Icon: IconBilling, desc: "Invoice clients and manage submittals" },
-    { id: "settings", label: "Settings", Icon: IconGear, desc: "Company, crew, and job setup" },
-  ];
+  function goTo(tabId) {
+    setView(tabId);
+    setMenuOpen(false);
+  }
 
-  if (mobile) {
-    const mobileTabs = (isCrew && logViews.includes(view)) ? logContextTabs : (isCrew ? crewTabs : ownerMobileTabs);
-    const mobileIsActive = (tab) => tab.isMore ? isMoreActive : view === tab.id;
+  function renderDrawer() {
     return (
       <>
-        {moreOpen && !isCrew && (
-          <>
-            <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 1001 }} />
-            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 1002, padding: "0 12px max(14px, env(safe-area-inset-bottom))", paddingBottom: "max(88px, calc(74px + env(safe-area-inset-bottom)))" }}>
-              <div style={{ backgroundColor: "white", borderRadius: "16px 16px 12px 12px", padding: "18px 16px 12px", boxShadow: theme.shadowLg, border: `1px solid ${theme.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 12, fontFamily: font.display }}>More</div>
-                {moreMenuItems.map(item => (
-                  <button key={item.id} type="button" onClick={() => { setView(item.id); setMoreOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 12px", borderRadius: 10, border: view === item.id ? `1.5px solid ${theme.accent}` : `1px solid ${theme.border}`, backgroundColor: view === item.id ? theme.accentLight : "white", cursor: "pointer", marginBottom: 8, textAlign: "left", fontFamily: font.body }}>
-                    <span style={{ color: theme.primary, display: "flex" }}><item.Icon /></span>
-                    <span style={{ flex: 1 }}>
-                      <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: theme.primary }}>{item.label}</span>
-                      <span style={{ display: "block", fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>{item.desc}</span>
-                    </span>
-                    {view === item.id && <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: theme.gold, flexShrink: 0 }} />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
+        {menuOpen && (
+          <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.45)", zIndex: 1101 }} />
         )}
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, backgroundColor: theme.primaryDark, zIndex: 1000, display: "flex", justifyContent: "space-around", padding: "12px 0 14px", boxShadow: "0 -1px 0 rgba(255,255,255,0.08), 0 -8px 28px rgba(0,0,0,0.28)", paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}>
-          {mobileTabs.map(tab => (
-            <button key={tab.id} onClick={() => tab.isMore ? setMoreOpen(o => !o) : setView(tab.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "6px 6px", borderRadius: "8px", minWidth: "44px", minHeight: "48px" }}>
-              <span style={{ color: mobileIsActive(tab) ? "white" : "rgba(255,255,255,0.4)", display: "flex", position: "relative" }}><tab.Icon />{!tab.isMore && <NavTabBadge count={tabBadgeCount(tab.id, badges, role)} />}</span>
-              <span style={{ fontSize: "9px", color: mobileIsActive(tab) ? "white" : "rgba(255,255,255,0.4)", fontWeight: mobileIsActive(tab) ? "600" : "400", letterSpacing: "0.2px" }}>{tab.label}</span>
-              {mobileIsActive(tab) && <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.gold }} />}
-            </button>
-          ))}
+        <div style={{
+          position: "fixed", top: 0, left: 0, bottom: 0, width: "min(300px, 88vw)",
+          backgroundColor: theme.primaryDark, zIndex: 1102,
+          transform: menuOpen ? "translateX(0)" : "translateX(-105%)",
+          transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+          display: "flex", flexDirection: "column",
+          boxShadow: menuOpen ? theme.shadowLg : "none",
+          paddingTop: "max(12px, env(safe-area-inset-top))",
+        }}>
+          <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <VantageLogo size={32} dark={true} />
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>Navigate</div>
+            </div>
+            <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, width: 32, height: 32, color: "white", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
+            {allTabs.map(tab => (
+              <button key={tab.id} type="button" onClick={() => goTo(tab.id)} style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 14px", borderRadius: 9, border: "none", cursor: "pointer",
+                marginBottom: 3, textAlign: "left", fontFamily: font.body,
+                backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent",
+                color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.55)",
+                fontWeight: isTabActive(tab.id) ? 700 : 500, fontSize: 14,
+              }}>
+                <span style={{ display: "flex", position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} title={tabBadgeHint(tab.id, badges)} /></span>
+                <span>{tab.label}</span>
+                {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: 3, height: 16, borderRadius: 2, backgroundColor: theme.gold }} />}
+              </button>
+            ))}
+          </div>
+          <div style={{ padding: "12px 14px max(16px, env(safe-area-inset-bottom))", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <button type="button" onClick={() => { setMenuOpen(false); onLogout(); }} style={{
+              width: "100%", padding: "11px 14px", borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.15)", backgroundColor: "transparent",
+              color: "rgba(255,255,255,0.6)", cursor: "pointer", fontFamily: font.body, fontSize: 13, fontWeight: 600,
+            }}>Sign Out</button>
+          </div>
         </div>
       </>
     );
   }
 
-  const desktopTabs = isCrew ? crewTabs : ownerDesktopTabs;
+  if (mobile) {
+    return (
+      <>
+        {renderDrawer()}
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 1099,
+          height: "max(52px, calc(48px + env(safe-area-inset-top)))",
+          paddingTop: "env(safe-area-inset-top)",
+          backgroundColor: theme.primaryDark,
+          display: "flex", alignItems: "center",
+          paddingLeft: 10, paddingRight: 10,
+          boxShadow: "0 1px 0 rgba(255,255,255,0.06)",
+        }}>
+          <button type="button" onClick={() => setMenuOpen(o => !o)} aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} style={{
+            width: 44, height: 44, borderRadius: 10, border: "none", cursor: "pointer", flexShrink: 0,
+            backgroundColor: menuOpen ? "rgba(255,255,255,0.12)" : "transparent",
+            color: "white", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <IconMenu />
+          </button>
+          <span style={{
+            flex: 1, textAlign: "center", color: "white", fontWeight: 700, fontSize: 15,
+            fontFamily: font.display, letterSpacing: "-0.2px", padding: "0 6px",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>{currentLabel}</span>
+          <div style={{ width: 44, flexShrink: 0 }} aria-hidden="true" />
+        </div>
+      </>
+    );
+  }
+
+  const desktopTabs = isCrew ? crewTabs : ownerTabs;
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.primaryDark, display: "flex", flexDirection: "column", zIndex: 1000, boxShadow: "1px 0 0 rgba(255,255,255,0.06)" }}>
@@ -685,7 +709,7 @@ function NavBar({ view, setView, role, onLogout, badges = null }) {
       <div style={{ flex: 1, padding: "18px 12px", overflowY: "auto" }}>
         {desktopTabs.map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: isTabActive(tab.id) ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
-            <span style={{ display: "flex", flexShrink: 0, position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} /></span>
+            <span style={{ display: "flex", flexShrink: 0, position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} title={tabBadgeHint(tab.id, badges)} /></span>
             <span>{tab.label}</span>
             {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
           </button>
@@ -1425,6 +1449,8 @@ function Row({ main, sub, actions }) {
 }
 
 // ─── CREW HOME (personalized stats) ───────────────────────────
+// Legacy full crew home — kept for embedded schedule/voice blocks if needed elsewhere
+// eslint-disable-next-line no-unused-vars
 function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, embedded = false }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1540,7 +1566,8 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
       {voiceSupported && !readonly && (
         <div style={{ marginBottom: "22px" }}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>Voice Log</div>
-          <div style={{ ...styles.card, padding: "16px", background: voiceListening ? `linear-gradient(135deg, ${theme.primary} 0%, #0d3d2e 100%)` : "white", transition: "background 0.3s" }}>
+          <VoiceInCardFrame processing={voiceProcessing} processingLabel="Reading your entry…">
+          <div style={{ ...styles.card, padding: "16px", minHeight: 88, background: voiceListening && !voiceProcessing ? `linear-gradient(135deg, ${theme.primary} 0%, #0d3d2e 100%)` : "white", transition: "background 0.3s" }}>
             {voiceResult ? (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
@@ -1692,8 +1719,6 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
                       <div style={{ fontSize: "14px", fontWeight: "700", color: "white", marginBottom: "3px" }}>Listening... release when done</div>
                       {voiceTranscript && <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.75)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{voiceTranscript}</div>}
                     </>
-                  ) : voiceProcessing ? (
-                    <div style={{ fontSize: "14px", fontWeight: "600", color: theme.primary }}>Reading your entry...</div>
                   ) : voiceError ? (
                     <div style={{ fontSize: "13px", color: theme.danger, fontWeight: "500" }}>{voiceError}</div>
                   ) : (
@@ -1706,6 +1731,7 @@ function CrewHome({ token, setView, setVoicePrefill = null, readonly = false, em
               </div>
             )}
           </div>
+          </VoiceInCardFrame>
         </div>
       )}
 
@@ -4652,6 +4678,97 @@ function ScheduleScreen({ token, readonly = false }) {
 
 // ─── ADMIN ────────────────────────────────────────────────────
 // ─── JOB SETUP FLOW ─────────────────────────────────────────────
+function VoiceInCardFrame({ processing = false, processingLabel = "Reading your entry…", children }) {
+  return (
+    <div style={{ position: "relative", overflow: "hidden", borderRadius: 12 }}>
+      {children}
+      {processing && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 2,
+          backgroundColor: "rgba(255,255,255,0.94)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          gap: 10, padding: "20px 16px", borderRadius: 12,
+        }}>
+          <Spinner />
+          <span style={{ fontSize: 13, fontWeight: 600, color: theme.primary, textAlign: "center" }}>{processingLabel}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobQuickEdit({ token, job, onSaved, onCancel, compact = false }) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const [form, setForm] = useState({
+    job_name: job.job_name || "",
+    job_code: job.job_code || "",
+    city: job.city || "",
+    contract_value: job.contract_value != null ? String(job.contract_value) : "",
+    budgeted_hours: job.budgeted_hours != null ? String(job.budgeted_hours) : "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (!form.job_name.trim()) { setError(`${T.project} name is required`); return; }
+    setSaving(true);
+    setError("");
+    const params = { job_name: form.job_name.trim() };
+    if (form.city.trim()) params.city = form.city.trim();
+    if (form.job_code.trim()) params.job_code = form.job_code.trim();
+    if (form.contract_value !== "") params.contract_value = form.contract_value;
+    if (form.budgeted_hours !== "") params.budgeted_hours = form.budgeted_hours;
+    const res = await apiFetch(`${API}/jobs/${job.job_id}?${new URLSearchParams(params)}`, { method: "PATCH", headers });
+    setSaving(false);
+    if (res.ok) {
+      onSaved(await res.json());
+    } else {
+      setError("Could not save changes. Try again.");
+    }
+  }
+
+  return (
+    <div style={{ backgroundColor: theme.bg, borderRadius: 10, padding: compact ? "14px" : "18px", border: `1.5px solid ${theme.gold}`, marginBottom: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 4 }}>Project setup</div>
+      <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 14px", lineHeight: 1.45 }}>
+        Set the contract amount and hour budget so the dashboard can track profit and warn you when you&apos;re running hot.
+      </p>
+      <label style={{ ...styles.label, marginTop: 0 }}>{T.project} name</label>
+      <input style={styles.input} value={form.job_name} onChange={e => { setForm({ ...form, job_name: e.target.value }); setError(""); }} />
+      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10 }}>
+        <div>
+          <label style={styles.label}>City</label>
+          <input style={styles.input} placeholder="e.g. Burnaby" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Job code (optional)</label>
+          <input style={styles.input} placeholder="e.g. JB-2024" value={form.job_code} onChange={e => setForm({ ...form, job_code: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Contract value ($)</label>
+          <input style={styles.input} type="number" placeholder="What the customer pays" value={form.contract_value} onChange={e => setForm({ ...form, contract_value: e.target.value })} />
+        </div>
+        <div>
+          <label style={styles.label}>Budgeted hours</label>
+          <input style={styles.input} type="number" placeholder="Expected labour hours" value={form.budgeted_hours} onChange={e => setForm({ ...form, budgeted_hours: e.target.value })} />
+        </div>
+      </div>
+      {error && <p style={{ ...styles.errorMsg, marginTop: 8 }}>{error}</p>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        <button type="button" disabled={saving} onClick={save} style={{ ...styles.button, marginTop: 0, flex: 1, minWidth: 120 }}>
+          {saving ? <><Spinner /> Saving…</> : "Save project details"}
+        </button>
+        {onCancel && (
+          <button type="button" onClick={onCancel} style={{ ...styles.button, marginTop: 0, backgroundColor: "#888", flex: compact ? undefined : 1 }}>Done</button>
+        )}
+      </div>
+      <button type="button" onClick={() => goToSettingsTab("categories")} style={{ marginTop: 10, background: "none", border: "none", color: theme.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font.body, padding: 0 }}>
+        Set up work types (framing, electrical, etc.) →
+      </button>
+    </div>
+  );
+}
+
 function ProjectCreateForm({ token, onCreated, onCancel, minimal = false, embedded = false, showCancel = true, submitLabel = null }) {
   const [jobForm, setJobForm] = useState({ job_name: "", job_code: "", city: "", contract_value: "", budgeted_hours: "" });
   const [saving, setSaving] = useState(false);
@@ -4682,26 +4799,39 @@ function ProjectCreateForm({ token, onCreated, onCancel, minimal = false, embedd
   return (
     <div style={embedded || minimal ? {} : { ...styles.card, maxWidth: "640px", padding: "28px" }}>
       {!minimal && !embedded && <h3 style={{ fontSize: "16px", fontWeight: "700", color: theme.primary, margin: "0 0 18px", fontFamily: font.display }}>New {T.project}</h3>}
-      <label style={styles.label}>{T.project} Name *</label>
-      <input style={styles.input} placeholder="e.g. Johnson Basement Reno" value={jobForm.job_name} onChange={e => { setJobForm({ ...jobForm, job_name: e.target.value }); setError(""); }} />
+
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Project basics</div>
+        <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 12px", lineHeight: 1.45 }}>Name this job the way your crew will recognize it.</p>
+        <label style={{ ...styles.label, marginTop: 0 }}>{T.project} name *</label>
+        <input style={styles.input} placeholder="e.g. Johnson Basement Reno" value={jobForm.job_name} onChange={e => { setJobForm({ ...jobForm, job_name: e.target.value }); setError(""); }} />
+        <label style={styles.label}>City (optional)</label>
+        <input style={styles.input} placeholder="e.g. Burnaby" value={jobForm.city} onChange={e => setJobForm({ ...jobForm, city: e.target.value })} />
+      </div>
+
+      <div style={{ marginBottom: 18, padding: isMobile() ? "14px" : "16px", backgroundColor: theme.bg, borderRadius: 10, border: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Budget & contract</div>
+        <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 12px", lineHeight: 1.45 }}>
+          Contract value is what the customer pays. Budgeted hours is how long you expect the crew to take — the dashboard compares actual spend and hours against these.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div>
+            <label style={{ ...styles.label, marginTop: 0 }}>Contract value ($)</label>
+            <input style={styles.input} type="number" placeholder="e.g. 45000" value={jobForm.contract_value} onChange={e => setJobForm({ ...jobForm, contract_value: e.target.value })} />
+          </div>
+          <div>
+            <label style={{ ...styles.label, marginTop: 0 }}>Budgeted hours</label>
+            <input style={styles.input} type="number" placeholder="e.g. 320" value={jobForm.budgeted_hours} onChange={e => setJobForm({ ...jobForm, budgeted_hours: e.target.value })} />
+          </div>
+        </div>
+      </div>
+
       {!minimal && (
         <>
-          <label style={styles.label}>{T.project} Code (optional)</label>
+          <label style={styles.label}>{T.project} code (optional)</label>
           <input style={styles.input} placeholder="e.g. JB-2024-047" value={jobForm.job_code} onChange={e => setJobForm({ ...jobForm, job_code: e.target.value })} />
         </>
       )}
-      <label style={styles.label}>City (optional)</label>
-      <input style={styles.input} placeholder="e.g. Burnaby" value={jobForm.city} onChange={e => setJobForm({ ...jobForm, city: e.target.value })} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-        <div>
-          <label style={styles.label}>Contract Value ($)</label>
-          <input style={styles.input} type="number" placeholder="0.00" value={jobForm.contract_value} onChange={e => setJobForm({ ...jobForm, contract_value: e.target.value })} />
-        </div>
-        <div>
-          <label style={styles.label}>Budgeted Hours</label>
-          <input style={styles.input} type="number" placeholder="0" value={jobForm.budgeted_hours} onChange={e => setJobForm({ ...jobForm, budgeted_hours: e.target.value })} />
-        </div>
-      </div>
       {error && <p style={styles.errorMsg}>{error}</p>}
       <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
         <button type="button" onClick={handleSubmit} disabled={saving} style={{ ...styles.button, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginTop: 0 }}>
@@ -4859,28 +4989,33 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
   const settingsTabGroups = [
     {
       label: "Organization",
+      desc: "Your company, people, and how you get alerted.",
       tabs: [
-        { id: "company", label: "Company Profile" },
-        { id: "notifications", label: "Notifications" },
-        { id: "projects", label: T.projects },
-        { id: "crew", label: "Crew Management" },
+        { id: "company", label: "Company Profile", desc: "Business name and contact info on PDFs" },
+        { id: "notifications", label: "Notifications", desc: "Bell icon and pop-up alerts" },
+        { id: "projects", label: T.projects, desc: "Add jobs, budgets, archive old work" },
+        { id: "crew", label: "Crew Management", desc: "Workers, pay rates, phone logins" },
       ],
     },
     {
       label: "Job setup",
+      desc: "How hours and quotes are organized on each job.",
       tabs: [
-        { id: "categories", label: T.workCategories },
-        { id: "estimating", label: "Estimating" },
+        { id: "categories", label: T.workCategories, desc: "Framing, electrical, etc. for time logs" },
+        { id: "estimating", label: "Estimating", desc: "Default rates for customer quotes" },
       ],
     },
     {
       label: "Money & data",
+      desc: "Pay rules and downloading your records.",
       tabs: [
-        { id: "financials", label: "Financials" },
-        { id: "exports", label: "Data Exports" },
+        { id: "financials", label: "Financials", desc: "Overtime and premium pay multipliers" },
+        { id: "exports", label: "Data Exports", desc: "Download CSV reports" },
       ],
     },
   ];
+
+  const activeTabMeta = settingsTabGroups.flatMap(g => g.tabs).find(t => t.id === settingsTab);
 
   useEffect(() => { setSettingsTab(initialTab); }, [initialTab]);
 
@@ -5066,7 +5201,7 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
 
   return (
     <ScreenContainer>
-      <ScreenHeader title="Settings & Configuration" subtitle="Company profile, projects, crew, and financial defaults." />
+      <ScreenHeader title="Settings & Configuration" subtitle="Set up your company, crew, job types, and money defaults — each section below is explained in plain language." />
 
       {message && <div style={{ color: theme.accent, fontWeight: "600", marginBottom: "14px", backgroundColor: theme.accentLight, padding: "11px 14px", borderRadius: "8px", fontSize: "13px", border: `1px solid ${theme.accent}` }}>{message}</div>}
 
@@ -5080,21 +5215,29 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
         />
       ) : (
         <div style={{ display: "flex", flexDirection: isMobile() ? "column" : "row", gap: "20px", alignItems: "flex-start" }}>
-          <div style={{ width: isMobile() ? "100%" : "240px", flexShrink: 0 }}>
+          <div style={{ width: isMobile() ? "100%" : "260px", flexShrink: 0 }}>
             {settingsTabGroups.map(group => (
-              <div key={group.label} style={{ marginBottom: isMobile() ? 12 : 18 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: theme.textLight, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6, paddingLeft: 2 }}>
+              <div key={group.label} style={{ marginBottom: isMobile() ? 14 : 20, padding: isMobile() ? "12px" : "14px", backgroundColor: "white", borderRadius: 12, border: `1px solid ${theme.border}`, boxShadow: theme.shadowSm }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: theme.primary, letterSpacing: "0.3px", marginBottom: 4, paddingLeft: 2 }}>
                   {group.label}
+                </div>
+                <div style={{ fontSize: 11, color: theme.textSecondary, lineHeight: 1.4, marginBottom: 10, paddingLeft: 2 }}>
+                  {group.desc}
                 </div>
                 <div style={{ display: "flex", flexDirection: isMobile() ? "row" : "column", flexWrap: "wrap", gap: "6px" }}>
                   {group.tabs.map(t => (
                     <button key={t.id} type="button" onClick={() => setSettingsTab(t.id)} style={{
-                      padding: "10px 14px", borderRadius: "8px", border: `1.5px solid ${settingsTab === t.id ? theme.accent : theme.border}`,
-                      backgroundColor: settingsTab === t.id ? theme.accentLight : "white",
+                      padding: "10px 12px", borderRadius: "8px", border: `1.5px solid ${settingsTab === t.id ? theme.accent : theme.border}`,
+                      backgroundColor: settingsTab === t.id ? theme.accentLight : theme.bg,
                       color: settingsTab === t.id ? theme.primary : theme.textSecondary,
                       fontWeight: settingsTab === t.id ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: font.body,
                       textAlign: "left", flex: isMobile() ? "1 1 auto" : undefined, width: isMobile() ? undefined : "100%",
-                    }}>{t.label}</button>
+                    }}>
+                      <span style={{ display: "block" }}>{t.label}</span>
+                      {!isMobile() && t.desc && (
+                        <span style={{ display: "block", fontSize: 10, fontWeight: 500, color: settingsTab === t.id ? theme.textSecondary : theme.textLight, marginTop: 3, lineHeight: 1.35 }}>{t.desc}</span>
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -5102,6 +5245,12 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
           </div>
 
           <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
+            {activeTabMeta && (
+              <div style={{ marginBottom: 16, padding: "14px 16px", backgroundColor: theme.accentLight, borderRadius: 10, borderLeft: `4px solid ${theme.accent}` }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary, marginBottom: 4, fontFamily: font.display }}>{activeTabMeta.label}</div>
+                <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0, lineHeight: 1.55 }}>{activeTabMeta.desc}</p>
+              </div>
+            )}
             {settingsTab === "company" && (
               <div style={styles.card}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.primary, margin: "0 0 16px", fontFamily: font.display }}>Company Profile</h2>
@@ -5353,6 +5502,7 @@ function Dashboard({ token, readonly = false, topOffset = 0, setView = null }) {
   const [savingCO, setSavingCO] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [focusJobId, setFocusJobId] = useState(null);
+  const [editingJobId, setEditingJobId] = useState(null);
 
   useHistoryOverlay(showNewProject, "new-project", () => setShowNewProject(false), "dashboard");
 
@@ -5454,7 +5604,7 @@ function Dashboard({ token, readonly = false, topOffset = 0, setView = null }) {
   const totalKm = mileage.reduce((s, m) => s + Number(m.km_driven || 0), 0);
 
   return (
-    <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: "90px", paddingTop: topOffset ? `${topOffset}px` : undefined }}>
+    <div style={{ fontFamily: font.body, backgroundColor: theme.bg, minHeight: "100vh", paddingBottom: isMobile() ? "max(28px, calc(20px + env(safe-area-inset-bottom)))" : "90px", paddingTop: topOffset ? `${topOffset}px` : undefined }}>
       {/* Header */}
       <div style={{ background: `linear-gradient(150deg, ${theme.primaryDark} 0%, ${theme.primary} 55%, ${theme.accent} 115%)`, padding: "32px 22px 38px", color: "white", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.06)" }}>
         <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
@@ -5516,6 +5666,7 @@ function Dashboard({ token, readonly = false, topOffset = 0, setView = null }) {
               onCreated={(job) => {
                 setShowNewProject(false);
                 setFocusJobId(job.job_id);
+                setEditingJobId(job.job_id);
                 setExpanded(prev => ({ ...prev, [job.job_id]: true }));
                 loadDashboard();
               }}
@@ -5704,6 +5855,24 @@ function Dashboard({ token, readonly = false, topOffset = 0, setView = null }) {
 
               {isOpen && (
                 <div onClick={e => e.stopPropagation()} style={{ padding: "0 18px 18px", borderTop: `1px solid ${theme.border}` }}>
+
+                  {editingJobId === job.job_id ? (
+                    <div style={{ paddingTop: 14 }}>
+                      <JobQuickEdit
+                        token={token}
+                        job={job}
+                        compact
+                        onSaved={() => { setEditingJobId(null); setFocusJobId(null); loadDashboard(); }}
+                        onCancel={() => { setEditingJobId(null); setFocusJobId(null); }}
+                      />
+                    </div>
+                  ) : !readonly && (
+                    <div style={{ paddingTop: 12, marginBottom: 4 }}>
+                      <button type="button" onClick={() => setEditingJobId(job.job_id)} style={{ fontSize: 12, fontWeight: 700, color: theme.accent, background: "none", border: `1px solid ${theme.accent}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontFamily: font.body }}>
+                        Edit contract, hours &amp; details
+                      </button>
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "14px", marginBottom: "10px" }}>
                     <div style={{ fontSize: "11px", fontWeight: "600", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.6px" }}>Change Orders</div>
@@ -6476,22 +6645,44 @@ function notifAllowedByPrefs(n, prefs) {
 
 function notifTypeMeta(type) {
   const map = {
-    new_request: { color: theme.gold, label: "Request" },
-    new_comment: { color: theme.accent, label: "Message" },
-    request_approved: { color: theme.accent, label: "Approved" },
-    request_denied: { color: theme.danger, label: "Denied" },
-    field_estimate_submitted: { color: theme.gold, label: "Site quote" },
-    field_estimate_approved: { color: theme.accent, label: "Quote approved" },
-    field_estimate_returned: { color: theme.danger, label: "Quote returned" },
-    estimate_comment: { color: theme.accent, label: "Estimate chat" },
-    change_order: { color: theme.primary, label: "Change order" },
-    budget_warning: { color: theme.danger, label: "Budget alert" },
-    schedule_assigned: { color: theme.accent, label: "Schedule" },
-    schedule_updated: { color: theme.accent, label: "Schedule" },
-    invoice_generated: { color: theme.primary, label: "Invoice" },
-    magic_link_submit: { color: theme.gold, label: "Submittal" },
+    new_request: { color: theme.gold, label: "New request", hint: "Someone submitted a field request that needs a response." },
+    new_comment: { color: theme.accent, label: "Request reply", hint: "New message on a request thread." },
+    request_approved: { color: theme.accent, label: "Request approved", hint: "Your request was approved by the office." },
+    request_denied: { color: theme.danger, label: "Request denied", hint: "Your request was declined — open to see why." },
+    field_estimate_submitted: { color: theme.gold, label: "Crew quote to review", hint: "A crew member finished a site quote and needs your approval before sending to the customer." },
+    field_estimate_approved: { color: theme.accent, label: "Quote approved", hint: "The office approved your site quote — you can send it to the customer." },
+    field_estimate_returned: { color: theme.danger, label: "Quote sent back", hint: "The office returned your quote with notes — open to make changes." },
+    estimate_comment: { color: theme.accent, label: "Estimate message", hint: "Someone left a note on an estimate — open the thread to read it." },
+    change_order: { color: theme.primary, label: "Change order", hint: "A contract change was recorded on a project." },
+    budget_warning: { color: theme.danger, label: "Over budget", hint: "A project is running over its contract value or hour budget." },
+    schedule_assigned: { color: theme.accent, label: "New shift", hint: "You were assigned to a job on the schedule." },
+    schedule_updated: { color: theme.accent, label: "Schedule change", hint: "One of your scheduled shifts was updated." },
+    invoice_generated: { color: theme.primary, label: "Invoice ready", hint: "A new invoice was created and is ready to send." },
+    magic_link_submit: { color: theme.gold, label: "Subcontractor form", hint: "A subcontractor submitted their paperwork via your link." },
   };
-  return map[type] || { color: theme.textSecondary, label: "Update" };
+  return map[type] || { color: theme.textSecondary, label: "Update", hint: "Open to see details." };
+}
+
+function tabBadgeHint(tabId, badges) {
+  if (!badges) return "";
+  if (tabId === "estimate" || tabId === "field_estimate") {
+    const parts = [];
+    if (badges.pending_estimates) parts.push(`${badges.pending_estimates} crew quote${badges.pending_estimates !== 1 ? "s" : ""} awaiting your review`);
+    const estNotifs = badges.estimates || 0;
+    if (estNotifs) parts.push(`${estNotifs} estimate message${estNotifs !== 1 ? "s" : ""} or update${estNotifs !== 1 ? "s" : ""}`);
+    return parts.join(" · ");
+  }
+  if (tabId === "requests" || tabId === "crew_requests") return badges.requests ? `${badges.requests} open request${badges.requests !== 1 ? "s" : ""}` : "";
+  if (tabId === "dashboard") return badges.projects ? `${badges.projects} project alert${badges.projects !== 1 ? "s" : ""}` : "";
+  if (tabId === "billing") return badges.billing ? `${badges.billing} billing update${badges.billing !== 1 ? "s" : ""}` : "";
+  if (tabId === "schedule") return badges.schedules ? `${badges.schedules} schedule update${badges.schedules !== 1 ? "s" : ""}` : "";
+  if (tabId === "home") {
+    const parts = [];
+    if (badges.schedules) parts.push(`${badges.schedules} schedule update${badges.schedules !== 1 ? "s" : ""}`);
+    if (badges.estimates) parts.push(`${badges.estimates} estimate update${badges.estimates !== 1 ? "s" : ""}`);
+    return parts.join(" · ");
+  }
+  return "";
 }
 
 function tabBadgeCount(tabId, badges, role) {
@@ -6502,15 +6693,15 @@ function tabBadgeCount(tabId, badges, role) {
   if (tabId === "home") return (badges.schedules || 0) + (badges.estimates || 0);
   if (tabId === "dashboard") return badges.projects || 0;
   if (tabId === "billing") return badges.billing || 0;
+  if (tabId === "schedule") return badges.schedules || 0;
   if (tabId === "inventory") return 0;
-  if (tabId === "more") return (badges.estimates || 0) + (badges.pending_estimates || 0) + (badges.billing || 0);
   return 0;
 }
 
-function NavTabBadge({ count }) {
+function NavTabBadge({ count, title: titleHint = "" }) {
   if (!count) return null;
   return (
-    <span style={{ position: "absolute", top: "-2px", right: "-4px", minWidth: "16px", height: "16px", padding: "0 4px", borderRadius: "8px", backgroundColor: theme.danger, color: "white", fontSize: "9px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, border: "2px solid rgba(15,40,24,0.9)" }}>
+    <span title={titleHint || undefined} style={{ position: "absolute", top: "-2px", right: "-4px", minWidth: "16px", height: "16px", padding: "0 4px", borderRadius: "8px", backgroundColor: theme.danger, color: "white", fontSize: "9px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.body, border: "2px solid rgba(15,40,24,0.9)" }}>
       {count > 9 ? "9+" : count}
     </span>
   );
@@ -6570,13 +6761,13 @@ function NotificationToast({ toast, onDismiss, onOpen }) {
   if (!toast) return null;
   const meta = notifTypeMeta(toast.type);
   return (
-    <div style={{ position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom))", left: "50%", transform: "translateX(-50%)", zIndex: 1200, width: "min(420px, calc(100vw - 28px))", backgroundColor: "white", borderRadius: "14px", border: `1.5px solid ${theme.border}`, boxShadow: theme.shadowLg, padding: "14px 16px", animation: "vlFadeUp 0.25s ease both", cursor: "pointer" }} onClick={onOpen}>
+    <div style={{ position: "fixed", bottom: "calc(22px + env(safe-area-inset-bottom))", left: "50%", transform: "translateX(-50%)", zIndex: 1200, width: "min(420px, calc(100vw - 28px))", backgroundColor: "white", borderRadius: "14px", border: `1.5px solid ${theme.border}`, boxShadow: theme.shadowLg, padding: "14px 16px", animation: "vlFadeUp 0.25s ease both", cursor: "pointer" }} onClick={onOpen}>
       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
         <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: meta.color, marginTop: "5px", flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "10px", fontWeight: "700", color: meta.color, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>{meta.label}</div>
           <div style={{ fontSize: "14px", fontWeight: "700", color: theme.primary }}>{toast.title}</div>
-          {toast.message && <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "4px", lineHeight: 1.4 }}>{toast.message}</div>}
+          <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "4px", lineHeight: 1.4 }}>{toast.message || meta.hint}</div>
         </div>
         <button type="button" onClick={e => { e.stopPropagation(); onDismiss(); }} style={{ background: "none", border: "none", color: theme.textLight, cursor: "pointer", fontSize: "18px", lineHeight: 1, padding: "0 4px" }}>×</button>
       </div>
@@ -6691,7 +6882,7 @@ function NotificationBell({ token, role, setView, mobile, onSummaryChange }) {
   return (
     <>
       <NotificationToast toast={toast} onDismiss={() => setToast(null)} onOpen={() => { setToast(null); setOpen(true); loadItems(); }} />
-      <div style={{ position: "fixed", top: mobile ? "12px" : "20px", right: mobile ? "14px" : "26px", zIndex: 1100 }}>
+      <div style={{ position: "fixed", top: mobile ? "max(10px, calc(6px + env(safe-area-inset-top)))" : "20px", right: mobile ? "14px" : "26px", zIndex: 1100 }}>
         <button onClick={() => { const next = !open; setOpen(next); if (next) refreshAll(); }} aria-label={`Notifications${displayCount ? `, ${displayCount} unread` : ""}`} style={{ position: "relative", width: "42px", height: "42px", borderRadius: "12px", border: `1px solid ${displayCount > 0 ? theme.gold : theme.border}`, backgroundColor: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: displayCount > 0 ? "0 2px 12px rgba(200,151,58,0.25)" : theme.shadowMd }}>
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={open || displayCount > 0 ? theme.primary : theme.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           {displayCount > 0 && (
@@ -6730,7 +6921,7 @@ function NotificationBell({ token, role, setView, mobile, onSummaryChange }) {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: "10px", fontWeight: "700", color: meta.color, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "2px" }}>{meta.label}</div>
                           <div style={{ fontSize: "13px", fontWeight: n.read ? "500" : "700", color: theme.textPrimary, marginBottom: "2px" }}>{n.title}</div>
-                          {n.message && <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4, marginBottom: "3px" }}>{n.message}</div>}
+                          <div style={{ fontSize: "12px", color: theme.textSecondary, lineHeight: 1.4, marginBottom: "3px" }}>{n.message || meta.hint}</div>
                           <div style={{ fontSize: "10.5px", color: theme.textLight }}>{timeAgo(n.created_at)}</div>
                         </div>
                         {!n.read && <span style={{ flexShrink: 0, width: "8px", height: "8px", borderRadius: "50%", backgroundColor: theme.danger, marginTop: "5px" }} />}
@@ -8120,6 +8311,40 @@ async function generateFieldEstimateAI(token, estimateId, { description, scope_s
   return await res.json();
 }
 
+function appendVoiceText(prev, spoken) {
+  const chunk = (spoken || "").trim();
+  if (!chunk) return prev || "";
+  const base = (prev || "").trim();
+  return base ? `${base} ${chunk}` : chunk;
+}
+
+function EstimateVoiceCapture({ voice, onTranscript, disabled = false, label = "Hold to describe the job" }) {
+  async function handleDone(spoken) {
+    if (spoken?.trim()) onTranscript(spoken);
+  }
+  if (!voice.supported) return null;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <VoiceHoldButton voice={voice} onDone={handleDone} disabled={disabled} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary }}>{label}</div>
+          <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 3, lineHeight: 1.4 }}>
+            Hold and speak — swipe up on the mic to keep recording while you walk the site. Tap when finished.
+          </div>
+        </div>
+      </div>
+      {(voice.listening || voice.locked) && voice.transcript && (
+        <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, backgroundColor: theme.bg, border: `1px solid ${theme.border}`, maxHeight: 120, overflowY: "auto" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, marginBottom: 4 }}>Live transcript</div>
+          <p style={{ fontSize: 13, color: theme.textPrimary, margin: 0, lineHeight: 1.45, fontStyle: "italic" }}>{voice.transcript}</p>
+        </div>
+      )}
+      {voice.error && <p style={{ ...styles.errorMsg, marginTop: 8, marginBottom: 0 }}>{voice.error}</p>}
+    </div>
+  );
+}
+
 function AIEstimatePanel({
   token,
   jobs = [],
@@ -8138,6 +8363,7 @@ function AIEstimatePanel({
   const [clientName, setClientName] = useState("");
   const [city, setCity] = useState("");
   const [localJobId, setLocalJobId] = useState(jobId ? String(jobId) : "");
+  const voice = useVoiceRecorder();
 
   useEffect(() => {
     if (jobId) {
@@ -8313,6 +8539,12 @@ function AIEstimatePanel({
       )}
 
       <label style={{ ...styles.label, marginTop: 0 }}>What needs to be done?</label>
+      <EstimateVoiceCapture
+        voice={voice}
+        disabled={generating}
+        label="Describe by voice"
+        onTranscript={(spoken) => setDescription(prev => appendVoiceText(prev, spoken))}
+      />
       <textarea
         style={{ ...styles.textarea, minHeight: 140, fontSize: 15, lineHeight: 1.5, marginBottom: 4 }}
         placeholder="Describe everything you know — scope, rooms, materials, timeline, access issues, anything that affects price. e.g. Full bathroom reno at Johnson's: demo existing, rough-in plumbing, waterproof shower, tile floor and walls, install vanity and toilet, paint…"
@@ -8354,9 +8586,8 @@ function FieldEstimateScreen({ token, readonly = false }) {
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [aiHints, setAiHints] = useState(null);
-  const [voiceSupported] = useState(() => typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window));
-  const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const estimateVoice = useVoiceRecorder();
   const [quoteApiReady, setQuoteApiReady] = useState(true);
 
   useHistoryOverlay(view === "edit", "field-estimate-edit", () => { setView("list"); loadList(); }, "field_estimate");
@@ -8555,24 +8786,11 @@ function FieldEstimateScreen({ token, readonly = false }) {
     }
   }
 
-  function startVoice() {
-    if (!voiceSupported || readonly) return;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.lang = "en-CA";
-    setListening(true);
-    setTranscript("");
-    rec.onresult = (e) => {
-      let text = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) text += e.results[i][0].transcript;
-      setTranscript(text);
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.start();
-    window._fieldEstVoice = rec;
+  function handleEstimateVoice(spoken) {
+    const chunk = (spoken || "").trim();
+    if (!chunk) return;
+    setTranscript(prev => appendVoiceText(prev, chunk));
+    setScopeSummary(prev => appendVoiceText(prev, chunk));
   }
 
   async function uploadPhoto(e) {
@@ -8699,14 +8917,17 @@ function FieldEstimateScreen({ token, readonly = false }) {
         {!readOnly && (
           <div style={{ ...styles.card, marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Capture site info</div>
-            {voiceSupported && (
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <button type="button" onClick={startVoice} disabled={listening} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: listening ? theme.primaryDark : theme.accent, fontSize: 13 }}>
-                  {listening ? "Listening…" : "Record voice note"}
-                </button>
+            <EstimateVoiceCapture
+              voice={estimateVoice}
+              disabled={readOnly || generating || busy}
+              onTranscript={handleEstimateVoice}
+            />
+            {transcript && (
+              <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 10, backgroundColor: theme.bg, border: `1px solid ${theme.border}`, maxHeight: 140, overflowY: "auto" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, marginBottom: 4 }}>Voice note (included in AI generate)</div>
+                <p style={{ fontSize: 13, color: theme.textPrimary, margin: 0, lineHeight: 1.45, fontStyle: "italic" }}>"{transcript}"</p>
               </div>
             )}
-            {transcript && <p style={{ fontSize: 12, color: theme.textSecondary, fontStyle: "italic", marginBottom: 10 }}>"{transcript}"</p>}
             <label style={styles.label}>Scope summary</label>
             <textarea style={styles.textarea} value={scopeSummary} onChange={e => setScopeSummary(e.target.value)} placeholder="What needs to be done on site?" />
             <label style={styles.label}>Site notes</label>
@@ -9112,15 +9333,37 @@ function EstimateHub({ token, readonly = false }) {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: theme.primary, fontFamily: font.display, marginBottom: 4 }}>Needs your attention</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: theme.primary, fontFamily: font.display, marginBottom: 6 }}>Needs your attention</div>
+              <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 12px", lineHeight: 1.45 }}>
+                {pendingReview.length > 0
+                  ? "Crew finished site quotes that need your sign-off before they go to the customer."
+                  : "Quotes waiting on customer approval before the dashboard baseline updates."}
+              </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {pendingReview.length > 0 && (
+                {pendingReview.slice(0, 4).map(est => {
+                  const unread = hasUnreadThread(est);
+                  return (
+                    <button key={est.estimate_id} type="button" onClick={() => { setReviewOpen(est.estimate_id); if (est.job_id) setSelectedJobId(est.job_id); scrollToPending(); }} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, width: "100%", textAlign: "left", padding: "12px 14px", borderRadius: 10, border: `1px solid ${unread ? theme.danger : theme.gold}`, backgroundColor: "white", cursor: "pointer", fontFamily: "inherit" }}>
+                      <span style={{ fontSize: 13, color: theme.textPrimary, lineHeight: 1.45 }}>
+                        <strong>{est.job_name || est.title || T.project}</strong>
+                        {est.created_by_name ? ` — quote from ${est.created_by_name}` : " — crew site quote"}
+                        {unread ? <span style={{ display: "block", color: theme.danger, fontWeight: 600, marginTop: 4, fontSize: 12 }}>New message in thread — tap to read</span> : <span style={{ display: "block", color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>Ready for your review (${fmt(est.total_cost || 0)})</span>}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: theme.gold, whiteSpace: "nowrap", flexShrink: 0 }}>Open →</span>
+                    </button>
+                  );
+                })}
+                {pendingReview.length > 4 && (
+                  <button type="button" onClick={scrollToPending} style={{ fontSize: 12, fontWeight: 600, color: theme.accent, background: "none", border: "none", cursor: "pointer", padding: "4px 0", fontFamily: font.body, textAlign: "left" }}>
+                    + {pendingReview.length - 4} more quote{pendingReview.length - 4 !== 1 ? "s" : ""} to review
+                  </button>
+                )}
+                {pendingReview.length === 0 && unreadPending.length > 0 && (
                   <button type="button" onClick={scrollToPending} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", textAlign: "left", padding: "12px 14px", borderRadius: 10, border: `1px solid ${theme.gold}`, backgroundColor: "white", cursor: "pointer", fontFamily: "inherit" }}>
                     <span style={{ fontSize: 14, color: theme.textPrimary, lineHeight: 1.4 }}>
-                      <strong>{pendingReview.length}</strong> site quote{pendingReview.length !== 1 ? "s" : ""} awaiting review
-                      {unreadPending.length > 0 && <span style={{ color: theme.danger, fontWeight: 600 }}> · {unreadPending.length} new message{unreadPending.length !== 1 ? "s" : ""}</span>}
+                      <strong>{unreadPending.length}</strong> estimate message{unreadPending.length !== 1 ? "s" : ""} you haven&apos;t read
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: theme.gold, whiteSpace: "nowrap" }}>Review →</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: theme.gold, whiteSpace: "nowrap" }}>View →</span>
                   </button>
                 )}
                 {selectedJob && sentAwaitingBaseline.length > 0 && (
@@ -9214,11 +9457,15 @@ function EstimateHub({ token, readonly = false }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 11, fontWeight: 800, color: theme.gold, backgroundColor: theme.goldLight, padding: "2px 7px", borderRadius: 6 }}>#{idx + 1}</span>
                       <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary }}>{est.job_name || est.title}</div>
-                      <EstimateActionBadge label={unread ? "New message" : "Review needed"} tone={unread ? "accent" : "gold"} />
+                      <EstimateActionBadge label={unread ? "Unread message" : "Needs your review"} tone={unread ? "accent" : "gold"} />
                     </div>
-                    <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>
-                      {est.created_by_name ? `From ${est.created_by_name}` : "From crew"} · ${fmt(est.total_cost || 0)} · {Number(est.total_hours || 0).toFixed(1)}h
-                      {est.comment_count > 0 && ` · ${est.comment_count} message${est.comment_count !== 1 ? "s" : ""}${unread ? " (unread)" : ""}`}
+                    <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4, lineHeight: 1.45 }}>
+                      {unread
+                        ? `New message from ${est.created_by_name || "crew"} — open thread to reply`
+                        : est.created_by_name
+                          ? `${est.created_by_name} submitted this site quote for your approval`
+                          : "Crew submitted this site quote — approve to send to customer or return with notes"}
+                      {" · "}${fmt(est.total_cost || 0)} · {Number(est.total_hours || 0).toFixed(1)}h
                     </div>
                     {est.scope_summary && <div style={{ fontSize: 12, color: theme.textPrimary, marginTop: 6, lineHeight: 1.45 }}>{est.scope_summary}</div>}
                   </div>
@@ -9938,43 +10185,179 @@ function MagicLinkScreen({ token: linkToken }) {
 
 function useVoiceRecorder() {
   const [listening, setListening] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState("");
   const supported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
   const recognitionRef = useRef(null);
+  const lockedRef = useRef(false);
+  const transcriptRef = useRef("");
 
-  const startListening = useCallback(() => {
-    if (!supported) return;
-    setError("");
-    setTranscript("");
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SR();
+  useEffect(() => { lockedRef.current = locked; }, [locked]);
+
+  const attachRecognition = useCallback((recognition, continuous) => {
     recognition.lang = "en-CA";
-    recognition.continuous = false;
+    recognition.continuous = continuous;
     recognition.interimResults = true;
-    recognitionRef.current = recognition;
-    window._voiceTranscript = "";
     recognition.onresult = (e) => {
       const t = Array.from(e.results).map(r => r[0].transcript).join("");
+      transcriptRef.current = t;
       setTranscript(t);
-      window._voiceTranscript = t;
     };
     recognition.onerror = (e) => {
+      if (e.error === "no-speech" && lockedRef.current) return;
       setListening(false);
+      setLocked(false);
+      lockedRef.current = false;
       setError(e.error === "not-allowed" ? "Microphone access denied." : "Could not hear clearly. Try again.");
     };
-    recognition.onend = () => setListening(false);
-    recognition.start();
-    setListening(true);
-  }, [supported]);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
+    recognition.onend = () => {
+      if (lockedRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          setListening(false);
+          setLocked(false);
+          lockedRef.current = false;
+        }
+        return;
+      }
+      setListening(false);
+    };
   }, []);
 
-  const getTranscript = useCallback(() => window._voiceTranscript || transcript, [transcript]);
+  const startSession = useCallback((continuous) => {
+    if (!supported) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SR();
+    recognitionRef.current = recognition;
+    attachRecognition(recognition, continuous);
+    if (!continuous) {
+      transcriptRef.current = "";
+      setTranscript("");
+    }
+    setError("");
+    setListening(true);
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      setError("Could not start microphone. Try again.");
+    }
+  }, [supported, attachRecognition]);
 
-  return { listening, transcript, error, setError, setTranscript, supported, startListening, stopListening, getTranscript };
+  const startListening = useCallback(() => {
+    lockedRef.current = false;
+    setLocked(false);
+    startSession(false);
+  }, [startSession]);
+
+  const lockListening = useCallback(() => {
+    lockedRef.current = true;
+    setLocked(true);
+    try { recognitionRef.current?.stop(); } catch { /* restart via onend */ }
+    setTimeout(() => startSession(true), 150);
+  }, [startSession]);
+
+  const stopListening = useCallback(() => {
+    lockedRef.current = false;
+    setLocked(false);
+    setListening(false);
+    try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
+    try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+  }, []);
+
+  const getTranscript = useCallback(() => transcriptRef.current || transcript, [transcript]);
+
+  return {
+    listening, locked, transcript, error, setError, setTranscript,
+    supported, startListening, lockListening, stopListening, getTranscript,
+  };
+}
+
+function VoiceHoldButton({ voice, onDone, disabled = false }) {
+  const startYRef = useRef(null);
+  const didLockRef = useRef(false);
+
+  function finishCapture() {
+    const t = voice.getTranscript();
+    voice.stopListening();
+    if (t?.trim()) onDone(t);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onPointerDown={(e) => {
+          if (disabled || voice.locked) return;
+          e.preventDefault();
+          startYRef.current = e.clientY;
+          didLockRef.current = false;
+          voice.setError("");
+          voice.startListening();
+        }}
+        onPointerMove={(e) => {
+          if (!voice.listening || voice.locked || startYRef.current == null) return;
+          const dy = startYRef.current - e.clientY;
+          if (dy > 50 && !didLockRef.current) {
+            didLockRef.current = true;
+            voice.lockListening();
+          }
+        }}
+        onPointerUp={(e) => {
+          if (voice.locked) return;
+          startYRef.current = null;
+          if (voice.listening) {
+            voice.stopListening();
+            setTimeout(() => {
+              const t = voice.getTranscript();
+              if (t?.trim()) onDone(t);
+            }, 280);
+          }
+          e.preventDefault();
+        }}
+        onPointerCancel={(e) => {
+          if (!voice.locked) {
+            startYRef.current = null;
+            voice.stopListening();
+          }
+          e.preventDefault();
+        }}
+        onClick={() => {
+          if (voice.locked) finishCapture();
+        }}
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: "50%",
+          border: voice.locked ? `2px solid ${theme.gold}` : "none",
+          backgroundColor: voice.locked ? theme.gold : voice.listening ? theme.gold : theme.accent,
+          color: "white",
+          cursor: disabled ? "default" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          touchAction: "none",
+          boxShadow: voice.listening ? "0 0 0 4px rgba(200,151,58,0.25)" : undefined,
+        }}
+        aria-label={voice.locked ? "Tap to finish recording" : "Hold to speak — swipe up to lock"}
+      >
+        {voice.locked ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        )}
+      </button>
+      {!voice.locked && voice.listening && (
+        <span style={{ fontSize: 10, color: theme.textLight, textAlign: "center", lineHeight: 1.2, maxWidth: 72 }}>Swipe up to lock</span>
+      )}
+      {voice.locked && (
+        <span style={{ fontSize: 10, color: theme.gold, fontWeight: 700, textAlign: "center" }}>Tap to finish</span>
+      )}
+    </div>
+  );
 }
 
 function StatsStrip({ stats, loading }) {
@@ -10030,7 +10413,67 @@ function ScheduleToday({ token, setView, schedule, loading }) {
   );
 }
 
-function BriefingCard({ token, setView }) {
+function buildClientSideBriefing(jobs, summary) {
+  const active = (Array.isArray(jobs) ? jobs : []).filter(j => j.status === "active");
+  const over = active.filter(j => (j.contract_value || 0) > 0 && (j.total_cost || 0) > j.contract_value);
+  const watch = active.filter(j => (j.budgeted_hours || 0) > 0 && (j.total_hours || 0) / j.budgeted_hours >= 0.85);
+  const parts = [];
+  if (over.length) {
+    const names = over.map(j => j.job_name).slice(0, 3).join(", ");
+    parts.push(`${over.length} project${over.length !== 1 ? "s" : ""} over budget (${names}${over.length > 3 ? "…" : ""}).`);
+  }
+  if (summary?.requests) parts.push(`${summary.requests} crew request${summary.requests !== 1 ? "s" : ""} need your review.`);
+  if (summary?.pending_estimates) parts.push(`${summary.pending_estimates} site quote${summary.pending_estimates !== 1 ? "s" : ""} awaiting review.`);
+  if (summary?.estimates) parts.push(`${summary.estimates} estimate update${summary.estimates !== 1 ? "s" : ""} in your notifications.`);
+  if (watch.length) {
+    const names = watch.map(j => j.job_name).slice(0, 3).join(", ");
+    parts.push(`Hours running high on ${names}${watch.length > 3 ? "…" : ""}.`);
+  }
+  if (!parts.length) {
+    if (!active.length) return "No active projects yet — add a job on the Dashboard to start tracking.";
+    return `All clear across ${active.length} active project${active.length !== 1 ? "s" : ""}. Nothing flagged right now.`;
+  }
+  return parts.join(" ");
+}
+
+function buildBriefingDataFromDashboard(jobs, summary) {
+  const active = (Array.isArray(jobs) ? jobs : []).filter(j => j.status === "active");
+  const projects = active.map(j => {
+    const contract = j.contract_value || 0;
+    const totalCost = j.total_cost || 0;
+    const budgetedHours = j.budgeted_hours || 0;
+    const totalHours = j.total_hours || 0;
+    const hoursPct = budgetedHours > 0 ? Math.round((totalHours / budgetedHours) * 1000) / 10 : null;
+    let health = "on_track";
+    if (contract > 0 && totalCost > contract) health = "over_budget";
+    else if (hoursPct != null && hoursPct >= 85) health = "watch";
+    return {
+      job_id: j.job_id,
+      name: j.job_name,
+      contract,
+      total_cost: totalCost,
+      total_hours: totalHours,
+      budgeted_hours: budgetedHours,
+      hours_pct: hoursPct,
+      health,
+    };
+  });
+  return {
+    projects,
+    crew_status: [],
+    pending_requests: [],
+    weekly_spend: {},
+    flags: {
+      over_budget_count: projects.filter(p => p.health === "over_budget").length,
+      watch_count: projects.filter(p => p.health === "watch").length,
+      not_logged_count: 0,
+      pending_count: summary?.requests || 0,
+      pending_estimates: summary?.pending_estimates || 0,
+    },
+  };
+}
+
+function BriefingCard({ token, setView, onDataChange = null }) {
   const [loading, setLoading] = useState(true);
   const [briefing, setBriefing] = useState("");
   const [briefingData, setBriefingData] = useState(null);
@@ -10039,22 +10482,76 @@ function BriefingCard({ token, setView }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const [loadErr, setLoadErr] = useState("");
+  const [usedFallback, setUsedFallback] = useState(false);
   const chatEndRef = useRef(null);
 
-  const loadBriefing = useCallback(() => {
+  const loadBriefing = useCallback(async () => {
     setLoading(true);
-    apiFetch(`${API}/home/briefing`, { method: "POST", headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data) {
-          setBriefing(data.briefing || "");
-          setBriefingData(data.data || null);
-          setUpdatedAt(new Date());
+    setLoadErr("");
+    setUsedFallback(false);
+    const authHeaders = { Authorization: `Bearer ${token}` };
+
+    async function loadFromDashboard() {
+      const [dashR, sumR] = await Promise.all([
+        apiFetch(`${API}/dashboard`, { headers: authHeaders }),
+        apiFetch(`${API}/notifications/summary`, { headers: authHeaders }),
+      ]);
+      if (!dashR.ok) throw new Error("Could not load your project data.");
+      const jobs = await dashR.json();
+      const summary = sumR.ok ? await sumR.json() : {};
+      const data = buildBriefingDataFromDashboard(jobs, summary);
+      setBriefing(buildClientSideBriefing(jobs, summary));
+      setBriefingData(data);
+      if (onDataChange) onDataChange(data);
+      setUpdatedAt(new Date());
+      setUsedFallback(true);
+      setLoading(false);
+    }
+
+    try {
+      let r = await apiFetch(`${API}/home/briefing`, { method: "GET", headers: authHeaders });
+      if (r.status === 404 || r.status === 405) {
+        r = await apiFetch(`${API}/home/briefing`, {
+          method: "POST",
+          headers: { ...authHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      }
+      if (!r.ok) {
+        if (r.status === 404 || r.status >= 500) {
+          await loadFromDashboard();
+          return;
         }
+        const d = await r.json().catch(() => ({}));
+        throw new Error(typeof d.detail === "string" ? d.detail : `Briefing unavailable (${r.status})`);
+      }
+      const data = await r.json();
+      const briefingText = (data.briefing || "").trim() || buildClientSideBriefing(
+        (data.data?.projects || []).map(p => ({
+          job_name: p.name,
+          status: "active",
+          contract_value: p.contract,
+          total_cost: p.total_cost,
+          budgeted_hours: p.budgeted_hours,
+          total_hours: p.total_hours,
+        })),
+        { requests: data.data?.flags?.pending_count },
+      );
+      setBriefing(briefingText);
+      setBriefingData(data.data || null);
+      if (onDataChange) onDataChange(data.data || null);
+      setUpdatedAt(new Date());
+      setLoading(false);
+    } catch (e) {
+      try {
+        await loadFromDashboard();
+      } catch {
+        setLoadErr(e.message || "Could not load briefing");
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [token]);
+      }
+    }
+  }, [token, onDataChange]);
 
   useEffect(() => { loadBriefing(); }, [loadBriefing]);
 
@@ -10075,7 +10572,11 @@ function BriefingCard({ token, setView }) {
       body: JSON.stringify({ message: msg, history: chatHistory, briefing_data: briefingData || {} }),
     });
     const data = res.ok ? await res.json() : { reply: "Could not get a response right now." };
-    setChatHistory([...nextHistory, { role: "assistant", text: data.reply || "" }]);
+    if (!res.ok && !briefingData) {
+      setChatHistory([...nextHistory, { role: "assistant", text: "Refresh the briefing first, then try again." }]);
+    } else {
+      setChatHistory([...nextHistory, { role: "assistant", text: data.reply || "" }]);
+    }
     setChatBusy(false);
   }
 
@@ -10083,6 +10584,16 @@ function BriefingCard({ token, setView }) {
 
   if (loading && !briefing) {
     return <div style={{ ...styles.card, height: 120, marginBottom: 16, background: theme.border, opacity: 0.45, borderRadius: 14, animation: "pulse 1.5s ease-in-out infinite" }} />;
+  }
+
+  if (loadErr && !briefing) {
+    return (
+      <div style={{ ...styles.card, marginBottom: 16, padding: 18, border: `1px solid ${theme.danger}` }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: theme.danger, marginBottom: 6 }}>Briefing unavailable</div>
+        <p style={{ fontSize: 13, color: theme.textSecondary, margin: "0 0 12px" }}>{loadErr}</p>
+        <button type="button" onClick={loadBriefing} style={{ ...styles.button, marginTop: 0, fontSize: 13, padding: "10px 16px" }}>Try again</button>
+      </div>
+    );
   }
 
   return (
@@ -10106,7 +10617,9 @@ function BriefingCard({ token, setView }) {
         <button type="button" onClick={e => { e.stopPropagation(); loadBriefing(); }} style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "white", display: "flex" }} aria-label="Refresh briefing">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: theme.gold, marginBottom: 8 }}>Your briefing</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: theme.gold, marginBottom: 8 }}>
+          Your briefing{usedFallback ? " · from dashboard" : ""}
+        </div>
         <p style={{
           margin: 0,
           fontSize: 15,
@@ -10251,12 +10764,8 @@ function CaptureInput({ token, role, setView, setVoicePrefill, readonly = false,
     setText("");
   }
 
-  async function handleVoiceRelease() {
-    voice.stopListening();
-    setTimeout(async () => {
-      const t = voice.getTranscript();
-      if (t?.trim()) await parseText(t);
-    }, 300);
+  async function handleVoiceDone(spoken) {
+    if (spoken?.trim()) await parseText(spoken);
   }
 
   async function saveParsed() {
@@ -10340,11 +10849,12 @@ function CaptureInput({ token, role, setView, setVoicePrefill, readonly = false,
   const lowConfidence = parsed && (parsed.cost_code_confidence === "low" || needsJobPick);
 
   return (
-    <div style={{ position: isMobile() ? "sticky" : "relative", bottom: isMobile() ? "calc(60px + env(safe-area-inset-bottom))" : undefined, zIndex: 10, marginTop: 8 }}>
+    <div style={{ position: "relative", zIndex: 10, marginTop: 8 }}>
       {toast && (
         <div style={{ backgroundColor: theme.accent, color: "white", padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 10, textAlign: "center" }}>{toast}</div>
       )}
-      <div style={{ ...styles.card, padding: "16px 18px", borderRadius: 14, boxShadow: theme.shadowMd }}>
+      <VoiceInCardFrame processing={processing} processingLabel="Reading what you said…">
+      <div style={{ ...styles.card, padding: "16px 18px", borderRadius: 14, boxShadow: theme.shadowMd, minHeight: processing ? 120 : undefined }}>
         <textarea
           style={{ width: "100%", border: "none", outline: "none", resize: "none", minHeight: 72, fontSize: 15, lineHeight: 1.5, fontFamily: font.body, background: "transparent", marginBottom: 12 }}
           rows={3}
@@ -10353,25 +10863,23 @@ function CaptureInput({ token, role, setView, setVoicePrefill, readonly = false,
           onChange={e => { setText(e.target.value); setErr(""); }}
           disabled={readonly || processing}
         />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
           {voice.supported && !readonly ? (
-            <button
-              type="button"
-              onPointerDown={() => { voice.setError(""); voice.startListening(); }}
-              onPointerUp={handleVoiceRelease}
-              onPointerLeave={() => voice.listening && handleVoiceRelease()}
-              style={{ width: 48, height: 48, borderRadius: "50%", border: "none", backgroundColor: voice.listening ? theme.gold : theme.accent, color: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-              aria-label="Hold to speak"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-            </button>
+            <VoiceHoldButton voice={voice} onDone={handleVoiceDone} disabled={processing} />
           ) : <div style={{ width: 48 }} />}
           <button type="button" disabled={readonly || processing || !text.trim()} onClick={() => parseText(text)} style={{ ...styles.button, marginTop: 0, borderRadius: 999, padding: "12px 22px", flex: 1, maxWidth: 200 }}>
             {processing ? "Reading…" : "Log it"}
           </button>
         </div>
         {(err || voice.error) && <p style={{ ...styles.errorMsg, marginTop: 10, marginBottom: 0 }}>{err || voice.error}</p>}
-        {voice.listening && <p style={{ fontSize: 12, color: theme.accent, marginTop: 8, marginBottom: 0 }}>Listening… release when done</p>}
+        {voice.listening && !voice.locked && (
+          <p style={{ fontSize: 12, color: theme.accent, marginTop: 8, marginBottom: 0 }}>
+            Listening… {voice.transcript ? `“${voice.transcript.slice(0, 60)}${voice.transcript.length > 60 ? "…" : ""}”` : "release when done, or swipe up on the mic to lock"}
+          </p>
+        )}
+        {voice.locked && voice.transcript && (
+          <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 8, marginBottom: 0, fontStyle: "italic" }}>{voice.transcript}</p>
+        )}
 
         {parsed && (
           <div style={{ marginTop: 14, padding: 14, borderRadius: 12, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
@@ -10411,16 +10919,106 @@ function CaptureInput({ token, role, setView, setVoicePrefill, readonly = false,
           </div>
         )}
       </div>
+      </VoiceInCardFrame>
     </div>
   );
 }
 
-function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false }) {
+function HomeAttentionActions({ setView, briefingData, notifBadges }) {
+  const flags = briefingData?.flags || {};
+  const estimateBadge = (notifBadges?.pending_estimates || 0) + (notifBadges?.estimates || 0);
+  const items = [];
+
+  if (flags.over_budget_count > 0) {
+    items.push({
+      view: "dashboard",
+      label: `${flags.over_budget_count} project${flags.over_budget_count !== 1 ? "s" : ""} over budget`,
+      hint: "Review spend vs contract on Dashboard",
+      tone: "danger",
+    });
+  }
+  if (flags.watch_count > 0) {
+    items.push({
+      view: "dashboard",
+      label: `${flags.watch_count} project${flags.watch_count !== 1 ? "s" : ""} running hot on hours`,
+      hint: "Open Dashboard to see which jobs",
+      tone: "gold",
+    });
+  }
+  if (flags.pending_estimates || notifBadges?.pending_estimates || estimateBadge > 0) {
+    const n = flags.pending_estimates || notifBadges?.pending_estimates || estimateBadge;
+    items.push({
+      view: "estimate",
+      label: `${n} estimate${n !== 1 ? "s" : ""} need your review`,
+      hint: "Site quotes or messages waiting",
+      tone: "gold",
+    });
+  }
+  if (flags.pending_count > 0 || notifBadges?.requests > 0) {
+    const n = flags.pending_count || notifBadges?.requests;
+    items.push({
+      view: "requests",
+      label: `${n} crew request${n !== 1 ? "s" : ""} pending`,
+      hint: "Approve, deny, or reply",
+      tone: "accent",
+    });
+  }
+  if (flags.not_logged_count > 0) {
+    items.push({
+      view: "schedule",
+      label: `${flags.not_logged_count} crew member${flags.not_logged_count !== 1 ? "s" : ""} haven't logged this week`,
+      hint: "Check Schedule or follow up with crew",
+      tone: "neutral",
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  const toneStyle = (tone) => {
+    if (tone === "danger") return { border: theme.danger, bg: theme.dangerLight, color: theme.danger };
+    if (tone === "gold") return { border: theme.gold, bg: theme.goldLight, color: "#7c5518" };
+    if (tone === "accent") return { border: theme.accent, bg: theme.accentLight, color: theme.accent };
+    return { border: theme.border, bg: theme.bg, color: theme.primary };
+  };
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 10 }}>Needs action</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map(item => {
+          const s = toneStyle(item.tone);
+          return (
+            <button
+              key={`${item.view}-${item.label}`}
+              type="button"
+              onClick={() => setView(item.view)}
+              style={{
+                textAlign: "left", padding: "14px 16px", borderRadius: 12, cursor: "pointer", fontFamily: font.body,
+                border: `1.5px solid ${s.border}`, backgroundColor: s.bg, width: "100%",
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{item.label}</div>
+                <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 3 }}>{item.hint}</div>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: s.color, flexShrink: 0 }}>Open →</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false, notifBadges = null }) {
   const isOwner = role === "owner" || role === "admin";
   const [stats, setStats] = useState(null);
   const [schedule, setSchedule] = useState([]);
   const [crewLoading, setCrewLoading] = useState(!isOwner);
   const [statsKey, setStatsKey] = useState(0);
+  const [briefingData, setBriefingData] = useState(null);
+  const [showLog, setShowLog] = useState(false);
 
   useEffect(() => {
     if (isOwner) return;
@@ -10441,18 +11039,52 @@ function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false })
   }
 
   return (
-    <div style={{ ...styles.container, backgroundColor: theme.bg, paddingBottom: isMobile() ? 120 : 40, maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ ...styles.container, backgroundColor: theme.bg, paddingBottom: isMobile() ? 28 : 40, maxWidth: 720, margin: "0 auto" }}>
       {isOwner ? (
-        <BriefingCard token={token} setView={setView} />
+        <>
+          <ScreenHeader
+            title="Good morning"
+            subtitle={new Date().toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" })}
+          />
+          <BriefingCard token={token} setView={setView} onDataChange={setBriefingData} />
+          <HomeAttentionActions setView={setView} briefingData={briefingData} notifBadges={notifBadges} />
+          <div style={{ ...styles.card, padding: 0, overflow: "hidden", marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={() => setShowLog(v => !v)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 16px", border: "none", background: "white", cursor: "pointer", fontFamily: font.body,
+              }}
+            >
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary }}>Quick log</div>
+                <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>Voice or type hours, materials, mileage</div>
+              </div>
+              <span style={{ fontSize: 12, color: theme.accent, fontWeight: 700 }}>{showLog ? "Hide" : "Open"}</span>
+            </button>
+            {showLog && (
+              <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${theme.border}` }}>
+                <CaptureInput token={token} role={role} setView={setView} setVoicePrefill={setVoicePrefill} readonly={readonly} />
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <>
+          <ScreenHeader title="Home" subtitle="Your week at a glance" />
           <StatsStrip stats={stats} loading={crewLoading} />
           <ScheduleToday token={token} setView={setView} schedule={schedule} loading={crewLoading} />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>Quick log</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <QuickActionBtn label="Hours" icon={IconHours} color={readonly ? theme.textLight : theme.primary} onClick={() => !readonly && setView("timesheet")} />
+              <QuickActionBtn label="Materials" icon={IconMaterials} color={readonly ? theme.textLight : theme.gold} onClick={() => !readonly && setView("materials")} />
+              <QuickActionBtn label="Mileage" icon={IconMileage} color={readonly ? theme.textLight : theme.accent} onClick={() => !readonly && setView("mileage")} />
+            </div>
+          </div>
+          <CaptureInput token={token} role={role} setView={setView} setVoicePrefill={setVoicePrefill} readonly={readonly} onSaved={refreshCrewStats} />
         </>
-      )}
-      <CaptureInput token={token} role={role} setView={setView} setVoicePrefill={setVoicePrefill} readonly={readonly} onSaved={isOwner ? null : refreshCrewStats} />
-      {!isOwner && (
-        <CrewHome token={token} setView={setView} setVoicePrefill={setVoicePrefill} readonly={readonly} embedded />
       )}
     </div>
   );
@@ -10678,7 +11310,7 @@ function AuthenticatedApp() {
         <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
           <div key={view} className="vl-screen">
           {view === "home" && (
-            <HomeScreen token={token} setView={setView} role={role} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} />
+            <HomeScreen token={token} setView={setView} role={role} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} notifBadges={notifBadges} />
           )}
           {role === "crew" && view === "field_estimate" && <FieldEstimateScreen token={token} readonly={subStatus === "expired"} />}
           {role === "crew" && view === "log" && <LogHub setView={setView} />}
@@ -10724,13 +11356,6 @@ function AuthenticatedApp() {
             />
           )}
           </div>
-          {mobile && (
-            <div style={{ padding: "8px 18px 100px", textAlign: "center" }}>
-              <button onClick={handleLogout} style={{ fontSize: "13px", color: "white", background: theme.danger, border: "none", borderRadius: "7px", padding: "10px 26px", cursor: "pointer", fontWeight: "600", fontFamily: font.body, minHeight: "40px" }}>
-                Sign Out
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </>
