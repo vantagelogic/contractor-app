@@ -216,6 +216,11 @@ const styles = {
   errorMsg: { color: theme.danger, fontSize: "12px", marginTop: "4px", fontWeight: "500" },
 };
 
+function logFormShell(insideLogMyDay) {
+  if (!insideLogMyDay) return styles.container;
+  return { maxWidth: "100%", margin: 0, padding: 0, minHeight: 0, fontFamily: font.body, backgroundColor: "transparent" };
+}
+
 function fmt(n) {
   return Number(n || 0).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -611,16 +616,25 @@ function NavBar({ view, setView, role, onLogout, badges = null }) {
     { id: "settings", label: "Settings", Icon: IconGear },
   ];
 
-  const ownerTabs = [
-    { id: "home", label: "Home", Icon: IconHome },
-    { id: "dashboard", label: "Dashboard", Icon: IconDashboard },
-    { id: "schedule", label: "Schedule", Icon: IconSchedule },
-    { id: "inventory", label: "Inventory", Icon: IconInventory },
-    { id: "requests", label: "Requests", Icon: IconRequests },
-    { id: "estimate", label: "Estimates", Icon: IconEstimate },
-    { id: "billing", label: "Billing", Icon: IconBilling },
-    { id: "settings", label: "Settings", Icon: IconGear },
+  const ownerNavGroups = [
+    { type: "item", id: "home", label: "Home", Icon: IconHome },
+    { type: "divider" },
+    { type: "label", text: "Win the work" },
+    { type: "item", id: "estimate", label: "Estimates", Icon: IconEstimate },
+    { type: "divider" },
+    { type: "label", text: "Do the work" },
+    { type: "item", id: "dashboard", label: "Projects", Icon: IconDashboard },
+    { type: "item", id: "schedule", label: "Schedule", Icon: IconSchedule },
+    { type: "item", id: "inventory", label: "Inventory", Icon: IconInventory },
+    { type: "item", id: "requests", label: "Requests", Icon: IconRequests },
+    { type: "divider" },
+    { type: "label", text: "Get paid" },
+    { type: "item", id: "billing", label: "Billing", Icon: IconBilling },
+    { type: "divider" },
+    { type: "item", id: "settings", label: "Settings", Icon: IconGear },
   ];
+
+  const ownerTabs = ownerNavGroups.filter(n => n.type === "item");
 
   const allTabs = isCrew ? crewTabs : ownerTabs;
   const currentLabel = allTabs.find(t => isTabActive(t.id))?.label || "Vantage Logic";
@@ -653,20 +667,25 @@ function NavBar({ view, setView, role, onLogout, badges = null }) {
             <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, width: 32, height: 32, color: "white", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
-            {allTabs.map(tab => (
-              <button key={tab.id} type="button" onClick={() => goTo(tab.id)} style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 14px", borderRadius: 9, border: "none", cursor: "pointer",
-                marginBottom: 3, textAlign: "left", fontFamily: font.body,
-                backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent",
-                color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.55)",
-                fontWeight: isTabActive(tab.id) ? 700 : 500, fontSize: 14,
-              }}>
-                <span style={{ display: "flex", position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} title={tabBadgeHint(tab.id, badges)} /></span>
-                <span>{tab.label}</span>
-                {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: 3, height: 16, borderRadius: 2, backgroundColor: theme.gold }} />}
-              </button>
-            ))}
+            {(isCrew ? crewTabs : ownerNavGroups).map((node, i) => {
+              if (node.type === "divider") return <div key={`d${i}`} style={{ height: "1px", background: "rgba(255,255,255,0.08)", margin: "6px 8px" }} />;
+              if (node.type === "label") return <div key={`l${i}`} style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", letterSpacing: "0.8px", textTransform: "uppercase", padding: "4px 14px 4px" }}>{node.text}</div>;
+              const tab = node;
+              return (
+                <button key={tab.id} type="button" onClick={() => goTo(tab.id)} style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 14px", borderRadius: 9, border: "none", cursor: "pointer",
+                  marginBottom: 3, textAlign: "left", fontFamily: font.body,
+                  backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.55)",
+                  fontWeight: isTabActive(tab.id) ? 700 : 500, fontSize: 14,
+                }}>
+                  <span style={{ display: "flex", position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} title={tabBadgeHint(tab.id, badges)} /></span>
+                  <span>{tab.label}</span>
+                  {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: 3, height: 16, borderRadius: 2, backgroundColor: theme.gold }} />}
+                </button>
+              );
+            })}
           </div>
           <div style={{ padding: "12px 14px max(16px, env(safe-area-inset-bottom))", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
             <button type="button" onClick={() => { setMenuOpen(false); onLogout(); }} style={{
@@ -711,21 +730,26 @@ function NavBar({ view, setView, role, onLogout, badges = null }) {
     );
   }
 
-  const desktopTabs = isCrew ? crewTabs : ownerTabs;
+  const desktopNav = isCrew ? crewTabs : ownerNavGroups;
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: theme.sidebarWidth, backgroundColor: theme.primaryDark, display: "flex", flexDirection: "column", zIndex: 1000, boxShadow: "1px 0 0 rgba(255,255,255,0.06)" }}>
-      <div style={{ padding: "30px 22px 26px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div style={{ padding: "20px 18px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <VantageLogo size={36} dark={true} />
       </div>
-      <div style={{ flex: 1, padding: "18px 12px", overflowY: "auto" }}>
-        {desktopTabs.map(tab => (
-          <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: isTabActive(tab.id) ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
-            <span style={{ display: "flex", flexShrink: 0, position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} title={tabBadgeHint(tab.id, badges)} /></span>
-            <span>{tab.label}</span>
-            {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
-          </button>
-        ))}
+      <div style={{ flex: 1, padding: "10px 12px", overflowY: "auto" }}>
+        {desktopNav.map((node, i) => {
+          if (node.type === "divider") return <div key={`d${i}`} style={{ height: "1px", background: "rgba(255,255,255,0.08)", margin: "6px 8px" }} />;
+          if (node.type === "label") return <div key={`l${i}`} style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)", letterSpacing: "0.8px", textTransform: "uppercase", padding: "4px 14px 4px" }}>{node.text}</div>;
+          const tab = node;
+          return (
+            <button key={tab.id} onClick={() => setView(tab.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "11px 14px", borderRadius: "7px", border: "none", cursor: "pointer", marginBottom: "3px", backgroundColor: isTabActive(tab.id) ? "rgba(255,255,255,0.12)" : "transparent", color: isTabActive(tab.id) ? "white" : "rgba(255,255,255,0.52)", fontFamily: font.body, fontSize: "13.5px", fontWeight: isTabActive(tab.id) ? "600" : "450", textAlign: "left", transition: "all 0.18s cubic-bezier(0.4,0,0.2,1)" }}>
+              <span style={{ display: "flex", flexShrink: 0, position: "relative" }}><tab.Icon /><NavTabBadge count={tabBadgeCount(tab.id, badges, role)} title={tabBadgeHint(tab.id, badges)} /></span>
+              <span>{tab.label}</span>
+              {isTabActive(tab.id) && <div style={{ marginLeft: "auto", width: "3px", height: "16px", borderRadius: "2px", backgroundColor: theme.gold }} />}
+            </button>
+          );
+        })}
       </div>
       <div style={{ padding: "8px 12px 16px", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
         <button onClick={onLogout} style={{ width: "100%", padding: "10px 14px", borderRadius: "7px", border: "1px solid rgba(255,255,255,0.12)", backgroundColor: "transparent", color: "rgba(255,255,255,0.55)", cursor: "pointer", fontFamily: font.body, fontSize: "12px", fontWeight: "500", textAlign: "center", letterSpacing: "0.3px" }}>
@@ -2003,6 +2027,7 @@ function LogBackButton({ setView }) {
 }
 
 function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null, insideLogMyDay = false }) {
+  const shell = logFormShell(insideLogMyDay);
   const [formData, setFormData] = useState({ employee_id: "", job_id: "", cost_code_id: "", shift_date: new Date().toISOString().split("T")[0], hours_worked: "", overtime_hours: "0", field_notes: "" });
   const [addOvertime, setAddOvertime] = useState(false);
   const [trackOvertime, setTrackOvertime] = useState(false);
@@ -2121,8 +2146,8 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   if (submitted) {
     return (
-      <div style={styles.container}>
-        <div style={{ textAlign: "center", marginTop: "80px" }}>
+      <div style={shell}>
+        <div style={{ textAlign: "center", marginTop: insideLogMyDay ? "24px" : "80px" }}>
           <div style={{ width: "72px", height: "72px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
@@ -2134,10 +2159,10 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
     );
   }
 
-  if (loading) return <div style={styles.container}><Skeleton width="40%" height="28px" /><div style={{marginTop:"12px"}}><Skeleton width="60%" height="14px" /></div><div style={{marginTop:"24px"}}><Skeleton width="100%" height="380px" radius="12px" /></div></div>;
+  if (loading) return <div style={shell}><Skeleton width="40%" height="28px" /><div style={{marginTop:"12px"}}><Skeleton width="60%" height="14px" /></div><div style={{marginTop:"24px"}}><Skeleton width="100%" height="380px" radius="12px" /></div></div>;
 
   return (
-    <div style={styles.container}>
+    <div style={shell}>
       {!insideLogMyDay && (
         <>
           <LogBackButton setView={setView} />
@@ -2263,6 +2288,7 @@ function TimesheetForm({ token, readonly = false, voicePrefill = null, onPrefill
 
 // ─── MATERIALS ────────────────────────────────────────────────
 function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null, insideLogMyDay = false }) {
+  const shell = logFormShell(insideLogMyDay);
   const [formData, setFormData] = useState({ job_id: "", employee_id: "", supplier: "", description: "", total_cost: "", purchase_date: new Date().toISOString().split("T")[0], notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2357,8 +2383,8 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 
   if (submitted) {
     return (
-      <div style={styles.container}>
-        <div style={{ textAlign: "center", marginTop: "80px" }}>
+      <div style={shell}>
+        <div style={{ textAlign: "center", marginTop: insideLogMyDay ? "24px" : "80px" }}>
           <div style={{ width: "72px", height: "72px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
@@ -2370,10 +2396,10 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
     );
   }
 
-  if (loading) return <div style={styles.container}><Skeleton width="40%" height="28px" /><div style={{marginTop:"12px"}}><Skeleton width="60%" height="14px" /></div><div style={{marginTop:"24px"}}><Skeleton width="100%" height="420px" radius="12px" /></div></div>;
+  if (loading) return <div style={shell}><Skeleton width="40%" height="28px" /><div style={{marginTop:"12px"}}><Skeleton width="60%" height="14px" /></div><div style={{marginTop:"24px"}}><Skeleton width="100%" height="420px" radius="12px" /></div></div>;
 
   return (
-    <div style={styles.container}>
+    <div style={shell}>
       {!insideLogMyDay && (
         <>
           <LogBackButton setView={setView} />
@@ -2696,6 +2722,7 @@ function MaterialsForm({ token, readonly = false, voicePrefill = null, onPrefill
 
 // ─── MILEAGE ──────────────────────────────────────────────────
 function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillConsumed = null, setView = null, insideLogMyDay = false }) {
+  const shell = logFormShell(insideLogMyDay);
   const [formData, setFormData] = useState({ job_id: "", trip_date: new Date().toISOString().split("T")[0], km_driven: "", purpose: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2780,8 +2807,8 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
 
   if (submitted) {
     return (
-      <div style={styles.container}>
-        <div style={{ textAlign: "center", marginTop: "80px" }}>
+      <div style={shell}>
+        <div style={{ textAlign: "center", marginTop: insideLogMyDay ? "24px" : "80px" }}>
           <div style={{ width: "72px", height: "72px", backgroundColor: theme.accentLight, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 22px" }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
@@ -2793,10 +2820,10 @@ function MileageForm({ token, readonly = false, voicePrefill = null, onPrefillCo
     );
   }
 
-  if (loading) return <div style={styles.container}><Skeleton width="40%" height="28px" /><div style={{marginTop:"12px"}}><Skeleton width="60%" height="14px" /></div><div style={{marginTop:"24px"}}><Skeleton width="100%" height="380px" radius="12px" /></div></div>;
+  if (loading) return <div style={shell}><Skeleton width="40%" height="28px" /><div style={{marginTop:"12px"}}><Skeleton width="60%" height="14px" /></div><div style={{marginTop:"24px"}}><Skeleton width="100%" height="380px" radius="12px" /></div></div>;
 
   return (
-    <div style={styles.container}>
+    <div style={shell}>
       {!insideLogMyDay && (
         <>
           <LogBackButton setView={setView} />
@@ -6394,38 +6421,36 @@ function LogMyDay({ token, voicePrefill = null, onPrefillConsumed = null, readon
   ];
 
   return (
-    <div>
-      <div style={styles.container}>
-        <h1 style={styles.title}>Log my day</h1>
-        <p style={styles.subtitle}>Tell the office what you did today</p>
-        <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${theme.border}`, marginBottom: 4 }}>
-          {tabs.map(tab => {
-            const active = logTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setLogTab(tab.id)}
-                style={{
-                  flex: 1,
-                  padding: "12px 10px",
-                  border: "none",
-                  borderBottom: active ? `3px solid ${theme.gold}` : "3px solid transparent",
-                  marginBottom: -1,
-                  background: "none",
-                  color: active ? theme.primary : theme.textLight,
-                  fontWeight: active ? 700 : 500,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  fontFamily: font.body,
-                  transition: "color 0.15s, border-color 0.15s",
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+    <div style={{ maxWidth: "640px", margin: "0 auto", padding: "20px 18px 48px", fontFamily: font.body, backgroundColor: theme.bg, boxSizing: "border-box" }}>
+      <h1 style={styles.title}>Log my day</h1>
+      <p style={{ ...styles.subtitle, marginBottom: 16 }}>Tell the office what you did today</p>
+      <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${theme.border}`, marginBottom: 16 }}>
+        {tabs.map(tab => {
+          const active = logTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setLogTab(tab.id)}
+              style={{
+                flex: 1,
+                padding: "12px 10px",
+                border: "none",
+                borderBottom: active ? `3px solid ${theme.gold}` : "3px solid transparent",
+                marginBottom: -1,
+                background: "none",
+                color: active ? theme.primary : theme.textLight,
+                fontWeight: active ? 700 : 500,
+                fontSize: 14,
+                cursor: "pointer",
+                fontFamily: font.body,
+                transition: "color 0.15s, border-color 0.15s",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
       {logTab === "timesheet" && <TimesheetForm {...formProps} />}
       {logTab === "materials" && <MaterialsForm {...formProps} />}
@@ -11875,7 +11900,7 @@ function AuthenticatedApp() {
           <OnboardingModal onClose={() => setShowOnboarding(false)} />
         )}
 
-        <div style={{ marginLeft: sidebarOffset, transition: "margin-left 0.2s" }}>
+        <div style={{ marginLeft: sidebarOffset, paddingTop: mobile ? "max(52px, calc(48px + env(safe-area-inset-top)))" : 0, transition: "margin-left 0.2s" }}>
           <div key={view} className="vl-screen">
           {view === "home" && (
             <HomeScreen token={token} setView={setView} role={role} setVoicePrefill={setVoicePrefill} readonly={subStatus === "expired"} notifBadges={notifBadges} />
