@@ -10578,7 +10578,6 @@ function useVoiceRecorder() {
   const recognitionRef = useRef(null);
   const lockedRef = useRef(false);
   const transcriptRef = useRef("");
-  const sessionBaseRef = useRef("")
 
   useEffect(() => { lockedRef.current = locked; }, [locked]);
 
@@ -10588,7 +10587,6 @@ function useVoiceRecorder() {
     recognition.interimResults = true;
     recognition.onresult = (e) => {
       const session = Array.from(e.results).map(r => r[0].transcript).join("");
-      const t = sessionBaseRef.current ? sessionBaseRef.current + " " + session : session;
       transcriptRef.current = t;
       setTranscript(t);
     };
@@ -10641,7 +10639,6 @@ function useVoiceRecorder() {
     lockedRef.current = false;
     setLocked(false);
     try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
-    sessionBaseRef.current = transcriptRef.current;
     setError("");
     if (!supported) {
       setError("Voice is not supported in this browser. Try Chrome, Edge, or Safari.");
@@ -10672,15 +10669,9 @@ function useVoiceRecorder() {
 
   const getTranscript = useCallback(() => transcriptRef.current || transcript, [transcript]);
 
-  function resetTranscript() {
-    transcriptRef.current = "";
-    sessionBaseRef.current = "";
-    setTranscript("");
-  }
-
   return {
     listening, locked, transcript, error, setError, setTranscript,
-    supported, startListening, lockListening, stopListening, getTranscript, resetTranscript,
+    supported, startListening, lockListening, stopListening, getTranscript,
   };
 }
 
@@ -10700,9 +10691,6 @@ function VoiceHoldButton({ voice, onDone, disabled = false, size = 56 }) {
   }
 
   function beginHold(e) {
-    voice.resetTranscript?.();
-    voice.setTranscript("");
-    if (voice.resetTranscript) voice.resetTranscript();
     e.preventDefault();
     cleanupRef.current?.();
     const target = e.currentTarget;
