@@ -11034,7 +11034,7 @@ function BriefingCard({ token, setView, onDataChange = null }) {
     const res = await apiFetch(`${API}/home/followup`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg, history: chatHistory, briefing_data: briefingData || {} }),
+      body: JSON.stringify({ message: msg, history: nextHistory, briefing_data: briefingData || {} }),
     });
     const data = res.ok ? await res.json() : { reply: "Could not get a response right now." };
     if (!res.ok && !briefingData) {

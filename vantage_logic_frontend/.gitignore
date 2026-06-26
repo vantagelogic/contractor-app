@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+vantage_logic_api/venv/
+venv/
+__pycache__/
+*.pyc
