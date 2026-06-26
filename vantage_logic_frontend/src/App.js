@@ -10587,8 +10587,8 @@ function useVoiceRecorder() {
     recognition.interimResults = true;
     recognition.onresult = (e) => {
       const session = Array.from(e.results).map(r => r[0].transcript).join("");
-      transcriptRef.current = t;
-      setTranscript(t);
+      transcriptRef.current = session;
+      setTranscript(session);
     };
     recognition.onerror = (e) => {
       if (e.error === "no-speech" && lockedRef.current) return;
