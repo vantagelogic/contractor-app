@@ -11632,7 +11632,7 @@ function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false, n
       {isOwner ? (
         <>
           <ScreenHeader
-            title="Good morning"
+            title={(() => { const h = new Date().getHours(); if (h < 12) return "Good morning"; if (h < 17) return "Good afternoon"; return "Good evening"; })()}
             subtitle={new Date().toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" })}
           />
           <BriefingCard token={token} setView={setView} onDataChange={setBriefingData} />
