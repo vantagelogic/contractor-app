@@ -11638,27 +11638,6 @@ function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false, n
           <BriefingCard token={token} setView={setView} onDataChange={setBriefingData} />
           <DailyActionPlan briefingData={briefingData} setView={setView} />
           <HomeAttentionActions setView={setView} briefingData={briefingData} notifBadges={notifBadges} token={token} />
-          <div style={{ ...styles.card, padding: 0, overflow: "hidden", marginBottom: 16 }}>
-            <button
-              type="button"
-              onClick={() => setShowLog(v => !v)}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "14px 16px", border: "none", background: "white", cursor: "pointer", fontFamily: font.body,
-              }}
-            >
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: theme.primary }}>Quick log</div>
-                <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>Voice or type hours, materials, mileage</div>
-              </div>
-              <span style={{ fontSize: 12, color: theme.accent, fontWeight: 700 }}>{showLog ? "Hide" : "Open"}</span>
-            </button>
-            {showLog && (
-              <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${theme.border}` }}>
-                <CaptureInput token={token} role={role} setView={setView} setVoicePrefill={setVoicePrefill} readonly={readonly} />
-              </div>
-            )}
-          </div>
         </>
       ) : (
         <>
