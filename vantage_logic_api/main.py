@@ -4057,9 +4057,27 @@ def get_my_field_estimates(current_user: models.User = Depends(get_current_user)
 
 @app.post("/field-estimates")
 def create_field_estimate(body: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    job_id = body.get("job_id")
+
+    if not job_id:
+        client_name = (body.get("client_name") or "").strip()
+        if not client_name:
+            raise HTTPException(status_code=400, detail="Provide a job_id or client_name.")
+        city = (body.get("city") or "").strip()
+        job_name = f"{client_name}{', ' + city if city else ''}"
+        new_job = models.Job(
+            company_id=current_user.company_id,
+            job_name=job_name,
+            status="active",
+        )
+        db.add(new_job)
+        db.commit()
+        db.refresh(new_job)
+        job_id = new_job.job_id
+
     e = models.Estimate(
         company_id=current_user.company_id,
-        job_id=body.get("job_id"),
+        job_id=job_id,
         title=body.get("title", "Site Quote"),
         scope_summary=body.get("scope_summary", ""),
         field_notes=body.get("field_notes", ""),
