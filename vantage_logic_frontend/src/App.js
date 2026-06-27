@@ -8161,7 +8161,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         <div style={{ ...styles.card, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Summary</div>
           {estimateSummaryGrid()}
-          <label style={{ ...styles.label, marginTop: 12 }}>Customer email (optional — for your records)</label>
+          <label style={{ ...styles.label, marginTop: 12, color: theme.primary, fontWeight: 700 }}>Customer email — enter to enable email sharing</label>
           <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
           {customerEmail.trim() && (
             <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>
@@ -8211,11 +8211,9 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           <button type="button" disabled={saving} onClick={() => downloadEstimatePdf(savedEstimate.estimate_id)} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accent, flex: isMobile() ? 1 : "0 0 auto" }}>
             {saving ? "Downloading…" : "Download PDF"}
           </button>
-          {customerEmail.trim() && (
-            <button type="button" disabled={saving} onClick={downloadAndOpenEmail} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accentLight, color: theme.primary, flex: isMobile() ? 1 : "0 0 auto" }}>
-              {saving ? "Preparing…" : "Share / draft email"}
-            </button>
-          )}
+            <button type="button" disabled={saving || !customerEmail.trim()} onClick={downloadAndOpenEmail} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.accentLight, color: theme.primary, flex: isMobile() ? 1 : "0 0 auto", opacity: customerEmail.trim() ? 1 : 0.45 }}>
+            {saving ? "Preparing…" : "Share / draft email"}
+          </button>
           <button type="button" disabled={saving} onClick={markSharedWithCustomer} style={{ ...styles.button, marginTop: 0, backgroundColor: theme.gold, flex: 1 }}>
             {saving ? "Saving…" : "I've shared it — continue"}
           </button>
