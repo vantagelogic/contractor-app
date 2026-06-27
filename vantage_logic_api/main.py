@@ -3903,3 +3903,227 @@ def seed_demo(
     if result.get("skipped"):
         raise HTTPException(status_code=409, detail=result["message"])
     return result
+
+
+# ─── ESTIMATES ────────────────────────────────────────────────
+
+@app.get("/jobs/{job_id}/estimates")
+def get_job_estimates(job_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    est = db.query(models.Estimate).filter(
+        models.Estimate.job_id == job_id,
+        models.Estimate.company_id == current_user.company_id
+    ).order_by(models.Estimate.created_at.desc()).all()
+    return [_estimate_dict(e, db) for e in est]
+
+@app.get("/estimates/pending-review")
+def get_pending_review(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner only.")
+    est = db.query(models.Estimate).filter(
+        models.Estimate.company_id == current_user.company_id,
+        models.Estimate.status == "pending_review"
+    ).order_by(models.Estimate.submitted_at.desc()).all()
+    return [_estimate_dict(e, db) for e in est]
+
+@app.get("/estimates/{estimate_id}")
+def get_estimate(estimate_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Estimate not found.")
+    return _estimate_dict(e, db)
+
+@app.patch("/estimates/{estimate_id}")
+def update_estimate(estimate_id: int, body: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Estimate not found.")
+    allowed = ["title", "notes", "scope_summary", "field_notes", "customer_email", "crew_count", "estimated_mileage_km", "status"]
+    for k, v in body.items():
+        if k in allowed:
+            setattr(e, k, v)
+    if "line_items" in body:
+        db.query(models.EstimateLineItem).filter(models.EstimateLineItem.estimate_id == estimate_id).delete()
+        for i, li in enumerate(body["line_items"]):
+            db.add(models.EstimateLineItem(
+                estimate_id=estimate_id,
+                description=li.get("description", ""),
+                quantity=li.get("quantity", 1),
+                estimated_hours=li.get("estimated_hours", 0),
+                material_cost=li.get("material_cost", 0),
+                labor_cost=li.get("labor_cost", 0),
+                sort_order=i,
+            ))
+    db.commit()
+    db.refresh(e)
+    _recalc_estimate(e, db)
+    return _estimate_dict(e, db)
+
+@app.patch("/estimates/{estimate_id}/submit-for-review")
+def submit_for_review(estimate_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Not found.")
+    e.status = "pending_review"
+    e.submitted_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+@app.patch("/estimates/{estimate_id}/approve-review")
+def approve_review(estimate_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner only.")
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Not found.")
+    e.status = "approved"
+    e.reviewed_by = current_user.user_id
+    e.reviewed_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+@app.patch("/estimates/{estimate_id}/return-to-field")
+def return_to_field(estimate_id: int, body: dict = {}, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner only.")
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Not found.")
+    e.status = "field_draft"
+    e.rejection_reason = body.get("reason", "")
+    db.commit()
+    return {"ok": True}
+
+@app.patch("/estimates/{estimate_id}/approve")
+def approve_estimate(estimate_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Owner only.")
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Not found.")
+    e.status = "approved"
+    e.approved_by = current_user.user_id
+    e.approved_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+@app.get("/estimates/{estimate_id}/comments")
+def get_comments(estimate_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.EstimateComment).filter(
+        models.EstimateComment.estimate_id == estimate_id,
+        models.EstimateComment.company_id == current_user.company_id
+    ).order_by(models.EstimateComment.created_at).all()
+
+@app.post("/estimates/{estimate_id}/comments")
+def add_comment(estimate_id: int, body: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    c = models.EstimateComment(
+        estimate_id=estimate_id,
+        user_id=current_user.user_id,
+        company_id=current_user.company_id,
+        message=body.get("message", "").strip()
+    )
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return c
+
+# ─── FIELD ESTIMATES (crew) ───────────────────────────────────
+
+@app.get("/field-estimates/mine")
+def get_my_field_estimates(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    est = db.query(models.Estimate).filter(
+        models.Estimate.company_id == current_user.company_id,
+        models.Estimate.created_by == current_user.user_id,
+        models.Estimate.source == "field"
+    ).order_by(models.Estimate.created_at.desc()).all()
+    return [_estimate_dict(e, db) for e in est]
+
+@app.post("/field-estimates")
+def create_field_estimate(body: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    e = models.Estimate(
+        company_id=current_user.company_id,
+        job_id=body.get("job_id"),
+        title=body.get("title", "Site Quote"),
+        scope_summary=body.get("scope_summary", ""),
+        field_notes=body.get("field_notes", ""),
+        source="field",
+        status="field_draft",
+        created_by=current_user.user_id,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+    return {"estimate": _estimate_dict(e, db)}
+
+# ─── HELPERS ─────────────────────────────────────────────────
+
+def _estimate_dict(e, db):
+    line_items = db.query(models.EstimateLineItem).filter(
+        models.EstimateLineItem.estimate_id == e.estimate_id
+    ).order_by(models.EstimateLineItem.sort_order).all()
+    attachments = db.query(models.EstimateAttachment).filter(
+        models.EstimateAttachment.estimate_id == e.estimate_id
+    ).all()
+    return {
+        "estimate_id": e.estimate_id,
+        "job_id": e.job_id,
+        "title": e.title,
+        "status": e.status,
+        "source": e.source,
+        "scope_summary": e.scope_summary,
+        "field_notes": e.field_notes,
+        "notes": e.notes,
+        "customer_email": e.customer_email,
+        "crew_count": e.crew_count,
+        "estimated_mileage_km": float(e.estimated_mileage_km) if e.estimated_mileage_km else None,
+        "total_hours": float(e.total_hours) if e.total_hours else 0,
+        "total_material_cost": float(e.total_material_cost) if e.total_material_cost else 0,
+        "total_labor_cost": float(e.total_labor_cost) if e.total_labor_cost else 0,
+        "total_cost": float(e.total_cost) if e.total_cost else 0,
+        "rejection_reason": e.rejection_reason,
+        "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
+        "reviewed_at": e.reviewed_at.isoformat() if e.reviewed_at else None,
+        "approved_at": e.approved_at.isoformat() if e.approved_at else None,
+        "sent_at": e.sent_at.isoformat() if e.sent_at else None,
+        "created_at": e.created_at.isoformat() if e.created_at else None,
+        "attachment_count": len(attachments),
+        "line_items": [
+            {
+                "line_item_id": li.line_item_id,
+                "description": li.description,
+                "quantity": float(li.quantity) if li.quantity else 1,
+                "estimated_hours": float(li.estimated_hours) if li.estimated_hours else 0,
+                "material_cost": float(li.material_cost) if li.material_cost else 0,
+                "labor_cost": float(li.labor_cost) if li.labor_cost else 0,
+                "sort_order": li.sort_order,
+            }
+            for li in line_items
+        ],
+    }
+
+def _recalc_estimate(e, db):
+    items = db.query(models.EstimateLineItem).filter(
+        models.EstimateLineItem.estimate_id == e.estimate_id
+    ).all()
+    e.total_hours = sum(float(i.estimated_hours or 0) * float(i.quantity or 1) for i in items)
+    e.total_material_cost = sum(float(i.material_cost or 0) * float(i.quantity or 1) for i in items)
+    e.total_labor_cost = sum(float(i.labor_cost or 0) * float(i.quantity or 1) for i in items)
+    e.total_cost = float(e.total_material_cost) + float(e.total_labor_cost)
+    db.commit()
