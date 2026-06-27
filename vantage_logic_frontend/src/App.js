@@ -483,6 +483,21 @@ function HelpChat({ token, role, mobile = false }) {
     setInput("");
     const nextMessages = [...messages, { from: "user", text }];
     setMessages(nextMessages);
+    const CACHE_KEY = "vl_briefing_cache";
+
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+const cached = (() => {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; }
+})();
+
+if (cached && Date.now() - cached.ts < CACHE_TTL) {
+  setBriefing(cached.briefing);
+  setBriefingData(cached.data);
+  if (onDataChange) onDataChange(cached.data);
+  setUpdatedAt(new Date(cached.ts));
+  setLoading(false);
+}
     setLoading(true);
     try {
       const history = nextMessages
@@ -506,7 +521,13 @@ function HelpChat({ token, role, mobile = false }) {
     }
     setLoading(false);
   }
-
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      briefing: briefingText,
+      data: data.data || data,
+      ts: Date.now(),
+    }));
+  } catch { /* ignore */ }
   return (
     <>
       <button
