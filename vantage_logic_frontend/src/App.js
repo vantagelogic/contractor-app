@@ -483,21 +483,6 @@ function HelpChat({ token, role, mobile = false }) {
     setInput("");
     const nextMessages = [...messages, { from: "user", text }];
     setMessages(nextMessages);
-    const CACHE_KEY = "vl_briefing_cache";
-
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
-const cached = (() => {
-  try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; }
-})();
-
-if (cached && Date.now() - cached.ts < CACHE_TTL) {
-  setBriefing(cached.briefing);
-  setBriefingData(cached.data);
-  if (onDataChange) onDataChange(cached.data);
-  setUpdatedAt(new Date(cached.ts));
-  setLoading(false);
-}
     setLoading(true);
     try {
       const history = nextMessages
@@ -521,13 +506,7 @@ if (cached && Date.now() - cached.ts < CACHE_TTL) {
     }
     setLoading(false);
   }
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      briefing: briefingText,
-      data: data.data || data,
-      ts: Date.now(),
-    }));
-  } catch { /* ignore */ }
+
   return (
     <>
       <button
@@ -10970,6 +10949,18 @@ function BriefingCard({ token, setView, onDataChange = null }) {
   const chatEndRef = useRef(null);
 
   const loadBriefing = useCallback(async () => {
+    const CACHE_KEY = "vl_briefing_cache";
+    const CACHE_TTL = 30 * 60 * 1000;
+    const cached = (() => {
+      try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; }
+    })();
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setBriefing(cached.briefing);
+      setBriefingData(cached.data);
+      if (onDataChange) onDataChange(cached.data);
+      setUpdatedAt(new Date(cached.ts));
+      setLoading(false);
+    }
     setLoading(true);
     setLoadErr("");
     setUsedFallback(false);
@@ -10984,11 +10975,19 @@ function BriefingCard({ token, setView, onDataChange = null }) {
       const jobs = await dashR.json();
       const summary = sumR.ok ? await sumR.json() : {};
       const data = buildBriefingDataFromDashboard(jobs, summary);
-      setBriefing(buildClientSideBriefing(jobs, summary));
+      const briefingText = buildClientSideBriefing(jobs, summary);
+      setBriefing(briefingText);
       setBriefingData(data);
       if (onDataChange) onDataChange(data);
       setUpdatedAt(new Date());
       setUsedFallback(true);
+      try {
+        localStorage.setItem("vl_briefing_cache", JSON.stringify({
+          briefing: briefingText,
+          data: data,
+          ts: Date.now(),
+        }));
+      } catch { /* ignore */ }
       setLoading(false);
     }
 
@@ -11025,6 +11024,13 @@ function BriefingCard({ token, setView, onDataChange = null }) {
       setBriefingData(data.data || null);
       if (onDataChange) onDataChange(data.data || null);
       setUpdatedAt(new Date());
+      try {
+        localStorage.setItem("vl_briefing_cache", JSON.stringify({
+          briefing: briefingText,
+          data: data.data || null,
+          ts: Date.now(),
+        }));
+      } catch { /* ignore */ }
       setLoading(false);
     } catch (e) {
       try {
