@@ -541,6 +541,98 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             f.write(data)
         return path
 
+    def _build_estimate_pdf_bytes(db, estimate, company, job) -> bytes:
+        from io import BytesIO
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import inch
+
+        lines = db.query(models.EstimateLineItem).filter(
+            models.EstimateLineItem.estimate_id == estimate.estimate_id
+        ).order_by(models.EstimateLineItem.sort_order).all()
+
+        buffer = BytesIO()
+        styles = getSampleStyleSheet()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.75 * inch)
+        story = []
+
+        created = estimate.created_at.strftime("%Y-%m-%d") if estimate.created_at else ""
+        meta = [f"Estimate #: <b>EST-{estimate.estimate_id:04d}</b>", f"Date: {created}"]
+        meta.append(f"Project: <b>{job.job_name}</b>")
+        if job.city:
+            meta.append(f"Location: {job.city}")
+        if job.street:
+            meta.append(f"Site: {job.street}")
+        if estimate.customer_email:
+            meta.append(f"Prepared for: {estimate.customer_email}")
+        _pdf_add_header(story, styles, company, "Project Estimate", meta)
+        story.append(Paragraph(
+            "<i>This is a proposal for customer review. Work begins after written approval.</i>",
+            styles["Normal"],
+        ))
+        if estimate.notes:
+            story.append(Spacer(1, 6))
+            story.append(Paragraph(f"<b>Notes:</b> {estimate.notes}", styles["Normal"]))
+        story.append(Spacer(1, 12))
+
+        table_data = [["Work type", "Hours", "Labour", "Materials", "Subtotal"]]
+        for ln in lines:
+            hrs = float(ln.estimated_hours or 0) * float(ln.quantity or 1)
+            mat = float(ln.material_cost or 0) * float(ln.quantity or 1)
+            lab = float(ln.labor_cost or 0) * float(ln.quantity or 1)
+            row_total = mat + lab
+            table_data.append([
+                ln.description,
+                f"{hrs:,.1f}",
+                f"${lab:,.2f}",
+                f"${mat:,.2f}",
+                f"${row_total:,.2f}",
+            ])
+
+        km = float(estimate.estimated_mileage_km or 0)
+        if km > 0:
+            rate = float(getattr(company, "mileage_rate_per_km", None) or MILEAGE_RATE_DEFAULT)
+            mi_cost = round(km * rate, 2)
+            table_data.append(["Mileage / travel", "—", "—", f"{km:,.0f} km", f"${mi_cost:,.2f}"])
+
+        subtotal = float(estimate.total_cost or 0)
+        tax_info = _estimate_tax(company, subtotal)
+        table_data.append(["", "", "", "Subtotal", f"${subtotal:,.2f}"])
+        if tax_info["tax_rate_percent"] > 0:
+            table_data.append([
+                "", "", "",
+                f"{tax_info['tax_label']} ({tax_info['tax_rate_percent']:g}%)",
+                f"${tax_info['tax_amount']:,.2f}",
+            ])
+        table_data.append(["", "", "", "TOTAL", f"${tax_info['total_with_tax']:,.2f}"])
+
+        t = Table(table_data, colWidths=[2.2 * inch, 0.7 * inch, 0.85 * inch, 0.95 * inch, 0.95 * inch])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a3d2b")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, len(lines)), 0.5, colors.grey),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fdf4e3")),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 24))
+        story.append(Paragraph(f"<b>Estimated hours:</b> {float(estimate.total_hours or 0):,.1f}", styles["Normal"]))
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(
+            "<i>Payment terms and schedule to be confirmed upon approval. "
+            "This estimate is valid for 30 days from the date above.</i>",
+            styles["Normal"],
+        ))
+        story.append(Spacer(1, 24))
+        story.append(Paragraph("Customer approval: _________________________  Date: __________", styles["Normal"]))
+
+        doc.build(story)
+        return buffer.getvalue()
+
     def _generate_estimate_pdf(db: Session, estimate: models.Estimate, company, job):
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
@@ -1067,10 +1159,20 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
         _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
-        path = _generate_estimate_pdf(db, estimate, company, job)
-        estimate.pdf_path = path
-        db.commit()
-        return FileResponse(path, media_type="application/pdf", filename=f"estimate_{estimate_id}.pdf")
+
+        job_slug = (job.job_name or "estimate").replace(" ", "_").replace(",", "")[:40]
+        filename = f"Estimate_EST-{estimate.estimate_id:04d}_{job_slug}.pdf"
+
+        try:
+            pdf_bytes = _build_estimate_pdf_bytes(db, estimate, company, job)
+        except ImportError:
+            raise HTTPException(status_code=503, detail="PDF generation not available")
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     @app.post("/estimates/{estimate_id}/send-customer")
     def send_estimate_to_customer(
@@ -1090,10 +1192,6 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         if estimate.status not in ("draft",):
             raise HTTPException(status_code=400, detail="Only office-approved draft estimates can be marked as sent to customer")
 
-        job = db.query(models.Job).filter(models.Job.job_id == estimate.job_id).first()
-        company = db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first()
-        path = _generate_estimate_pdf(db, estimate, company, job)
-        estimate.pdf_path = path
         estimate.status = "sent"
         estimate.sent_at = datetime.utcnow()
         if body.customer_email:
