@@ -4072,6 +4072,105 @@ def create_field_estimate(body: dict, current_user: models.User = Depends(get_cu
     db.refresh(e)
     return {"estimate": _estimate_dict(e, db)}
 
+@app.post("/field-estimates/{estimate_id}/generate")
+def generate_field_estimate_ai(
+    estimate_id: int,
+    body: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    e = db.query(models.Estimate).filter(
+        models.Estimate.estimate_id == estimate_id,
+        models.Estimate.company_id == current_user.company_id,
+    ).first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Estimate not found.")
+
+    description = (body.get("description") or body.get("scope_summary") or body.get("transcript") or "").strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="Description is required.")
+
+    labor_rate = float(getattr(
+        db.query(models.Company).filter(models.Company.company_id == current_user.company_id).first(),
+        "estimate_labor_rate_per_hour", None
+    ) or 75)
+
+    work_types = db.query(models.CostCode).filter(
+        models.CostCode.company_id == current_user.company_id
+    ).all()
+    work_type_list = "\n".join([f"- id:{wt.cost_code_id} | {wt.description}" for wt in work_types]) or "None set up yet"
+
+    prompt = f"""You are a construction estimator. Based on this job description, generate estimate line items.
+
+Job description: "{description}"
+
+Available work types (use these where possible):
+{work_type_list}
+
+Labor rate: ${labor_rate}/hour
+
+Respond with ONLY a JSON object in this exact format, no other text:
+{{
+  "line_items": [
+    {{
+      "description": "line item name",
+      "cost_code_id": 12,
+      "quantity": 1,
+      "estimated_hours": 4.0,
+      "material_cost": 150.00,
+      "labor_cost": 300.00
+    }}
+  ],
+  "assumptions": ["assumption 1", "assumption 2"],
+  "questions_for_office": ["question 1"]
+}}
+
+Rules:
+- labor_cost = estimated_hours * quantity * {labor_rate}
+- Be realistic for trades work (electrical, plumbing, framing, etc.)
+- 2 to 8 line items is ideal
+- Use plain English descriptions a contractor would write
+- Match each line item to an available work type id where possible. If no match exists, omit cost_code_id."""
+
+    try:
+        response = get_gemini_client().models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt],
+        )
+        raw = (response.text or "").strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(raw)
+        line_items = parsed.get("line_items", [])
+    except Exception as ex:
+        print(f"Estimate AI generation error: {ex}")
+        raise HTTPException(status_code=500, detail="AI could not generate estimate rows. Try describing the job in more detail.")
+
+    db.query(models.EstimateLineItem).filter(
+        models.EstimateLineItem.estimate_id == estimate_id
+    ).delete()
+
+    for i, li in enumerate(line_items):
+        db.add(models.EstimateLineItem(
+            estimate_id=estimate_id,
+            description=li.get("description", ""),
+            cost_code_id=li.get("cost_code_id") or None,
+            quantity=float(li.get("quantity", 1)),
+            estimated_hours=float(li.get("estimated_hours", 0)),
+            material_cost=float(li.get("material_cost", 0)),
+            labor_cost=float(li.get("labor_cost", 0)),
+            sort_order=i,
+        ))
+
+    db.commit()
+    _recalc_estimate(e, db)
+    db.refresh(e)
+
+    return {
+        "estimate": _estimate_dict(e, db),
+        "assumptions": parsed.get("assumptions", []),
+        "questions_for_office": parsed.get("questions_for_office", []),
+    }
+
 # ─── HELPERS ─────────────────────────────────────────────────
 
 def _estimate_dict(e, db):
