@@ -11607,7 +11607,6 @@ function HomeScreen({ token, setView, role, setVoicePrefill, readonly = false, n
   const [crewLoading, setCrewLoading] = useState(!isOwner);
   const [statsKey, setStatsKey] = useState(0);
   const [briefingData, setBriefingData] = useState(null);
-  const [showLog, setShowLog] = useState(false);
 
   useEffect(() => {
     if (isOwner) return;
