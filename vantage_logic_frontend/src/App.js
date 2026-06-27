@@ -8161,7 +8161,8 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         <div style={{ ...styles.card, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 10 }}>Summary</div>
           {estimateSummaryGrid()}
-          <label style={{ ...styles.label, marginTop: 12, color: theme.primary, fontWeight: 700 }}>Customer email — enter to enable email sharing</label>
+          <div style={{ height: 1, background: theme.border, margin: "20px 0 16px" }} />
+          <label style={{ ...styles.label, marginTop: 24, color: theme.primary, fontWeight: 700 }}>Customer email — enter to enable email sharing</label>
           <input style={styles.input} type="email" placeholder="customer@email.com" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} />
           {customerEmail.trim() && (
             <p style={{ fontSize: 11, color: theme.textLight, marginTop: 6 }}>
@@ -8170,7 +8171,7 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
           )}
         </div>
 
-        <div style={{ ...styles.card, marginBottom: 16, padding: 0, overflow: "hidden" }}>
+        <div style={{ ...styles.card, marginBottom: 8, padding: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "12px 16px", borderBottom: `1px solid ${theme.border}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary }}>PDF preview</div>
             <button type="button" disabled={saving} onClick={refreshPreview} style={{ fontSize: 12, fontWeight: 600, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontFamily: font.body }}>
