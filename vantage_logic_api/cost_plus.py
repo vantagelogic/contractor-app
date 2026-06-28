@@ -1086,6 +1086,17 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         ).order_by(models.Estimate.created_at.desc()).all()
         return [_serialize_estimate(db, e) for e in estimates]
 
+    @app.get("/estimates/pending-review")
+    def list_pending_review_estimates(
+        current_user: models.User = Depends(require_owner),
+        db: Session = Depends(get_db),
+    ):
+        estimates = db.query(models.Estimate).filter(
+            models.Estimate.company_id == current_user.company_id,
+            models.Estimate.status == "pending_review",
+        ).order_by(models.Estimate.submitted_at.desc()).all()
+        return [_serialize_estimate(db, e) for e in estimates]
+
     @app.get("/estimates/{estimate_id}")
     def get_estimate(
         estimate_id: int,
@@ -1308,17 +1319,6 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         if not _is_owner_role(current_user):
             q = q.filter(models.Estimate.created_by == current_user.user_id)
         estimates = q.order_by(models.Estimate.created_at.desc()).limit(50).all()
-        return [_serialize_estimate(db, e) for e in estimates]
-
-    @app.get("/estimates/pending-review")
-    def list_pending_review_estimates(
-        current_user: models.User = Depends(require_owner),
-        db: Session = Depends(get_db),
-    ):
-        estimates = db.query(models.Estimate).filter(
-            models.Estimate.company_id == current_user.company_id,
-            models.Estimate.status == "pending_review",
-        ).order_by(models.Estimate.submitted_at.desc()).all()
         return [_serialize_estimate(db, e) for e in estimates]
 
     @app.patch("/estimates/{estimate_id}/submit-for-review")
