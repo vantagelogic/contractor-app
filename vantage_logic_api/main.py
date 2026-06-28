@@ -86,6 +86,10 @@ STRIPE_PRICE_STARTER = os.environ.get("STRIPE_PRICE_STARTER", "")
 STRIPE_PRICE_GROWTH = os.environ.get("STRIPE_PRICE_GROWTH", "")
 STRIPE_PRICE_PRO = os.environ.get("STRIPE_PRICE_PRO", "")
 
+PROMO_CODES = {
+    "DEMO2026": 90,
+}
+
 TIER_LIMITS = {
     "starter": 5,
     "growth": 15,
@@ -957,6 +961,7 @@ def signup(
     password: str,
     first_name: str = None, 
     last_name: str = None,
+    promo_code: str = None,
     db: Session = Depends(get_db)
 ):
     existing = db.query(models.User).filter(models.User.email == email).first()
@@ -967,7 +972,7 @@ def signup(
     company_name=company_name,
     trial_status="trial",
     subscription_status="trial",
-    trial_end_date=datetime.utcnow() + timedelta(days=14)
+    trial_end_date=datetime.utcnow() + timedelta(days=PROMO_CODES.get((promo_code or "").strip().upper(), 14))
 )
     db.add(company)
     db.commit()
