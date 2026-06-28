@@ -1268,7 +1268,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
                 raise HTTPException(status_code=404, detail="Project not found")
             if job.status != "active":
                 raise HTTPException(status_code=400, detail="Project is not active")
-        elif _is_owner_role(current_user) and body.client_name and body.client_name.strip():
+        elif body.client_name and body.client_name.strip():
             job_name = body.client_name.strip()
             if body.city and body.city.strip():
                 job_name = f"{job_name}, {body.city.strip()}"
