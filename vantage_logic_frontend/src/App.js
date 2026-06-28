@@ -9837,12 +9837,48 @@ function EstimateHub({ token, readonly = false }) {
                       <button type="button" disabled={busyId === est.estimate_id} onClick={() => approveForCustomer(est.estimate_id, est.job_id)} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.gold }}>
                         Approve for customer
                       </button>
+                      <button type="button" onClick={() => setEditTarget({ job: jobs.find(j => j.job_id === est.job_id), estimate: est })} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.accent }}>
+                        Edit line items
+                      </button>
                     </div>
                   )}
                 </div>
                 {isOpen && (
                   <div style={{ marginTop: 12 }}>
                     {est.field_notes && <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8 }}><strong>Site notes:</strong> {est.field_notes}</div>}
+                    {est.line_items && est.line_items.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: theme.primary, marginBottom: 6 }}>Line items</div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                              <th style={{ textAlign: "left", padding: "4px 8px", color: theme.textSecondary, fontWeight: 600 }}>Work type</th>
+                              <th style={{ textAlign: "right", padding: "4px 8px", color: theme.textSecondary, fontWeight: 600 }}>Hours</th>
+                              <th style={{ textAlign: "right", padding: "4px 8px", color: theme.textSecondary, fontWeight: 600 }}>Labour</th>
+                              <th style={{ textAlign: "right", padding: "4px 8px", color: theme.textSecondary, fontWeight: 600 }}>Materials</th>
+                              <th style={{ textAlign: "right", padding: "4px 8px", color: theme.textSecondary, fontWeight: 600 }}>Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {est.line_items.map((li, i) => (
+                              <tr key={i} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                                <td style={{ padding: "6px 8px", color: theme.textPrimary }}>{li.description}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", color: theme.textSecondary }}>{Number(li.estimated_hours || 0).toFixed(1)}h</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", color: theme.textSecondary }}>${fmt(li.labor_cost || 0)}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", color: theme.textSecondary }}>${fmt(li.material_cost || 0)}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600, color: theme.primary }}>${fmt((li.labor_cost || 0) + (li.material_cost || 0))}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <td colSpan={4} style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: theme.primary }}>Total</td>
+                              <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: theme.primary }}>${fmt(est.total_cost || 0)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
                     {!readonly && (
                       <div style={{ marginBottom: 10 }}>
                         <input style={styles.input} placeholder="Reason if returning to crew (optional)" value={returnReason} onChange={e => setReturnReason(e.target.value)} />
