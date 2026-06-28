@@ -1132,6 +1132,7 @@ function SignUp({ onCheckEmail, onBack }) {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
 
   function validate() {
     const e = {};
@@ -1153,7 +1154,8 @@ function SignUp({ onCheckEmail, onBack }) {
     if (!validate()) return;
     setLoading(true);
     const params = new URLSearchParams({ first_name: form.first_name, last_name: form.last_name, company_name: form.company_name, email: form.email, password: form.password });
-    const response = await fetch(`${API}/signup?${params}`, { method: "POST" });
+    const signupUrl = `${API}/signup?${params}${promoCode.trim() ? `&promo_code=${encodeURIComponent(promoCode.trim())}` : ""}`;
+    const response = await fetch(signupUrl, { method: "POST" });
     setLoading(false);
     if (response.ok) {
       onCheckEmail(form.email);
@@ -1224,6 +1226,18 @@ function SignUp({ onCheckEmail, onBack }) {
             </label>
           </div>
           {errors.terms && <p style={styles.errorMsg}>{errors.terms}</p>}
+
+          <div style={{ marginTop: 12 }}>
+            <label style={styles.label}>Promo code (optional)</label>
+            <input
+              style={styles.input}
+              type="text"
+              placeholder="e.g. DEMO2026"
+              value={promoCode}
+              onChange={e => setPromoCode(e.target.value.toUpperCase())}
+              autoCapitalize="characters"
+            />
+          </div>
 
           <button style={{...styles.button, marginTop: "16px", backgroundColor: theme.accent, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"}} type="submit" disabled={loading}>
             {loading ? <><Spinner /> Creating account...</> : "Create Free Account"}
