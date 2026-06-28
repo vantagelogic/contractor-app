@@ -9745,7 +9745,7 @@ function EstimateHub({ token, readonly = false }) {
       {actionMsg && <div style={{ ...styles.card, backgroundColor: theme.accentLight, border: `1px solid ${theme.accent}`, fontSize: 13, color: theme.primary, marginBottom: 16, padding: "14px 16px" }}>{actionMsg}</div>}
       {actionErr && <p style={{ ...styles.errorMsg, marginBottom: 16 }}>{actionErr}</p>}
 
-      {jobs.length > 0 ? (
+      {jobs.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <label style={{ ...styles.label, marginTop: 0 }}>Browse {T.projects.toLowerCase()}</label>
           <select style={styles.input} value={selectedJobId || ""} onChange={e => setSelectedJobId(e.target.value ? parseInt(e.target.value, 10) : null)}>
@@ -9763,11 +9763,6 @@ function EstimateHub({ token, readonly = false }) {
             Optional — pick a {T.project.toLowerCase()} to view past estimates, or use AI below to start fresh.
           </p>
         </div>
-      ) : (
-        <EmptyStateCard
-          title={`No ${T.projects.toLowerCase()} yet`}
-          description={"Go to Projects and create a project first — then come back here to build an estimate for it."}
-        />
       )}
 
       {!readonly && (
@@ -9775,7 +9770,7 @@ function EstimateHub({ token, readonly = false }) {
           <ScreenActionButton variant="gold" onClick={() => setAiOpen(v => !v)}>
             {aiOpen ? "Hide AI generator" : "Generate with AI"}
           </ScreenActionButton>
-          <ScreenActionButton variant="accent" onClick={() => jobs.length === 0 ? alert("Create a project on the Projects screen first, then come back to create an estimate.") : setFormOpen(true)}>+ New estimate</ScreenActionButton>
+          <ScreenActionButton variant="accent" onClick={() => setFormOpen(true)}>+ New estimate</ScreenActionButton>
         </ScreenActionBar>
       )}
 
