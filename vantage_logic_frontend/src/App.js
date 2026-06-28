@@ -9766,7 +9766,7 @@ function EstimateHub({ token, readonly = false }) {
       ) : (
         <EmptyStateCard
           title={`No ${T.projects.toLowerCase()} yet`}
-          description={`Use Generate with AI below to describe a job — we'll create the project and draft an estimate for you.`}
+          description={"Go to Projects and create a project first — then come back here to build an estimate for it."}
         />
       )}
 
@@ -9775,7 +9775,7 @@ function EstimateHub({ token, readonly = false }) {
           <ScreenActionButton variant="gold" onClick={() => setAiOpen(v => !v)}>
             {aiOpen ? "Hide AI generator" : "Generate with AI"}
           </ScreenActionButton>
-          <ScreenActionButton variant="accent" onClick={() => setFormOpen(true)} disabled={jobs.length === 0}>+ New estimate</ScreenActionButton>
+          <ScreenActionButton variant="accent" onClick={() => jobs.length === 0 ? alert("Create a project on the Projects screen first, then come back to create an estimate.") : setFormOpen(true)}>+ New estimate</ScreenActionButton>
         </ScreenActionBar>
       )}
 
