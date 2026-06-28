@@ -9481,6 +9481,8 @@ function EstimateHub({ token, readonly = false }) {
   const [pendingReview, setPendingReview] = useState([]);
   const [reviewOpen, setReviewOpen] = useState(null);
   const [returnReason, setReturnReason] = useState("");
+  const [editingJobName, setEditingJobName] = useState(null);
+  const [jobNameDraft, setJobNameDraft] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
   const pendingSectionRef = useRef(null);
 
@@ -9845,6 +9847,40 @@ function EstimateHub({ token, readonly = false }) {
                 </div>
                 {isOpen && (
                   <div style={{ marginTop: 12 }}>
+                    <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      {editingJobName === est.estimate_id ? (
+                        <>
+                          <input
+                            style={{ ...styles.input, marginBottom: 0, flex: 1 }}
+                            value={jobNameDraft}
+                            onChange={e => setJobNameDraft(e.target.value)}
+                            placeholder="Project name"
+                          />
+                          <button type="button" onClick={async () => {
+                            await apiFetch(`${API}/jobs/${est.job_id}`, {
+                              method: "PATCH",
+                              headers: { ...headers, "Content-Type": "application/json" },
+                              body: JSON.stringify({ job_name: jobNameDraft.trim() }),
+                            });
+                            setEditingJobName(null);
+                            loadPendingReview();
+                            refreshJobs();
+                          }} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 12px" }}>
+                            Save
+                          </button>
+                          <button type="button" onClick={() => setEditingJobName(null)} style={{ ...styles.button, marginTop: 0, fontSize: 12, padding: "8px 12px", backgroundColor: "#888" }}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: theme.primary, flex: 1 }}>{est.job_name || est.title}</div>
+                          <button type="button" onClick={() => { setEditingJobName(est.estimate_id); setJobNameDraft(est.job_name || ""); }} style={{ fontSize: 11, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontFamily: font.body, fontWeight: 600 }}>
+                            Edit name
+                          </button>
+                        </>
+                      )}
+                    </div>
                     {est.field_notes && <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8 }}><strong>Site notes:</strong> {est.field_notes}</div>}
                     {est.line_items && est.line_items.length > 0 && (
                       <div style={{ marginBottom: 12 }}>
