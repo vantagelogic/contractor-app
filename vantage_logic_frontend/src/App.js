@@ -8942,6 +8942,7 @@ function FieldEstimateScreen({ token, readonly = false }) {
   const [costCodes, setCostCodes] = useState([]);
   const [rows, setRows] = useState([]);
   const [selectedJobId, setSelectedJobId] = useState("");
+  const [newProjectName, setNewProjectName] = useState("");
   const [fieldNotes, setFieldNotes] = useState("");
   const [scopeSummary, setScopeSummary] = useState("");
   const [mileageKm, setMileageKm] = useState("");
@@ -9067,7 +9068,9 @@ function FieldEstimateScreen({ token, readonly = false }) {
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
-            job_id: parseInt(selectedJobId, 10),
+            ...(selectedJobId === "__new__"
+              ? { job_id: null, client_name: newProjectName.trim() }
+              : { job_id: parseInt(selectedJobId, 10) }),
             ...metaPayload,
             line_items: lineItems.length ? lineItems : undefined,
           }),
@@ -9253,12 +9256,21 @@ function FieldEstimateScreen({ token, readonly = false }) {
                   disabled={readOnly}
                 >
                   <option value="">{T.selectProject}…</option>
+                  <option value="__new__">+ New project (type name below)</option>
                   {jobs.map(j => (
                     <option key={j.job_id} value={j.job_id}>
                       {j.job_name}{j.city ? ` — ${j.city}` : ""}
                     </option>
                   ))}
                 </select>
+                {selectedJobId === "__new__" && (
+                  <input
+                    style={{ ...styles.input, marginTop: 8 }}
+                    placeholder="Client / project name e.g. Henderson North Van"
+                    value={newProjectName}
+                    onChange={e => setNewProjectName(e.target.value)}
+                  />
+                )}
                 {selectedJob && (
                   <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, backgroundColor: theme.bg, border: `1px solid ${theme.border}` }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>Office setup (read-only)</div>
