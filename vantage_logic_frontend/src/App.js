@@ -8460,11 +8460,19 @@ function CreateEstimateForm({ token, onDone, onCancel, initialJob = null, initia
         </p>
       </div>
 
-      <button type="button" disabled={saving} onClick={prepareForReview} style={{ ...styles.button, backgroundColor: theme.accent }}>
-        {saving ? "Preparing preview…" : savedEstimate ? "Save changes & review" : "Continue to review"}
-      </button>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button type="button" disabled={saving} onClick={async () => {
+          const saved = await saveEstimateDraft();
+          if (saved) onDone(saved.job);
+        }} style={{ ...styles.button, backgroundColor: theme.primary, flex: 1 }}>
+          {saving ? "Saving…" : "Save & close"}
+        </button>
+        <button type="button" disabled={saving} onClick={prepareForReview} style={{ ...styles.button, backgroundColor: theme.accent, flex: 1 }}>
+          {saving ? "Preparing preview…" : savedEstimate ? "Save & review to send" : "Continue to review"}
+        </button>
+      </div>
       <p style={{ fontSize: 12, color: theme.textSecondary, marginTop: 12 }}>
-        You will download the PDF and send it from your own Outlook or Gmail.
+        "Save & close" saves your changes and returns you to the list. "Save & review to send" lets you preview and email the PDF.
       </p>
     </div>
   );
