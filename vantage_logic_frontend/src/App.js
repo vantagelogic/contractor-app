@@ -9493,6 +9493,8 @@ function EstimateHub({ token, readonly = false }) {
   const [pendingReview, setPendingReview] = useState([]);
   const [reviewOpen, setReviewOpen] = useState(null);
   const [returnReason, setReturnReason] = useState("");
+  const [auditLog, setAuditLog] = useState({});
+  const [auditOpen, setAuditOpen] = useState({});
   const [editingJobName, setEditingJobName] = useState(null);
   const [jobNameDraft, setJobNameDraft] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
@@ -9523,6 +9525,14 @@ function EstimateHub({ token, readonly = false }) {
       .then(r => r.ok ? r.json() : [])
       .then(setPendingReview)
       .catch(() => setPendingReview([]));
+  }
+
+  async function loadAuditLog(estimateId) {
+    const res = await apiFetch(`${API}/estimates/${estimateId}/audit-log`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      setAuditLog(prev => ({ ...prev, [estimateId]: data }));
+    }
   }
 
   useEffect(() => { loadPendingReview(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -9928,8 +9938,34 @@ function EstimateHub({ token, readonly = false }) {
                       </div>
                     )}
                     {est.last_edited_by_name && (
-                      <div style={{ fontSize: 11, color: theme.textTertiary, marginBottom: 12 }}>
-                        Last edited by {est.last_edited_by_name}
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, color: theme.textTertiary, display: "flex", alignItems: "center", gap: 8 }}>
+                          Last edited by {est.last_edited_by_name}
+                          <button type="button" onClick={() => {
+                            const isOpenNow = auditOpen[est.estimate_id];
+                            setAuditOpen(prev => ({ ...prev, [est.estimate_id]: !isOpenNow }));
+                            if (!isOpenNow && !auditLog[est.estimate_id]) loadAuditLog(est.estimate_id);
+                          }} style={{ fontSize: 11, color: theme.accent, background: "none", border: "none", cursor: "pointer", fontFamily: font.body, fontWeight: 600, textDecoration: "underline" }}>
+                            {auditOpen[est.estimate_id] ? "Hide changes" : "View changes"}
+                          </button>
+                        </div>
+                        {auditOpen[est.estimate_id] && (
+                          <div style={{ marginTop: 8, padding: 10, background: theme.bg, borderRadius: 8, fontSize: 11 }}>
+                            {(auditLog[est.estimate_id] || []).length === 0 ? (
+                              <div style={{ color: theme.textTertiary }}>No changes recorded yet</div>
+                            ) : (
+                              (auditLog[est.estimate_id] || []).map(log => (
+                                <div key={log.audit_id} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: `1px solid ${theme.border}` }}>
+                                  <span style={{ fontWeight: 600, color: theme.primary }}>{log.changed_by_name}</span>
+                                  {log.field_changed === "hours" && <span> changed hours on "{log.line_item_description}" from {log.old_value}h to {log.new_value}h</span>}
+                                  {log.field_changed === "material_cost" && <span> changed materials on "{log.line_item_description}" from ${log.old_value} to ${log.new_value}</span>}
+                                  {log.field_changed === "line_item_added" && <span> added "{log.line_item_description}"</span>}
+                                  {log.field_changed === "line_item_removed" && <span> removed "{log.line_item_description}"</span>}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     {!readonly && (
