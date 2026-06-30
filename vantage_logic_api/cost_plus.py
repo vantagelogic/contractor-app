@@ -1071,6 +1071,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
         db.commit()
+        db.expire(estimate)
         db.refresh(estimate)
         return _serialize_estimate(db, estimate)
 
@@ -1151,6 +1152,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
             estimate.sent_at = None
         estimate.pdf_path = None
         db.commit()
+        db.expire(estimate)
         db.refresh(estimate)
         return _serialize_estimate(db, estimate)
 
@@ -1304,6 +1306,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
             _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
 
         db.commit()
+        db.expire(estimate)
         db.refresh(estimate)
         return _serialize_estimate(db, estimate)
 
@@ -1679,6 +1682,7 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
         estimate.pdf_path = None
         db.commit()
+        db.expire(estimate)
         db.refresh(estimate)
 
         return {
