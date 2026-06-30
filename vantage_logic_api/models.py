@@ -435,4 +435,5 @@ class SubcontractorSubmission(Base):
     file_url = Column(String(500))
     signature_name = Column(String(255))
     material_id = Column(Integer, ForeignKey("materials.material_id"), nullable=True)
+    estimate_id = Column(Integer, ForeignKey("estimates.estimate_id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())

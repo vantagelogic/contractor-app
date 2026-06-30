@@ -1228,6 +1228,17 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         db.commit()
         db.expire(estimate)
         db.refresh(estimate)
+        if not _is_owner_role(current_user) and estimate.status == "pending_review" and body.line_items is not None:
+            job = db.query(models.Job).filter(models.Job.job_id == estimate.job_id).first()
+            job_label = job.job_name if job else "Project"
+            editor_name = _user_display_name(db, current_user.user_id) or "Crew"
+            _notify_company_owners(
+                db, current_user.company_id, current_user.user_id,
+                "estimate_edited_after_submit",
+                "Subcontractor edited a submitted quote",
+                f"{editor_name} made changes to the {job_label} quote after submitting it. Review the updated numbers before approving.",
+                estimate.estimate_id, "estimate",
+            )
         return _serialize_estimate(db, estimate)
 
     @app.get("/estimates/{estimate_id}/pdf")
@@ -2062,7 +2073,7 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
         ).first()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-        if body.purpose not in ("invoice_upload", "lien_waiver"):
+        if body.purpose not in ("invoice_upload", "lien_waiver", "estimate_submit"):
             raise HTTPException(status_code=400, detail="Invalid purpose")
 
         token = secrets.token_urlsafe(32)
@@ -2139,6 +2150,20 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
             db.flush()
             material_id = mat.material_id
 
+        estimate_id_created = None
+        if link.purpose == "estimate_submit" and description:
+            new_estimate = models.Estimate(
+                company_id=link.company_id,
+                job_id=link.job_id,
+                title=f"Subcontractor Estimate — {sub_name or 'Subcontractor'}",
+                status="field_draft",
+                source="field",
+                scope_summary=description,
+            )
+            db.add(new_estimate)
+            db.flush()
+            estimate_id_created = new_estimate.estimate_id
+
         submission = models.SubcontractorSubmission(
             magic_link_id=link.magic_link_id,
             company_id=link.company_id,
@@ -2150,6 +2175,7 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
             file_url=file_url,
             signature_name=signature_name,
             material_id=material_id,
+            estimate_id=estimate_id_created,
         )
         link.used_at = datetime.utcnow()
         db.add(submission)
@@ -2163,6 +2189,14 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
                 f"{sub_name or 'Subcontractor'}: ${float(amount or 0):,.2f} on {job_label}",
                 link.job_id, "billing",
             )
+        elif link.purpose == "estimate_submit":
+            _notify_company_owners(
+                db, link.company_id, None,
+                "magic_link_submit",
+                "Subcontractor estimate submitted",
+                f"{sub_name or 'Subcontractor'} submitted a quote for {job_label} — open Estimates to review",
+                estimate_id_created or link.job_id, "estimate",
+            )
         else:
             _notify_company_owners(
                 db, link.company_id, None,
@@ -2172,4 +2206,4 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
                 link.job_id, "billing",
             )
         db.commit()
-        return {"message": "Submitted successfully", "material_id": material_id}
+        return {"message": "Submitted successfully", "material_id": material_id, "estimate_id": estimate_id_created}
