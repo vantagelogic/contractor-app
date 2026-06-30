@@ -1350,6 +1350,54 @@ def update_employee(
     db.refresh(emp)
     return emp
 
+@app.get("/me/employee-profile")
+def get_my_employee_profile(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.employee_id:
+        raise HTTPException(status_code=404, detail="No employee profile linked to this account")
+    emp = db.query(models.Employee).filter(
+        models.Employee.employee_id == current_user.employee_id,
+        models.Employee.company_id == current_user.company_id,
+    ).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee profile not found")
+    return {
+        "employee_id": emp.employee_id,
+        "first_name": emp.first_name,
+        "last_name": emp.last_name,
+        "phone": emp.phone,
+        "email": emp.email,
+        "worker_type": emp.worker_type,
+        "wcb_number": emp.wcb_number,
+        "gst_number": emp.gst_number,
+        "insurance_info": emp.insurance_info,
+        "payment_terms_days": emp.payment_terms_days,
+    }
+
+@app.patch("/me/employee-profile")
+def update_my_employee_profile(
+    body: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.employee_id:
+        raise HTTPException(status_code=404, detail="No employee profile linked to this account")
+    emp = db.query(models.Employee).filter(
+        models.Employee.employee_id == current_user.employee_id,
+        models.Employee.company_id == current_user.company_id,
+    ).first()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee profile not found")
+    allowed = ["phone", "wcb_number", "gst_number", "insurance_info"]
+    for k in allowed:
+        if k in body:
+            setattr(emp, k, body[k])
+    db.commit()
+    db.refresh(emp)
+    return {"ok": True}
+
 # =============================================
 # JOBS
 # =============================================

@@ -63,6 +63,10 @@ class Employee(Base):
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     worker_type = Column(String(20), default="employee", nullable=False)
+    wcb_number = Column(String(100), nullable=True)
+    gst_number = Column(String(100), nullable=True)
+    insurance_info = Column(String(255), nullable=True)
+    payment_terms_days = Column(Integer, nullable=True)
 
 class CostCode(Base):
     __tablename__ = "cost_codes"
