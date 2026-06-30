@@ -212,7 +212,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         if _is_owner_role(user):
             return estimate.status in ("draft", "sent", "field_draft", "pending_review")
         if user.role == "crew":
-            return estimate.status == "field_draft" and estimate.created_by == user.user_id
+            return estimate.status in ("field_draft", "pending_review") and estimate.created_by == user.user_id
         return False
 
     def _log_line_item_changes(db: Session, estimate: models.Estimate, old_lines: list, new_line_items: list, user_id: int | None):
