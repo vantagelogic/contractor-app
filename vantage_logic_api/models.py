@@ -306,6 +306,8 @@ class Estimate(Base):
     approved_at = Column(DateTime, nullable=True)
     approved_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    last_edited_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    last_edited_at = Column(DateTime, nullable=True)
     reviewed_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)

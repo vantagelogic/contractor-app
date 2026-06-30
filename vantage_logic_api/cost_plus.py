@@ -211,7 +211,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             return estimate.status == "field_draft" and estimate.created_by == user.user_id
         return False
 
-    def _apply_line_items(db: Session, estimate: models.Estimate, line_items: list[EstimateLineIn]):
+    def _apply_line_items(db: Session, estimate: models.Estimate, line_items: list[EstimateLineIn], edited_by_user_id: int | None = None):
         db.query(models.EstimateLineItem).filter(
             models.EstimateLineItem.estimate_id == estimate.estimate_id
         ).delete()
@@ -229,6 +229,9 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
                 labor_cost=ln.labor_cost,
                 sort_order=i,
             ))
+        if edited_by_user_id:
+            estimate.last_edited_by = edited_by_user_id
+            estimate.last_edited_at = datetime.utcnow()
         db.flush()
 
     def _recalc_estimate_totals(db: Session, estimate: models.Estimate, company_id: int | None = None):
@@ -1144,7 +1147,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         if body.line_items is not None:
             if not body.line_items:
                 raise HTTPException(status_code=400, detail="At least one line item is required")
-            _apply_line_items(db, estimate, body.line_items)
+            _apply_line_items(db, estimate, body.line_items, current_user.user_id)
 
         _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
@@ -1302,7 +1305,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
         db.flush()
 
         if body.line_items:
-            _apply_line_items(db, estimate, body.line_items)
+            _apply_line_items(db, estimate, body.line_items, current_user.user_id)
             _recalc_estimate_totals(db, estimate, current_user.company_id)
             _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
 
@@ -1678,7 +1681,7 @@ Use conservative hours. Only use cost_code_id values from the list. Include 2-8 
 
         if parsed.get("scope_summary"):
             estimate.scope_summary = parsed["scope_summary"]
-        _apply_line_items(db, estimate, line_items)
+        _apply_line_items(db, estimate, line_items, current_user.user_id)
         _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
         estimate.pdf_path = None
