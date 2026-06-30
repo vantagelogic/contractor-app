@@ -271,8 +271,10 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         old_lines = db.query(models.EstimateLineItem).filter(
             models.EstimateLineItem.estimate_id == estimate.estimate_id
         ).all()
+        print(f"DEBUG AUDIT: old_lines count = {len(old_lines)}, edited_by_user_id = {edited_by_user_id}")
         if edited_by_user_id and old_lines:
             _log_line_item_changes(db, estimate, old_lines, line_items, edited_by_user_id)
+            print(f"DEBUG AUDIT: called _log_line_item_changes")
         db.query(models.EstimateLineItem).filter(
             models.EstimateLineItem.estimate_id == estimate.estimate_id
         ).delete()
