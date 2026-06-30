@@ -9839,7 +9839,7 @@ function EstimateHub({ token, readonly = false }) {
                         : est.created_by_name
                           ? `${est.created_by_name} submitted this site quote for your approval`
                           : "Crew submitted this site quote — approve to send to customer or return with notes"}
-                      {" · "}${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))} · {Number(est.total_hours || 0).toFixed(1)}h
+                      {" · "}${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))} · {Number((est.line_items || []).reduce((sum, li) => sum + (li.estimated_hours || 0) * (li.quantity || 1), 0)).toFixed(1)}h
                     </div>
                     {est.scope_summary && <div style={{ fontSize: 12, color: theme.textPrimary, marginTop: 6, lineHeight: 1.45 }}>{est.scope_summary}</div>}
                   </div>
@@ -11643,7 +11643,7 @@ function HomeAttentionActions({ setView, briefingData, notifBadges, token }) {
         key: `est-${est.estimate_id}`,
         action: () => goToEstimate(est.estimate_id),
         label: `Site quote: ${est.job_name}`,
-        hint: `${est.created_by_name} submitted $${fmt(est.total_cost)} — open Estimates to approve`,
+        hint: `${est.created_by_name} submitted $${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))} — open Estimates to approve`,
         tone: "gold",
       });
     });
