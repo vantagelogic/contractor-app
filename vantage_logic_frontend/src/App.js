@@ -6890,11 +6890,81 @@ function ProfileSettingsForm({ token, role, showCompany = false }) {
   );
 }
 
+function SubcontractorInfoSection({ token }) {
+  const [profile, setProfile] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({});
+  const [saving, setSaving] = useState(false);
+  const headers = { Authorization: `Bearer ${token}` };
+
+  useEffect(() => {
+    apiFetch(`${API}/me/employee-profile`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(setProfile)
+      .catch(() => setProfile(null));
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!profile || profile.worker_type !== "contractor") return null;
+
+  const missing = [];
+  if (!profile.wcb_number) missing.push("WCB number");
+  if (!profile.gst_number) missing.push("GST number");
+  if (!profile.insurance_info) missing.push("Insurance info");
+
+  async function save() {
+    setSaving(true);
+    await apiFetch(`${API}/me/employee-profile`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+    });
+    const fresh = await apiFetch(`${API}/me/employee-profile`, { headers }).then(r => r.json());
+    setProfile(fresh);
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <div style={{ ...styles.card, marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: theme.primary, marginBottom: 8 }}>Subcontractor info</div>
+      {missing.length > 0 && !editing && (
+        <div style={{ fontSize: 12, color: theme.danger, marginBottom: 10 }}>
+          Missing: {missing.join(", ")} — the office may need this for payment.
+        </div>
+      )}
+      {editing ? (
+        <>
+          <label style={styles.label}>WCB number</label>
+          <input style={styles.input} value={draft.wcb_number ?? profile.wcb_number ?? ""} onChange={e => setDraft(d => ({ ...d, wcb_number: e.target.value }))} />
+          <label style={styles.label}>GST number</label>
+          <input style={styles.input} value={draft.gst_number ?? profile.gst_number ?? ""} onChange={e => setDraft(d => ({ ...d, gst_number: e.target.value }))} />
+          <label style={styles.label}>Insurance info</label>
+          <input style={styles.input} value={draft.insurance_info ?? profile.insurance_info ?? ""} onChange={e => setDraft(d => ({ ...d, insurance_info: e.target.value }))} />
+          <button type="button" disabled={saving} onClick={save} style={{ ...styles.button, marginTop: 10 }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 4 }}>WCB: {profile.wcb_number || "Not set"}</div>
+          <div style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 4 }}>GST: {profile.gst_number || "Not set"}</div>
+          <div style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 10 }}>Insurance: {profile.insurance_info || "Not set"}</div>
+          <button type="button" onClick={() => setEditing(true)} style={{ ...styles.button, backgroundColor: theme.accent }}>
+            Edit info
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SettingsScreen({ token, role, onLogout }) {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Settings</h1>
       <p style={styles.subtitle}>Manage your account and preferences</p>
+
+      <SubcontractorInfoSection token={token} />
 
       <div style={styles.card}>
         <div style={{ fontSize: "15px", fontWeight: "700", color: theme.primary, marginBottom: "16px", fontFamily: font.display }}>Your Profile</div>
