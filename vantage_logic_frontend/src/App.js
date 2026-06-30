@@ -10758,26 +10758,27 @@ function MagicLinkScreen({ token: linkToken }) {
       <GlobalStyles />
       <div style={styles.card}>
         <h2 style={{ ...styles.title, fontSize: 20 }}>Submitted</h2>
-        <p style={styles.subtitle}>Your {info.purpose === "lien_waiver" ? "lien waiver" : "invoice"} was received for {info.job_name}.</p>
+        <p style={styles.subtitle}>Your {info.purpose === "lien_waiver" ? "lien waiver" : info.purpose === "estimate_submit" ? "quote" : "invoice"} was received for {info.job_name}.</p>
       </div>
     </div>
   );
 
   const isWaiver = info.purpose === "lien_waiver";
+  const isEstimate = info.purpose === "estimate_submit";
 
   return (
     <div style={styles.container}>
       <GlobalStyles />
       <VantageLogo size={36} centered />
       <h1 style={{ ...styles.title, marginTop: 16, fontSize: 22 }}>{info.company_name}</h1>
-      <p style={styles.subtitle}>{info.job_name} — {isWaiver ? "Sign Lien Waiver" : "Submit Invoice"}</p>
+      <p style={styles.subtitle}>{info.job_name} — {isWaiver ? "Sign Lien Waiver" : isEstimate ? "Submit Your Quote" : "Submit Invoice"}</p>
       {error && <p style={styles.errorMsg}>{error}</p>}
 
       <form onSubmit={submit} style={styles.form}>
         <label style={styles.label}>Your Name</label>
         <input style={styles.input} value={name} onChange={e => setName(e.target.value)} required />
 
-        {!isWaiver && (
+        {!isWaiver && !isEstimate && (
           <>
             <label style={styles.label}>Invoice Amount ($)</label>
             <input style={styles.input} type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
@@ -10785,6 +10786,18 @@ function MagicLinkScreen({ token: linkToken }) {
             <input style={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. Plumbing rough-in" />
             <label style={styles.label}>Upload Invoice / Receipt</label>
             <input style={styles.input} type="file" accept="image/*,.pdf" onChange={e => setFile(e.target.files?.[0] || null)} />
+          </>
+        )}
+
+        {isEstimate && (
+          <>
+            <label style={styles.label}>Describe the job</label>
+            <textarea style={{ ...styles.input, minHeight: 100 }} value={description} onChange={e => setDescription(e.target.value)} required placeholder="What needs to be done? Include scope, materials, and estimated time." />
+            <label style={styles.label}>Your price for this job ($, optional)</label>
+            <input style={styles.input} type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Leave blank if office will price it" />
+            <p style={{ fontSize: 12, color: styles.subtitle.color, marginTop: -8, marginBottom: 8 }}>
+              Submit your scope and price. The office will review before it goes to the customer.
+            </p>
           </>
         )}
 
