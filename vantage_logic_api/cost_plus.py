@@ -229,6 +229,7 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
                 labor_cost=ln.labor_cost,
                 sort_order=i,
             ))
+        db.flush()
 
     def _recalc_estimate_totals(db: Session, estimate: models.Estimate, company_id: int | None = None):
         company = None
