@@ -9726,7 +9726,7 @@ function EstimateHub({ token, readonly = false }) {
                       <span style={{ fontSize: 13, color: theme.textPrimary, lineHeight: 1.45 }}>
                         <strong>{est.job_name || est.title || T.project}</strong>
                         {est.created_by_name ? ` — quote from ${est.created_by_name}` : " — crew site quote"}
-                        {unread ? <span style={{ display: "block", color: theme.danger, fontWeight: 600, marginTop: 4, fontSize: 12 }}>New message in thread — tap to read</span> : <span style={{ display: "block", color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>Ready for your review (${fmt(est.total_cost || 0)})</span>}
+                        {unread ? <span style={{ display: "block", color: theme.danger, fontWeight: 600, marginTop: 4, fontSize: 12 }}>New message in thread — tap to read</span> : <span style={{ display: "block", color: theme.textSecondary, marginTop: 4, fontSize: 12 }}>Ready for your review (${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))})</span>}
                       </span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: theme.gold, whiteSpace: "nowrap", flexShrink: 0 }}>Open →</span>
                     </button>
