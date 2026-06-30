@@ -9927,6 +9927,11 @@ function EstimateHub({ token, readonly = false }) {
                         </table>
                       </div>
                     )}
+                    {est.last_edited_by_name && (
+                      <div style={{ fontSize: 11, color: theme.textTertiary, marginBottom: 12 }}>
+                        Last edited by {est.last_edited_by_name}
+                      </div>
+                    )}
                     {!readonly && (
                       <div style={{ marginBottom: 10 }}>
                         <input style={styles.input} placeholder="Reason if returning to crew (optional)" value={returnReason} onChange={e => setReturnReason(e.target.value)} />
