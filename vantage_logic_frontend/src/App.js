@@ -5650,16 +5650,19 @@ function SettingsHub({ token, readonly = false, initialTab = "company", subTier 
             )}
             {activeEmps.length > 0 && (
               <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                {activeEmps.map(emp => (
+                {activeEmps.map(emp => {
+                  const missingDocs = emp.worker_type === "contractor" && (!emp.wcb_number || !emp.gst_number || !emp.insurance_info);
+                  return (
                   <Row key={emp.employee_id}
                     main={`${emp.first_name} ${emp.last_name}`}
-                    sub={`${emp.worker_type === "contractor" ? "Contractor" : "Employee"} · ${emp.role || "No role"} · $${emp.hourly_rate || 0}/hr`}
+                    sub={`${emp.worker_type === "contractor" ? "Contractor" : "Employee"} · ${emp.role || "No role"} · $${emp.hourly_rate || 0}/hr${missingDocs ? " · ⚠ Missing WCB/GST/insurance" : ""}`}
                     actions={[
                       <Btn key="e" label="Edit" bg={theme.accentLight} color={theme.accent} onClick={() => startEditEmp(emp)} />,
                       <Btn key="a" label="Archive" bg={theme.dangerLight} color={theme.danger} onClick={() => toggleEmployee(emp)} />
                     ]}
                   />
-                ))}
+                  );
+                })}
               </div>
             )}
             {inactiveEmps.length > 0 && (
