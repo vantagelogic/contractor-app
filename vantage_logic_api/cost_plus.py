@@ -1150,6 +1150,7 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
             if not body.line_items:
                 raise HTTPException(status_code=400, detail="At least one line item is required")
             _apply_line_items(db, estimate, body.line_items, current_user.user_id)
+            print(f"DEBUG: applied line items, last_edited_by set to {current_user.user_id}, estimate.last_edited_by is now {estimate.last_edited_by}")
 
         _recalc_estimate_totals(db, estimate, current_user.company_id)
         _add_mileage_to_estimate_total(db, estimate, current_user.company_id)
