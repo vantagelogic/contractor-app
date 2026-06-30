@@ -9839,7 +9839,7 @@ function EstimateHub({ token, readonly = false }) {
                         : est.created_by_name
                           ? `${est.created_by_name} submitted this site quote for your approval`
                           : "Crew submitted this site quote — approve to send to customer or return with notes"}
-                      {" · "}${fmt(est.total_cost || 0)} · {Number(est.total_hours || 0).toFixed(1)}h
+                      {" · "}${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))} · {Number(est.total_hours || 0).toFixed(1)}h
                     </div>
                     {est.scope_summary && <div style={{ fontSize: 12, color: theme.textPrimary, marginTop: 6, lineHeight: 1.45 }}>{est.scope_summary}</div>}
                   </div>
@@ -9914,14 +9914,14 @@ function EstimateHub({ token, readonly = false }) {
                                 <td style={{ padding: "6px 8px", textAlign: "right", color: theme.textSecondary }}>{Number(li.estimated_hours || 0).toFixed(1)}h</td>
                                 <td style={{ padding: "6px 8px", textAlign: "right", color: theme.textSecondary }}>${fmt(li.labor_cost || 0)}</td>
                                 <td style={{ padding: "6px 8px", textAlign: "right", color: theme.textSecondary }}>${fmt(li.material_cost || 0)}</td>
-                                <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600, color: theme.primary }}>${fmt((li.labor_cost || 0) + (li.material_cost || 0))}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600, color: theme.primary }}>${fmt(((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1))}</td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
                             <tr>
                               <td colSpan={4} style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: theme.primary }}>Total</td>
-                              <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: theme.primary }}>${fmt(est.total_cost || 0)}</td>
+                              <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: theme.primary }}>${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))}</td>
                             </tr>
                           </tfoot>
                         </table>
