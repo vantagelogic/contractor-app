@@ -318,6 +318,20 @@ class Estimate(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class EstimateAuditLog(Base):
+    __tablename__ = "estimate_audit_log"
+
+    audit_id = Column(Integer, primary_key=True, index=True)
+    estimate_id = Column(Integer, ForeignKey("estimates.estimate_id"), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.company_id"), nullable=False)
+    changed_by = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    field_changed = Column(String(100))
+    line_item_description = Column(String(255))
+    old_value = Column(String(255))
+    new_value = Column(String(255))
+    changed_at = Column(DateTime, server_default=func.now())
+
+
 class EstimateComment(Base):
     __tablename__ = "estimate_comments"
 

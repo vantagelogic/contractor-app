@@ -211,7 +211,68 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             return estimate.status == "field_draft" and estimate.created_by == user.user_id
         return False
 
+    def _log_line_item_changes(db: Session, estimate: models.Estimate, old_lines: list, new_line_items: list, user_id: int | None):
+        if not user_id:
+            return
+        old_by_desc = {ln.description: ln for ln in old_lines}
+        new_by_desc = {}
+        for ln in new_line_items:
+            cc = db.query(models.CostCode).filter(models.CostCode.cost_code_id == ln.cost_code_id).first() if ln.cost_code_id else None
+            desc = ln.description or (cc.description if cc else "Line item")
+            new_by_desc[desc] = ln
+
+        for desc, new_ln in new_by_desc.items():
+            old_ln = old_by_desc.get(desc)
+            if old_ln is None:
+                db.add(models.EstimateAuditLog(
+                    estimate_id=estimate.estimate_id,
+                    company_id=estimate.company_id,
+                    changed_by=user_id,
+                    field_changed="line_item_added",
+                    line_item_description=desc,
+                    old_value=None,
+                    new_value=f"{new_ln.estimated_hours}h, ${new_ln.material_cost} materials",
+                ))
+                continue
+            if float(old_ln.estimated_hours or 0) != float(new_ln.estimated_hours or 0):
+                db.add(models.EstimateAuditLog(
+                    estimate_id=estimate.estimate_id,
+                    company_id=estimate.company_id,
+                    changed_by=user_id,
+                    field_changed="hours",
+                    line_item_description=desc,
+                    old_value=str(old_ln.estimated_hours),
+                    new_value=str(new_ln.estimated_hours),
+                ))
+            if float(old_ln.material_cost or 0) != float(new_ln.material_cost or 0):
+                db.add(models.EstimateAuditLog(
+                    estimate_id=estimate.estimate_id,
+                    company_id=estimate.company_id,
+                    changed_by=user_id,
+                    field_changed="material_cost",
+                    line_item_description=desc,
+                    old_value=str(old_ln.material_cost),
+                    new_value=str(new_ln.material_cost),
+                ))
+
+        for desc in old_by_desc:
+            if desc not in new_by_desc:
+                db.add(models.EstimateAuditLog(
+                    estimate_id=estimate.estimate_id,
+                    company_id=estimate.company_id,
+                    changed_by=user_id,
+                    field_changed="line_item_removed",
+                    line_item_description=desc,
+                    old_value="removed",
+                    new_value=None,
+                ))
+
     def _apply_line_items(db: Session, estimate: models.Estimate, line_items: list[EstimateLineIn], edited_by_user_id: int | None = None):
+        old_lines = db.query(models.EstimateLineItem).filter(
+            models.EstimateLineItem.estimate_id == estimate.estimate_id
+        ).all()
+        if edited_by_user_id and old_lines:
+            _log_line_item_changes(db, estimate, old_lines, line_items, edited_by_user_id)
         db.query(models.EstimateLineItem).filter(
             models.EstimateLineItem.estimate_id == estimate.estimate_id
         ).delete()
@@ -1439,6 +1500,29 @@ Pick 2-8 templates that fit. quantity is usually 1 unless the scope clearly repe
                 "role": user.role if user else "unknown",
                 "created_at": str(c.created_at),
                 "is_mine": c.user_id == current_user.user_id,
+            })
+        return result
+
+    @app.get("/estimates/{estimate_id}/audit-log")
+    def get_estimate_audit_log(
+        estimate_id: int,
+        current_user: models.User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ):
+        _get_estimate(db, estimate_id, current_user.company_id)
+        logs = db.query(models.EstimateAuditLog).filter(
+            models.EstimateAuditLog.estimate_id == estimate_id
+        ).order_by(models.EstimateAuditLog.changed_at.desc()).all()
+        result = []
+        for log in logs:
+            result.append({
+                "audit_id": log.audit_id,
+                "changed_by_name": _user_display_name(db, log.changed_by) or "Unknown",
+                "field_changed": log.field_changed,
+                "line_item_description": log.line_item_description,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "changed_at": str(log.changed_at),
             })
         return result
 
