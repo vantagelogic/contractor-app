@@ -11643,7 +11643,7 @@ function HomeAttentionActions({ setView, briefingData, notifBadges, token }) {
         key: `est-${est.estimate_id}`,
         action: () => goToEstimate(est.estimate_id),
         label: `Site quote: ${est.job_name}`,
-        hint: `${est.created_by_name} submitted $${fmt((est.line_items || []).reduce((sum, li) => sum + ((li.labor_cost || 0) + (li.material_cost || 0)) * (li.quantity || 1), 0))} — open Estimates to approve`,
+        hint: `${est.created_by_name} submitted $${fmt(est.total_cost)} — open Estimates to approve`,
         tone: "gold",
       });
     });
