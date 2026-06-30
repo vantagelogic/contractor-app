@@ -178,10 +178,14 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
         user = db.query(models.User).filter(models.User.user_id == user_id).first()
         if not user:
             return None
+        if user.first_name or user.last_name:
+            return f"{user.first_name or ''} {user.last_name or ''}".strip()
         if user.employee_id:
             emp = db.query(models.Employee).filter(models.Employee.employee_id == user.employee_id).first()
             if emp:
                 return f"{emp.first_name} {emp.last_name}".strip()
+        if user.role in ("owner", "admin"):
+            return "Owner"
         return user.email
 
     def _is_owner_role(user) -> bool:
