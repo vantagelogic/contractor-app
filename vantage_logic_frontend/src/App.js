@@ -9579,6 +9579,10 @@ function EstimateHub({ token, readonly = false }) {
   const [editingJobName, setEditingJobName] = useState(null);
   const [jobNameDraft, setJobNameDraft] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
+  const [subLinkModal, setSubLinkModal] = useState(false);
+  const [subLinkJob, setSubLinkJob] = useState("");
+  const [subLinkName, setSubLinkName] = useState("");
+  const [subLinkResult, setSubLinkResult] = useState("");
   const pendingSectionRef = useRef(null);
 
   useHistoryOverlay(formOpen || !!editTarget, "estimate-form", () => { setFormOpen(false); setEditTarget(null); }, "estimate");
@@ -9614,6 +9618,19 @@ function EstimateHub({ token, readonly = false }) {
       const data = await res.json();
       setAuditLog(prev => ({ ...prev, [estimateId]: data }));
     }
+  }
+
+  async function createSubcontractorLink(jobId, subName) {
+    const res = await apiFetch(`${API}/jobs/${jobId}/magic-links`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ purpose: "estimate_submit", subcontractor_name: subName, expires_days: 14 }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.url;
+    }
+    return null;
   }
 
   useEffect(() => { loadPendingReview(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -9878,7 +9895,44 @@ function EstimateHub({ token, readonly = false }) {
             {aiOpen ? "Hide AI generator" : "Generate with AI"}
           </ScreenActionButton>
           <ScreenActionButton variant="accent" onClick={() => setFormOpen(true)}>+ New estimate</ScreenActionButton>
+          <ScreenActionButton variant="secondary" onClick={() => setSubLinkModal(true)}>Send link to subcontractor</ScreenActionButton>
         </ScreenActionBar>
+      )}
+
+      {subLinkModal && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, width: "min(400px, 90vw)" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: theme.primary, marginBottom: 12 }}>Send estimate link to subcontractor</div>
+            {!subLinkResult ? (
+              <>
+                <label style={styles.label}>Project</label>
+                <select style={styles.input} value={subLinkJob} onChange={e => setSubLinkJob(e.target.value)}>
+                  <option value="">Select project...</option>
+                  {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.job_name}</option>)}
+                </select>
+                <label style={styles.label}>Subcontractor name (optional)</label>
+                <input style={styles.input} value={subLinkName} onChange={e => setSubLinkName(e.target.value)} placeholder="e.g. Dave's Painting" />
+                <button type="button" disabled={!subLinkJob} onClick={async () => {
+                  const url = await createSubcontractorLink(subLinkJob, subLinkName);
+                  if (url) setSubLinkResult(url);
+                }} style={{ ...styles.button, marginTop: 12 }}>
+                  Generate link
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 8 }}>Send this link to your subcontractor. No account needed.</div>
+                <div style={{ padding: 10, background: theme.bg, borderRadius: 8, fontSize: 12, wordBreak: "break-all", marginBottom: 10 }}>{subLinkResult}</div>
+                <button type="button" onClick={() => { navigator.clipboard.writeText(subLinkResult); }} style={{ ...styles.button, backgroundColor: theme.accent }}>
+                  Copy link
+                </button>
+              </>
+            )}
+            <button type="button" onClick={() => { setSubLinkModal(false); setSubLinkResult(""); setSubLinkJob(""); setSubLinkName(""); }} style={{ ...styles.button, backgroundColor: "#888", marginTop: 10 }}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {aiOpen && (
