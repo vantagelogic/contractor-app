@@ -9682,6 +9682,7 @@ function EstimateHub({ token, readonly = false }) {
     const estimate = editTarget?.estimate || null;
     const prefillEstimate = editTarget?.prefillEstimate || null;
     const aiHints = editTarget?.aiHints || null;
+    const quickEdit = editTarget?.quickEdit || false;
     return (
       <CreateEstimateForm
         token={token}
@@ -9689,6 +9690,7 @@ function EstimateHub({ token, readonly = false }) {
         initialEstimate={estimate}
         prefillEstimate={prefillEstimate}
         initialAiHints={aiHints}
+        quickEdit={quickEdit}
         onDone={(j) => {
           refreshJobs();
           setSelectedJobId(j.job_id);
@@ -9861,7 +9863,7 @@ function EstimateHub({ token, readonly = false }) {
                       <button type="button" disabled={busyId === est.estimate_id} onClick={() => approveForCustomer(est.estimate_id, est.job_id)} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.gold }}>
                         Approve for customer
                       </button>
-                      <button type="button" onClick={() => setEditTarget({ job: jobs.find(j => j.job_id === est.job_id), estimate: est })} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.accent }}>
+                      <button type="button" onClick={() => setEditTarget({ job: jobs.find(j => j.job_id === est.job_id), estimate: est, quickEdit: true })} style={{ ...styles.button, marginTop: 0, fontSize: 11, padding: "6px 10px", backgroundColor: theme.accent }}>
                         Edit line items
                       </button>
                     </div>
