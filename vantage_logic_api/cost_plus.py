@@ -316,6 +316,8 @@ def register_cost_plus_routes(app, get_db, get_current_user, require_owner, time
             "rejection_reason": getattr(estimate, "rejection_reason", None),
             "created_by": getattr(estimate, "created_by", None),
             "created_by_name": _user_display_name(db, getattr(estimate, "created_by", None)),
+            "last_edited_by_name": _user_display_name(db, getattr(estimate, "last_edited_by", None)),
+            "last_edited_at": str(estimate.last_edited_at) if getattr(estimate, "last_edited_at", None) else None,
             "reviewed_by": getattr(estimate, "reviewed_by", None),
             "reviewed_at": str(estimate.reviewed_at) if getattr(estimate, "reviewed_at", None) else None,
             "submitted_at": str(estimate.submitted_at) if getattr(estimate, "submitted_at", None) else None,
