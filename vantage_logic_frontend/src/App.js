@@ -3022,6 +3022,8 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
   const [imageFile, setImageFile] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
 
   const UNITS = ["each", "box", "roll", "litre", "kg", "metre", "sheet", "bag", "pail", "tube"];
   const h = { Authorization: `Bearer ${token}` };
@@ -3115,6 +3117,29 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
       showMsg("Item added."); setForm({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "", item_type: "" }); setShowForm(false); loadItems();
     }
     else showMsg("Failed to add item.");
+  }
+
+  async function handleCsvImport(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportMsg("");
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await apiFetch(`${API}/inventory/import-csv`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    setImporting(false);
+    if (res.ok) {
+      const data = await res.json();
+      setImportMsg(`Imported ${data.created} items${data.skipped ? `, skipped ${data.skipped}` : ""}.`);
+      loadItems();
+    } else {
+      setImportMsg("Import failed — check your CSV format.");
+    }
+    e.target.value = "";
   }
 
   async function uploadItemImage(id, file) {
@@ -3219,9 +3244,18 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
       )}
 
       {!showForm ? (
-        <button onClick={() => setShowForm(true)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: theme.accent, width: "100%" }}>
-          + Add Item
-        </button>
+        <>
+          <button onClick={() => setShowForm(true)} style={{ ...styles.button, marginTop: 0, marginBottom: "16px", backgroundColor: theme.accent, width: "100%" }}>
+            + Add Item
+          </button>
+          {!readonly && (
+            <label style={{ ...styles.button, backgroundColor: theme.primary, cursor: "pointer", marginTop: 0, display: "inline-block" }}>
+              {importing ? "Importing…" : "Import CSV"}
+              <input type="file" accept=".csv" style={{ display: "none" }} onChange={handleCsvImport} disabled={importing} />
+            </label>
+          )}
+          {importMsg && <div style={{ fontSize: 12, color: theme.textSecondary, marginTop: 6 }}>{importMsg}</div>}
+        </>
       ) : (
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
           <button onClick={() => setShowForm(false)} style={{ ...styles.button, marginTop: 0, flex: 1, backgroundColor: "#888" }}>Cancel</button>

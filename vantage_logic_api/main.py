@@ -3086,6 +3086,76 @@ def create_inventory_item(
     db.refresh(item)
     return item
 
+@app.post("/inventory/import-csv")
+async def import_inventory_csv(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    import csv, io
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    headers = [h.strip().lower() for h in (reader.fieldnames or [])]
+
+    def find_col(row, *candidates):
+        for c in candidates:
+            for k in row:
+                if k.strip().lower() == c:
+                    return row[k].strip() if row[k] else ""
+        return ""
+
+    created = 0
+    skipped = 0
+    errors = []
+
+    for i, row in enumerate(reader, start=2):
+        name = find_col(row, "name", "item", "description", "product")
+        if not name:
+            skipped += 1
+            continue
+        unit = find_col(row, "unit", "uom", "units") or "each"
+        try:
+            purchase_price = float(find_col(row, "purchase_price", "cost", "price", "unit_cost", "buy_price") or 0) or None
+        except ValueError:
+            purchase_price = None
+        try:
+            charge_out_price = float(find_col(row, "charge_out_price", "sell_price", "selling_price", "sale_price") or 0) or None
+        except ValueError:
+            charge_out_price = None
+        try:
+            quantity = float(find_col(row, "quantity", "qty", "stock") or 0)
+        except ValueError:
+            quantity = 0
+        markup_pct_str = find_col(row, "markup", "markup_percent", "markup_%")
+        if markup_pct_str and purchase_price and not charge_out_price:
+            try:
+                pct = float(markup_pct_str)
+                charge_out_price = round(purchase_price * (1 + pct / 100), 2)
+            except ValueError:
+                pass
+        notes = find_col(row, "notes", "note", "comments")
+        item_type = find_col(row, "category", "type", "item_type")
+
+        db.add(models.Inventory(
+            company_id=current_user.company_id,
+            name=name,
+            unit=unit,
+            quantity=quantity,
+            purchase_price=purchase_price,
+            charge_out_price=charge_out_price,
+            notes=notes,
+            item_type=item_type,
+        ))
+        created += 1
+
+    db.commit()
+    return {"created": created, "skipped": skipped, "errors": errors}
+
 @app.patch("/inventory/{inventory_id}")
 def update_inventory_item(
     inventory_id: int,
