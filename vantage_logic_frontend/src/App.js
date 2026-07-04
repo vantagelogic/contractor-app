@@ -3017,7 +3017,7 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
   const [assignForm, setAssignForm] = useState({ job_id: "", quantity: "", cost_code_id: "", notes: "" });
   const [assignErrors, setAssignErrors] = useState({});
   const [assigning, setAssigning] = useState(false);
-  const [form, setForm] = useState({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "", item_type: "" });
+  const [form, setForm] = useState({ name: "", unit: "each", quantity: "", purchase_price: "", charge_out_price: "", notes: "", item_type: "", markup_percent: "" });
   const [editForm, setEditForm] = useState({});
   const [imageFile, setImageFile] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
@@ -3257,9 +3257,28 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
             </div>
             <div>
               <label style={styles.label}>Purchase Price</label>
-              <input style={styles.input} type="number" step="0.01" placeholder="$0.00" value={form.purchase_price} onChange={e => setForm({...form, purchase_price: e.target.value})} />
+              <input style={styles.input} type="number" step="0.01" placeholder="$0.00" value={form.purchase_price} onChange={e => {
+                const base = parseFloat(e.target.value) || 0;
+                const pct = parseFloat(form.markup_percent) || 0;
+                const chargeOut = base > 0 && pct > 0 ? (base * (1 + pct / 100)).toFixed(2) : form.charge_out_price;
+                setForm(f => ({ ...f, purchase_price: e.target.value, charge_out_price: chargeOut }));
+              }} />
             </div>
             <div>
+              <label style={styles.label}>Markup % (optional)</label>
+              <input
+                style={styles.input}
+                type="number"
+                min="0"
+                placeholder="e.g. 20 for 20% markup"
+                value={form.markup_percent}
+                onChange={e => {
+                  const pct = parseFloat(e.target.value) || 0;
+                  const base = parseFloat(form.purchase_price) || 0;
+                  const chargeOut = base > 0 && pct > 0 ? (base * (1 + pct / 100)).toFixed(2) : form.charge_out_price;
+                  setForm(f => ({ ...f, markup_percent: e.target.value, charge_out_price: chargeOut }));
+                }}
+              />
               <label style={styles.label}>Charge-Out Price</label>
               <input style={styles.input} type="number" step="0.01" placeholder="$0.00" value={form.charge_out_price} onChange={e => setForm({...form, charge_out_price: e.target.value})} />
             </div>
@@ -3320,7 +3339,13 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
                       {!readonly && parseFloat(item.quantity || 0) > 0 && (
                         <button onClick={() => openAssign(item)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.goldLight, color: "#7c5518", fontWeight: "700", fontFamily: font.body }}>Assign</button>
                       )}
-                      <button onClick={() => { setEditingId(item.inventory_id); setEditForm({ name: item.name, unit: item.unit, quantity: String(item.quantity || 0), purchase_price: String(item.purchase_price || ""), charge_out_price: String(item.charge_out_price || ""), item_type: item.item_type || "" }); }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
+                      <button onClick={() => {
+                        const existingMarkup = item.purchase_price && item.charge_out_price
+                          ? (((item.charge_out_price / item.purchase_price) - 1) * 100).toFixed(1)
+                          : "";
+                        setEditingId(item.inventory_id);
+                        setEditForm({ ...item, markup_percent: existingMarkup });
+                      }} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.accentLight, color: theme.accent, fontWeight: "600", fontFamily: font.body }}>Edit</button>
                       <button onClick={() => handleRemove(item.inventory_id, item.name)} style={{ fontSize: "11px", padding: "5px 10px", borderRadius: "5px", border: "none", cursor: "pointer", backgroundColor: theme.dangerLight, color: theme.danger, fontWeight: "600", fontFamily: font.body }}>Remove</button>
                     </div>
                   </div>
@@ -3331,7 +3356,24 @@ function InventoryScreen({ token, readonly = false, embedded = false }) {
                       <div><label style={styles.label}>Unit</label><select style={{...styles.input, marginTop: "4px"}} value={editForm.unit} onChange={e => setEditForm({...editForm, unit: e.target.value})}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
                       <div><label style={styles.label}>Qty on Hand</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: e.target.value})} /></div>
                       <div><label style={styles.label}>Purchase Price</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.purchase_price} onChange={e => setEditForm({...editForm, purchase_price: e.target.value})} /></div>
-                      <div><label style={styles.label}>Charge-Out Price</label><input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.charge_out_price} onChange={e => setEditForm({...editForm, charge_out_price: e.target.value})} /></div>
+                      <div>
+                        <label style={styles.label}>Markup % (optional)</label>
+                        <input
+                          style={{...styles.input, marginTop: "4px"}}
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 20 for 20% markup"
+                          value={editForm.markup_percent || ""}
+                          onChange={e => {
+                            const pct = parseFloat(e.target.value) || 0;
+                            const base = parseFloat(editForm.purchase_price) || 0;
+                            const chargeOut = base > 0 && pct > 0 ? (base * (1 + pct / 100)).toFixed(2) : editForm.charge_out_price;
+                            setEditForm(f => ({ ...f, markup_percent: e.target.value, charge_out_price: chargeOut }));
+                          }}
+                        />
+                        <label style={styles.label}>Charge-Out Price</label>
+                        <input style={{...styles.input, marginTop: "4px"}} type="number" step="0.01" value={editForm.charge_out_price} onChange={e => setEditForm({...editForm, charge_out_price: e.target.value})} />
+                      </div>
                     </div>
                     <label style={styles.label}>Category</label>
                     <select style={{ ...styles.input, marginBottom: 8 }} value={editForm.item_type || ""} onChange={e => setEditForm({ ...editForm, item_type: e.target.value })}>
